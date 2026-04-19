@@ -1,0 +1,82 @@
+name: test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+        node-version: ["22"]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Cache pip downloads
+        if: ${{ hashFiles('requirements*.txt', 'pyproject.toml', 'poetry.lock') != '' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-test-${{ hashFiles('requirements*.txt', 'pyproject.toml', 'poetry.lock') }}
+
+      - name: Cache npm packages
+        if: ${{ hashFiles('package-lock.json', 'frontend/package-lock.json') != '' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-test-${{ hashFiles('package-lock.json', 'frontend/package-lock.json') }}
+
+      - name: Install pytest
+        shell: bash
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Run pytest
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -d tests || git ls-files 'test_*.py' '*_test.py' | grep -q .; then
+            pytest
+          else
+            echo "No Python tests yet; skipping pytest."
+          fi
+
+      - name: Install Node dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f package-lock.json; then
+            npm ci
+          elif test -f package.json; then
+            npm install
+          else
+            echo "No Node package manifest at repo root; skipping install."
+          fi
+
+      - name: Run vitest
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f package.json && git ls-files '*.test.ts' '*.test.tsx' '*.spec.ts' '*.spec.tsx' | grep -q .; then
+            npx vitest run
+          else
+            echo "No Vitest suite yet; skipping vitest."
+          fi
