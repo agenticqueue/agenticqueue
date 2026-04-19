@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 
-
 DEFAULT_DATABASE_URL = (
     "postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:54329/agenticqueue"
 )

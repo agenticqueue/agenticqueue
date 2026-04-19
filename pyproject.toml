@@ -22,3 +22,6 @@ packages = ["apps/api/src/agenticqueue_api"]
 [tool.pytest.ini_options]
 pythonpath = ["apps/api/src"]
 testpaths = ["tests"]
+
+[tool.black]
+target-version = ["py312"]

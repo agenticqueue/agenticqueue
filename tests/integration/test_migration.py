@@ -9,7 +9,6 @@ from alembic.script import ScriptDirectory
 
 from agenticqueue_api.config import get_sync_database_url
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_CONFIG_PATH = REPO_ROOT / "apps" / "api" / "alembic.ini"
 

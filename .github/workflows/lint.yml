@@ -42,7 +42,7 @@ jobs:
 
       - name: Install Python lint tooling
         shell: bash
-        run: python -m pip install --upgrade pip ruff black mypy
+        run: python -m pip install --upgrade pip . ruff black mypy
 
       - name: Install actionlint
         shell: bash
