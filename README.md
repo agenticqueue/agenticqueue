@@ -1,5 +1,7 @@
 # AgenticQueue
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/agenticqueue/agenticqueue/badge)](https://scorecard.dev/viewer/?uri=github.com/agenticqueue/agenticqueue)
+
 AgenticQueue is an Apache-2.0 coordination plane for humans and agents.
 
 ## Install

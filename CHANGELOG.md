@@ -10,3 +10,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Baseline repository scaffolding for the public AgenticQueue repo.
+- OpenSSF Scorecard workflow and README badge for published score tracking.
+- Placeholder: record the first published Scorecard result here after the initial `main` branch analysis run.
