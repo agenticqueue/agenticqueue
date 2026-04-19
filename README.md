@@ -9,9 +9,14 @@ AgenticQueue is an Apache-2.0 coordination plane for humans and agents.
 ```bash
 git clone https://github.com/agenticqueue/agenticqueue.git
 cd agenticqueue
+cp .env.example .env
+uv sync
+docker compose up -d db
+uv run alembic -c apps/api/alembic.ini upgrade head
 ```
 
-The runnable stack lands in later Phase 0 and Phase 1 tickets. This scaffold establishes the public repo contract first.
+Phase 1 starts with a minimal Postgres + Alembic foundation in `apps/api/`. The
+full API, worker, and UI land in later tickets.
 
 ## Repo Map
 
@@ -20,18 +25,20 @@ The runnable stack lands in later Phase 0 and Phase 1 tickets. This scaffold est
 - `SECURITY.md` - responsible disclosure process
 - `CODE_OF_CONDUCT.md` - community standards
 - `CHANGELOG.md` - release notes in Keep a Changelog format
+- `apps/api/` - Alembic config, migration scaffolding, and future FastAPI code
+- `tests/integration/` - integration coverage for migrations and future API work
 
 Planned code surfaces from the accepted build plan:
 
 - `apps/web/` - Next.js UI
-- `apps/api/` - FastAPI API and worker entrypoints
 - `packages/` - shared contracts, SDKs, and utilities
 - `infra/` - local dev and deployment support
 - `docs/` - public documentation and architecture notes
 
 ## Status
 
-This repository is in Phase 0 bootstrap. Baseline OSS files and CI land before the first product code.
+This repository is in early Phase 1. Baseline OSS files, CI, and migration
+scaffolding are in place before the first entity models and API endpoints land.
 
 ## License
 

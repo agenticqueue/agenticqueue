@@ -1,0 +1,19 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: agenticqueue
+      POSTGRES_PASSWORD: agenticqueue
+      POSTGRES_USER: agenticqueue
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agenticqueue -d agenticqueue"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "54329:5432"
+    volumes:
+      - agenticqueue_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  agenticqueue_postgres_data:
