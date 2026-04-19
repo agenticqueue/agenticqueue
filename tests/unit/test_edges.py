@@ -13,7 +13,12 @@ from sqlalchemy.orm import Session
 from agenticqueue_api.config import get_sqlalchemy_sync_database_url
 from agenticqueue_api.models import EdgeModel, EdgeRelation
 from agenticqueue_api.models.edge import edge_metadata_marks_superseded
-from agenticqueue_api.repo import create_edge, get_edge, list_edges_by_source, list_edges_by_target
+from agenticqueue_api.repo import (
+    create_edge,
+    get_edge,
+    list_edges_by_source,
+    list_edges_by_target,
+)
 
 
 EDGE_FIXTURE = {
@@ -55,7 +60,9 @@ def make_edge_payload(**overrides: object) -> EdgeModel:
 
 
 @pytest.mark.parametrize("relation", list(EdgeRelation))
-def test_edge_model_accepts_all_supported_relation_types(relation: EdgeRelation) -> None:
+def test_edge_model_accepts_all_supported_relation_types(
+    relation: EdgeRelation,
+) -> None:
     payload = make_edge_payload(relation=relation.value, metadata=None)
     assert payload.relation is relation
     assert payload.metadata == {}
@@ -147,7 +154,9 @@ def test_duplicate_edge_signature_raises_integrity_error(db_session: Session) ->
         )
 
 
-def test_superseded_edges_are_excluded_from_active_queries(db_session: Session) -> None:
+def test_superseded_edges_are_excluded_from_active_queries(
+    db_session: Session,
+) -> None:
     active_edge = create_edge(db_session, make_edge_payload())
     superseded_edge = create_edge(
         db_session,
