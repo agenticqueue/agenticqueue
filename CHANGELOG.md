@@ -11,4 +11,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Baseline repository scaffolding for the public AgenticQueue repo.
 - OpenSSF Scorecard workflow and README badge for published score tracking.
-- Placeholder: record the first published Scorecard result here after the initial `main` branch analysis run.
+- Recorded the first published OpenSSF Scorecard result: `6.1` on 2026-04-19 via `api.scorecard.dev`.
