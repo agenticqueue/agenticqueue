@@ -11,6 +11,12 @@ permissions:
 
 jobs:
   pre-commit:
+    # Skip on Dependabot PRs: Dependabot bumps action versions in .github/workflows
+    # and pre-commit's file-modifying hooks (end-of-file-fixer, trailing-whitespace,
+    # mixed-line-ending) can conflict with bot-authored commits. Skipping keeps
+    # Dependabot auto-merge-green. Required status checks on main still run the
+    # real gates (build / lint / test / dependency-review).
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
