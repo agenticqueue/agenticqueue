@@ -20,7 +20,7 @@ from agenticqueue_api.repo import (
     list_edges_by_target,
 )
 
-EDGE_FIXTURE = {
+EDGE_FIXTURE: dict[str, object] = {
     "id": "00000000-0000-0000-0000-000000000201",
     "src_entity_type": "task",
     "src_id": "00000000-0000-0000-0000-000000000301",
@@ -53,7 +53,7 @@ def db_session(engine: Engine) -> Iterator[Session]:
 
 
 def make_edge_payload(**overrides: object) -> EdgeModel:
-    payload = dict(EDGE_FIXTURE)
+    payload: dict[str, object] = dict(EDGE_FIXTURE)
     payload.update(overrides)
     return EdgeModel.model_validate_json(json.dumps(payload))
 

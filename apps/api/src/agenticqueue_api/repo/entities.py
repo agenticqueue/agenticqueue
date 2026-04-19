@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -141,8 +141,8 @@ def get_edge(session: Session, entity_id: uuid.UUID) -> EdgeModel | None:
 def _list_edges(
     session: Session,
     *,
-    entity_type_column: sa.ColumnElement[str],
-    entity_id_column: sa.ColumnElement[uuid.UUID],
+    entity_type_column: Any,
+    entity_id_column: Any,
     entity_type: str,
     entity_id: uuid.UUID,
     relation: EdgeRelation | None,
