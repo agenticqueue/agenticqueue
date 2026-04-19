@@ -17,6 +17,7 @@ ENTITY_TABLES = {
     "audit_log",
     "capability",
     "decision",
+    "edge",
     "learning",
     "packet_version",
     "policy",
@@ -25,6 +26,8 @@ ENTITY_TABLES = {
     "task",
     "workspace",
 }
+PHASE_1_ENTITY_TABLES = ENTITY_TABLES - {"edge"}
+PHASE_1_ENTITIES_REVISION = "4d68ebda8f16"
 
 
 def alembic_config() -> Config:
@@ -102,9 +105,9 @@ def test_migration_reaches_head_with_extensions() -> None:
 def test_latest_migration_is_reversible() -> None:
     config = alembic_config()
     downgrade(config, "-1")
-    assert current_revision() == "20260419_01"
-    assert_foundation_state("20260419_01")
-    assert_entity_tables(set())
+    assert current_revision() == PHASE_1_ENTITIES_REVISION
+    assert_foundation_state(PHASE_1_ENTITIES_REVISION)
+    assert_entity_tables(PHASE_1_ENTITY_TABLES)
     upgrade(config, "head")
     expected_head = ScriptDirectory.from_config(config).get_current_head()
     assert expected_head is not None

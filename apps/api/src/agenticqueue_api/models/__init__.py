@@ -5,6 +5,7 @@ from agenticqueue_api.models.artifact import ArtifactModel, ArtifactRecord
 from agenticqueue_api.models.audit_log import AuditLogModel, AuditLogRecord
 from agenticqueue_api.models.capability import CapabilityModel, CapabilityRecord
 from agenticqueue_api.models.decision import DecisionModel, DecisionRecord
+from agenticqueue_api.models.edge import EdgeModel, EdgeRecord, EdgeRelation
 from agenticqueue_api.models.learning import LearningModel, LearningRecord
 from agenticqueue_api.models.packet_version import (
     PacketVersionModel,
@@ -27,6 +28,9 @@ __all__ = [
     "CapabilityRecord",
     "DecisionModel",
     "DecisionRecord",
+    "EdgeModel",
+    "EdgeRecord",
+    "EdgeRelation",
     "LearningModel",
     "LearningRecord",
     "PacketVersionModel",

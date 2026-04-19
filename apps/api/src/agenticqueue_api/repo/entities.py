@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import TypeVar
 
+import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from agenticqueue_api.models import (
@@ -18,6 +19,9 @@ from agenticqueue_api.models import (
     CapabilityRecord,
     DecisionModel,
     DecisionRecord,
+    EdgeModel,
+    EdgeRecord,
+    EdgeRelation,
     LearningModel,
     LearningRecord,
     PacketVersionModel,
@@ -110,6 +114,90 @@ def create_decision(session: Session, payload: DecisionModel) -> DecisionModel:
 
 def get_decision(session: Session, entity_id: uuid.UUID) -> DecisionModel | None:
     return _get_entity(session, DecisionRecord, DecisionModel, entity_id)
+
+
+def create_edge(session: Session, payload: EdgeModel) -> EdgeModel:
+    record = EdgeRecord(
+        id=payload.id,
+        created_at=payload.created_at,
+        src_entity_type=payload.src_entity_type,
+        src_id=payload.src_id,
+        dst_entity_type=payload.dst_entity_type,
+        dst_id=payload.dst_id,
+        relation=payload.relation,
+        edge_metadata=payload.metadata,
+        created_by=payload.created_by,
+    )
+    session.add(record)
+    session.flush()
+    session.refresh(record)
+    return EdgeModel.model_validate(record)
+
+
+def get_edge(session: Session, entity_id: uuid.UUID) -> EdgeModel | None:
+    return _get_entity(session, EdgeRecord, EdgeModel, entity_id)
+
+
+def _list_edges(
+    session: Session,
+    *,
+    entity_type_column: sa.ColumnElement[str],
+    entity_id_column: sa.ColumnElement[uuid.UUID],
+    entity_type: str,
+    entity_id: uuid.UUID,
+    relation: EdgeRelation | None,
+    active_only: bool,
+) -> list[EdgeModel]:
+    statement = (
+        sa.select(EdgeRecord)
+        .where(entity_type_column == entity_type.strip(), entity_id_column == entity_id)
+        .order_by(EdgeRecord.created_at.asc(), EdgeRecord.id.asc())
+    )
+    if relation is not None:
+        statement = statement.where(EdgeRecord.relation == relation)
+
+    edges = [EdgeModel.model_validate(record) for record in session.scalars(statement)]
+    if not active_only:
+        return edges
+    return [edge for edge in edges if edge.is_active]
+
+
+def list_edges_by_source(
+    session: Session,
+    entity_type: str,
+    entity_id: uuid.UUID,
+    *,
+    relation: EdgeRelation | None = None,
+    active_only: bool = True,
+) -> list[EdgeModel]:
+    return _list_edges(
+        session,
+        entity_type_column=EdgeRecord.src_entity_type,
+        entity_id_column=EdgeRecord.src_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        relation=relation,
+        active_only=active_only,
+    )
+
+
+def list_edges_by_target(
+    session: Session,
+    entity_type: str,
+    entity_id: uuid.UUID,
+    *,
+    relation: EdgeRelation | None = None,
+    active_only: bool = True,
+) -> list[EdgeModel]:
+    return _list_edges(
+        session,
+        entity_type_column=EdgeRecord.dst_entity_type,
+        entity_id_column=EdgeRecord.dst_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        relation=relation,
+        active_only=active_only,
+    )
 
 
 def create_actor(session: Session, payload: ActorModel) -> ActorModel:
