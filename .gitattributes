@@ -1,0 +1,23 @@
+# Shell scripts MUST stay LF — they run inside Linux containers.
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Dockerfiles + compose
+Dockerfile* text eol=lf
+docker-compose*.yml text eol=lf
+*.dockerfile text eol=lf
+
+# Python files in containers
+*.py text eol=lf
+
+# Common config files
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.env* text eol=lf
+
+# Windows-only files keep CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
