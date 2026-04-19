@@ -11,5 +11,29 @@ jobs:
   dependency-review:
     runs-on: ubuntu-latest
     steps:
+      - name: Check dependency graph availability
+        id: dependency-graph
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.repos.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const enabled =
+              data.security_and_analysis?.dependency_graph?.status === "enabled";
+
+            core.setOutput("enabled", enabled ? "true" : "false");
+            core.notice(
+              enabled
+                ? "Dependency graph is enabled; running dependency review."
+                : "Dependency graph is disabled; skipping dependency review for this seed-phase repo."
+            );
+
       - name: Check dependency changes
+        if: ${{ steps.dependency-graph.outputs.enabled == 'true' }}
         uses: actions/dependency-review-action@v4
+
+      - name: Skip until dependency graph is enabled
+        if: ${{ steps.dependency-graph.outputs.enabled != 'true' }}
+        run: echo "Dependency graph is disabled in repository settings; dependency review is intentionally skipped."
