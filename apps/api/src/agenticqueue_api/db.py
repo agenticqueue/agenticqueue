@@ -20,3 +20,7 @@ class Base(DeclarativeBase):
     """Declarative base for future AgenticQueue models."""
 
     metadata = metadata
+
+
+# Import ORM models so metadata is populated before Alembic autogenerate runs.
+from agenticqueue_api import models as _models  # noqa: E402,F401

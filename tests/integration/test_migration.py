@@ -11,6 +11,20 @@ from agenticqueue_api.config import get_sync_database_url
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_CONFIG_PATH = REPO_ROOT / "apps" / "api" / "alembic.ini"
+ENTITY_TABLES = {
+    "actor",
+    "artifact",
+    "audit_log",
+    "capability",
+    "decision",
+    "learning",
+    "packet_version",
+    "policy",
+    "project",
+    "run",
+    "task",
+    "workspace",
+}
 
 
 def alembic_config() -> Config:
@@ -45,6 +59,16 @@ def assert_foundation_state(expected_revision: str) -> None:
             assert cursor.fetchone() == ("agenticqueue",)
 
 
+def assert_entity_tables(expected_tables: set[str]) -> None:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'agenticqueue' ORDER BY table_name"
+            )
+            assert {row[0] for row in cursor.fetchall()} == expected_tables
+
+
 def assert_base_state() -> None:
     with psycopg.connect(get_sync_database_url()) as connection:
         with connection.cursor() as cursor:
@@ -72,9 +96,23 @@ def test_migration_reaches_head_with_extensions() -> None:
     assert expected_head is not None
     assert current_revision() == expected_head
     assert_foundation_state(expected_head)
+    assert_entity_tables(ENTITY_TABLES)
 
 
-def test_migration_is_reversible() -> None:
+def test_latest_migration_is_reversible() -> None:
+    config = alembic_config()
+    downgrade(config, "-1")
+    assert current_revision() == "20260419_01"
+    assert_foundation_state("20260419_01")
+    assert_entity_tables(set())
+    upgrade(config, "head")
+    expected_head = ScriptDirectory.from_config(config).get_current_head()
+    assert expected_head is not None
+    assert_foundation_state(expected_head)
+    assert_entity_tables(ENTITY_TABLES)
+
+
+def test_full_migration_stack_is_reversible_to_base() -> None:
     config = alembic_config()
     downgrade(config, "base")
     assert_base_state()
@@ -82,3 +120,4 @@ def test_migration_is_reversible() -> None:
     expected_head = ScriptDirectory.from_config(config).get_current_head()
     assert expected_head is not None
     assert_foundation_state(expected_head)
+    assert_entity_tables(ENTITY_TABLES)

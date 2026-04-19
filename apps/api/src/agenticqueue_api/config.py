@@ -31,3 +31,15 @@ def get_sync_database_url() -> str:
     if url.startswith("postgresql://"):
         return url
     return url
+
+
+def get_sqlalchemy_sync_database_url() -> str:
+    """Return a sync SQLAlchemy URL derived from the configured async database URL."""
+    url = get_database_url()
+    if url.startswith(ASYNC_PREFIX):
+        return SQLALCHEMY_SYNC_PREFIX + url[len(ASYNC_PREFIX) :]
+    if url.startswith(PSYCOPG_PREFIX):
+        return SQLALCHEMY_SYNC_PREFIX + url[len(PSYCOPG_PREFIX) :]
+    if url.startswith(SQLALCHEMY_SYNC_PREFIX):
+        return url
+    return url
