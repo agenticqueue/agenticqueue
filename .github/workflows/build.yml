@@ -1,0 +1,35 @@
+name: build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Build Docker scaffolds
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t dockerfiles < <(find . -path './.git' -prune -o -name 'Dockerfile*' -print | sort)
+
+          if [ "${#dockerfiles[@]}" -eq 0 ]; then
+            echo "No Dockerfiles yet; build skeleton is in place."
+            exit 0
+          fi
+
+          for dockerfile in "${dockerfiles[@]}"; do
+            context_dir="$(dirname "$dockerfile")"
+            tag="agenticqueue-ci-$(echo "$dockerfile" | tr '/.' '--')"
+            echo "Building $dockerfile from $context_dir"
+            docker build --file "$dockerfile" --tag "$tag" "$context_dir"
+          done

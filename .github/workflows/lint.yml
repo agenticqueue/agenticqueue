@@ -1,0 +1,119 @@
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Cache pip downloads
+        if: ${{ hashFiles('requirements*.txt', 'pyproject.toml', 'poetry.lock') != '' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('requirements*.txt', 'pyproject.toml', 'poetry.lock') }}
+
+      - name: Cache npm packages
+        if: ${{ hashFiles('package-lock.json', 'frontend/package-lock.json') != '' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-lint-${{ hashFiles('package-lock.json', 'frontend/package-lock.json') }}
+
+      - name: Install Python lint tooling
+        shell: bash
+        run: python -m pip install --upgrade pip ruff black mypy
+
+      - name: Install actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="1.7.7"
+          curl -sSL "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz" \
+            | tar -xz actionlint
+          sudo mv actionlint /usr/local/bin/actionlint
+
+      - name: Run actionlint
+        run: actionlint
+
+      - name: Run ruff
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files '*.py' '*.pyi' | grep -q .; then
+            ruff check .
+          else
+            echo "No Python files yet; skipping ruff."
+          fi
+
+      - name: Run black
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files '*.py' '*.pyi' | grep -q .; then
+            black --check .
+          else
+            echo "No Python files yet; skipping black."
+          fi
+
+      - name: Run mypy
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f mypy.ini || test -f pyproject.toml || git ls-files '*.py' '*.pyi' | grep -q .; then
+            mypy .
+          else
+            echo "No Python typing surface yet; skipping mypy."
+          fi
+
+      - name: Install Node dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f package-lock.json; then
+            npm ci
+          elif test -f package.json; then
+            npm install
+          else
+            echo "No Node package manifest at repo root; skipping install."
+          fi
+
+      - name: Run eslint
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f package.json && git ls-files '*.js' '*.jsx' '*.ts' '*.tsx' | grep -q .; then
+            npx eslint .
+          else
+            echo "No JavaScript or TypeScript sources yet; skipping eslint."
+          fi
+
+      - name: Run tsc
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f tsconfig.json; then
+            npx tsc --noEmit
+          else
+            echo "No tsconfig.json yet; skipping TypeScript compile check."
+          fi
