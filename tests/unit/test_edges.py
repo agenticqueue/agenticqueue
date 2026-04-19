@@ -20,7 +20,6 @@ from agenticqueue_api.repo import (
     list_edges_by_target,
 )
 
-
 EDGE_FIXTURE = {
     "id": "00000000-0000-0000-0000-000000000201",
     "src_entity_type": "task",
