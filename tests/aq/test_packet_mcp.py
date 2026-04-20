@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 import json
 from pathlib import Path
 import uuid
+from typing import Any
 
 from fastapi.testclient import TestClient
 from fastmcp import Client as FastMCPClient
@@ -109,8 +111,8 @@ def _actor_payload(*, handle: str, actor_type: str = "agent") -> ActorModel:
 
 def _mcp_call(
     server, tool_name: str, arguments: dict[str, object]
-) -> dict[str, object]:
-    async def _invoke() -> dict[str, object]:
+) -> dict[str, Any]:
+    async def _invoke() -> dict[str, Any]:
         async with FastMCPClient(server) as client:
             result = await client.call_tool(tool_name, arguments)
             return result.data
@@ -138,7 +140,7 @@ def session_factory(engine: Engine) -> sessionmaker[Session]:
 
 
 @pytest.fixture
-def client(session_factory: sessionmaker[Session]) -> TestClient:
+def client(session_factory: sessionmaker[Session]) -> Iterator[TestClient]:
     with TestClient(create_app(session_factory=session_factory)) as test_client:
         yield test_client
 
@@ -203,7 +205,7 @@ def _seed_task_with_token(
                 }
             ),
         )
-        capability_scope = (
+        capability_scope: dict[str, object] = (
             {"project_id": str(uuid.uuid4())}
             if wrong_scope
             else {"project_id": str(project.id)}
