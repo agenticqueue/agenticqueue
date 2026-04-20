@@ -6,15 +6,16 @@ import datetime as dt
 from dataclasses import dataclass, field
 from enum import Enum
 import uuid
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import pydantic
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Body, Depends, Request, Response, status
 from jsonschema import ValidationError as JsonSchemaValidationError  # type: ignore[import-untyped]
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from agenticqueue_api.capabilities import require_capability
 from agenticqueue_api.errors import raise_api_error
 from agenticqueue_api.models import (
     ActorModel,
@@ -26,6 +27,7 @@ from agenticqueue_api.models import (
     EdgeModel,
     EdgeRecord,
     EdgeRelation,
+    CapabilityKey,
     LearningModel,
     LearningRecord,
     PolicyModel,
@@ -131,6 +133,26 @@ ENTITY_CONFIGS = (
     ),
 )
 
+MUTATION_CAPABILITY_BY_RESOURCE = {
+    "workspaces": CapabilityKey.ADMIN,
+    "projects": CapabilityKey.ADMIN,
+    "tasks": CapabilityKey.WRITE_BRANCH,
+    "runs": CapabilityKey.RUN_TESTS,
+    "artifacts": CapabilityKey.CREATE_ARTIFACT,
+    "decisions": CapabilityKey.UPDATE_TASK,
+    "actors": CapabilityKey.ADMIN,
+    "policies": CapabilityKey.ADMIN,
+    "learnings": CapabilityKey.WRITE_LEARNING,
+    "edges": CapabilityKey.UPDATE_TASK,
+}
+
+TASK_SCOPED_RECORD_BY_RESOURCE = {
+    "runs": RunRecord,
+    "artifacts": ArtifactRecord,
+    "decisions": DecisionRecord,
+    "learnings": LearningRecord,
+}
+
 
 def _require_scope(request: Request, required_scope: str) -> None:
     api_token = request.state.api_token
@@ -146,6 +168,170 @@ def _require_scope(request: Request, required_scope: str) -> None:
             "granted_scopes": api_token.scopes,
         },
     )
+
+
+def _extract_uuid(value: Any) -> uuid.UUID | None:
+    if isinstance(value, uuid.UUID):
+        return value
+    if value is None:
+        return None
+    try:
+        return uuid.UUID(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _lookup_task_project_id(
+    session: Session,
+    task_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    if task_id is None:
+        return None
+    return session.scalar(
+        sa.select(TaskRecord.project_id).where(TaskRecord.id == task_id)
+    )
+
+
+def _lookup_task_project_id_for_record(
+    session: Session,
+    config: CrudEntityConfig,
+    entity_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    if entity_id is None:
+        return None
+
+    if config.resource_name == "tasks":
+        record = session.get(TaskRecord, entity_id)
+        return None if record is None else record.project_id
+
+    record_type = TASK_SCOPED_RECORD_BY_RESOURCE.get(config.resource_name)
+    if record_type is not None:
+        scoped_record = session.get(record_type, entity_id)
+        task_id = (
+            None if scoped_record is None else getattr(scoped_record, "task_id", None)
+        )
+        return _lookup_task_project_id(session, task_id)
+
+    if config.resource_name == "projects":
+        return entity_id
+
+    if config.resource_name == "edges":
+        edge_record = session.get(EdgeRecord, entity_id)
+        if edge_record is None:
+            return None
+        return _lookup_edge_project_id(
+            session,
+            src_entity_type=edge_record.src_entity_type,
+            src_id=edge_record.src_id,
+            dst_entity_type=edge_record.dst_entity_type,
+            dst_id=edge_record.dst_id,
+        )
+
+    return None
+
+
+def _lookup_edge_project_id(
+    session: Session,
+    *,
+    src_entity_type: str | None,
+    src_id: uuid.UUID | None,
+    dst_entity_type: str | None,
+    dst_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    if src_entity_type == "project":
+        return src_id
+    if dst_entity_type == "project":
+        return dst_id
+    if src_entity_type == "task":
+        return _lookup_task_project_id(session, src_id)
+    if dst_entity_type == "task":
+        return _lookup_task_project_id(session, dst_id)
+    return None
+
+
+def _required_capability_scope(
+    config: CrudEntityConfig,
+    *,
+    session: Session,
+    payload: dict[str, Any] | None,
+    entity_id: uuid.UUID | None,
+) -> dict[str, Any]:
+    if config.resource_name == "tasks":
+        project_id = _extract_uuid(
+            None if payload is None else payload.get("project_id")
+        )
+        project_id = project_id or _lookup_task_project_id_for_record(
+            session, config, entity_id
+        )
+        return {} if project_id is None else {"project_id": str(project_id)}
+
+    if config.resource_name == "projects":
+        project_id = _extract_uuid(None if payload is None else payload.get("id"))
+        project_id = project_id or entity_id
+        return {} if project_id is None else {"project_id": str(project_id)}
+
+    if config.resource_name in TASK_SCOPED_RECORD_BY_RESOURCE:
+        task_id = _extract_uuid(None if payload is None else payload.get("task_id"))
+        project_id = _lookup_task_project_id(session, task_id)
+        project_id = project_id or _lookup_task_project_id_for_record(
+            session, config, entity_id
+        )
+        return {} if project_id is None else {"project_id": str(project_id)}
+
+    if config.resource_name == "edges":
+        project_id = _lookup_edge_project_id(
+            session,
+            src_entity_type=(
+                None
+                if payload is None
+                else cast(str | None, payload.get("src_entity_type"))
+            ),
+            src_id=_extract_uuid(None if payload is None else payload.get("src_id")),
+            dst_entity_type=(
+                None
+                if payload is None
+                else cast(str | None, payload.get("dst_entity_type"))
+            ),
+            dst_id=_extract_uuid(None if payload is None else payload.get("dst_id")),
+        )
+        project_id = project_id or _lookup_task_project_id_for_record(
+            session, config, entity_id
+        )
+        return {} if project_id is None else {"project_id": str(project_id)}
+
+    return {}
+
+
+def _build_write_capability_dependency(
+    config: CrudEntityConfig,
+    get_db_session: Any,
+) -> Any:
+    dependency = require_capability(
+        MUTATION_CAPABILITY_BY_RESOURCE[config.resource_name],
+        lambda request, session, payload, entity_id: _required_capability_scope(
+            config,
+            session=session,
+            payload=payload,
+            entity_id=entity_id,
+        ),
+        entity_type=config.scope_name,
+    )
+
+    def route_dependency(
+        request: Request,
+        payload: dict[str, Any] | None = Body(default=None),
+        entity_id: uuid.UUID | None = None,
+        session: Session = Depends(get_db_session),
+    ) -> None:
+        dependency(
+            request=request,
+            session=session,
+            payload=payload,
+            entity_id=entity_id,
+        )
+
+    route_dependency.__name__ = dependency.__name__
+    return Depends(route_dependency)
 
 
 def _record_attr_name(config: CrudEntityConfig, field_name: str) -> str:
@@ -354,6 +540,10 @@ def _register_entity_routes(
     config: CrudEntityConfig,
     get_db_session: Any,
 ) -> None:
+    write_capability_dependency = _build_write_capability_dependency(
+        config, get_db_session
+    )
+
     def create_entity(
         payload: dict[str, Any],
         request: Request,
@@ -458,6 +648,7 @@ def _register_entity_routes(
         f"/{config.resource_name}",
         create_entity,
         methods=["POST"],
+        dependencies=[write_capability_dependency],
         response_model=config.schema_type,
         status_code=status.HTTP_201_CREATED,
     )
@@ -476,12 +667,14 @@ def _register_entity_routes(
         f"/{config.resource_name}/{{entity_id}}",
         update_entity,
         methods=["PATCH"],
+        dependencies=[write_capability_dependency],
         response_model=config.schema_type,
     )
     router.add_api_route(
         f"/{config.resource_name}/{{entity_id}}",
         delete_entity,
         methods=["DELETE"],
+        dependencies=[write_capability_dependency],
         status_code=status.HTTP_204_NO_CONTENT,
     )
 
