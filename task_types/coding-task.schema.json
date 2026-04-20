@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "coding-task",
+  "type": "object",
+  "required": [
+    "surface_area",
+    "deliverable",
+    "verification"
+  ],
+  "properties": {
+    "surface_area": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "deliverable": {
+      "type": "string",
+      "minLength": 1
+    },
+    "verification": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

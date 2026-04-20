@@ -1,4 +1,4 @@
-"""FastAPI app for the AgenticQueue auth and capability surface."""
+"""FastAPI app for the AgenticQueue API surface."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from fastapi import Depends, FastAPI, Request, status
-from pydantic import Field
+from pydantic import ConfigDict, Field
 from sqlalchemy.orm import Session, sessionmaker
 
 from agenticqueue_api.audit import set_session_audit_context
@@ -26,7 +26,11 @@ from agenticqueue_api.capabilities import (
     list_capabilities_for_actor,
     revoke_capability_grant,
 )
-from agenticqueue_api.config import get_sqlalchemy_sync_database_url
+from agenticqueue_api.config import (
+    get_reload_enabled,
+    get_sqlalchemy_sync_database_url,
+    get_task_types_dir,
+)
 from agenticqueue_api.crud import build_crud_router
 from agenticqueue_api.errors import install_exception_handlers, raise_api_error
 from agenticqueue_api.models import (
@@ -37,6 +41,7 @@ from agenticqueue_api.models import (
     CapabilityKey,
 )
 from agenticqueue_api.models.shared import SchemaModel
+from agenticqueue_api.task_type_registry import TaskTypeDefinition, TaskTypeRegistry
 
 
 class ActorSummary(SchemaModel):
@@ -120,9 +125,40 @@ class RevokeCapabilityRequest(SchemaModel):
     grant_id: uuid.UUID
 
 
+class TaskTypeView(SchemaModel):
+    """Task type registry entry exposed over the API."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str
+    schema_document: dict[str, Any] = Field(alias="schema")
+    policy: dict[str, Any]
+    schema_path: str
+    policy_path: str
+
+
+class RegisterTaskTypeRequest(SchemaModel):
+    """Payload for registering one task type."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str
+    schema_document: dict[str, Any] = Field(alias="schema")
+    policy: dict[str, Any] = Field(default_factory=dict)
+
+
 def _default_session_factory() -> sessionmaker[Session]:
     engine = sa.create_engine(get_sqlalchemy_sync_database_url(), future=True)
     return sessionmaker(bind=engine, expire_on_commit=False)
+
+
+def _default_task_type_registry() -> TaskTypeRegistry:
+    registry = TaskTypeRegistry(
+        get_task_types_dir(),
+        reload_enabled=get_reload_enabled(),
+    )
+    registry.load()
+    return registry
 
 
 def _actor_summary(actor: ActorModel) -> ActorSummary:
@@ -162,6 +198,16 @@ def _capability_grant_view(grant: CapabilityGrantModel) -> CapabilityGrantView:
     )
 
 
+def _task_type_view(definition: TaskTypeDefinition) -> TaskTypeView:
+    return TaskTypeView(
+        name=definition.name,
+        schema=definition.schema,
+        policy=definition.policy,
+        schema_path=str(definition.schema_path),
+        policy_path=str(definition.policy_path),
+    )
+
+
 def _require_actor(request: Request) -> ActorModel:
     actor = getattr(request.state, "actor", None)
     if actor is None:
@@ -196,11 +242,16 @@ def get_db_session(request: Request) -> Iterator[Session]:
         session.close()
 
 
+def get_task_type_registry(request: Request) -> TaskTypeRegistry:
+    return cast(TaskTypeRegistry, request.app.state.task_type_registry)
+
+
 def create_app(
     *,
     session_factory: sessionmaker[Session] | None = None,
+    task_type_registry: TaskTypeRegistry | None = None,
 ) -> FastAPI:
-    """Create the FastAPI app with auth middleware and token endpoints."""
+    """Create the FastAPI app with auth, CRUD, and task type routes."""
     app = FastAPI(
         title="AgenticQueue API",
         docs_url=None,
@@ -208,9 +259,44 @@ def create_app(
         openapi_url="/openapi.json",
     )
     app.state.session_factory = session_factory or _default_session_factory()
+    app.state.task_type_registry = task_type_registry or _default_task_type_registry()
     app.add_middleware(AgenticQueueAuthMiddleware)
     install_exception_handlers(app)
     app.include_router(build_crud_router(get_db_session))
+
+    @app.get("/task-types", include_in_schema=False, response_model=list[TaskTypeView])
+    @app.get("/v1/task-types", response_model=list[TaskTypeView])
+    def list_task_types(request: Request) -> list[TaskTypeView]:
+        _require_actor(request)
+        registry = get_task_type_registry(request)
+        return [_task_type_view(definition) for definition in registry.list()]
+
+    @app.post(
+        "/task-types",
+        include_in_schema=False,
+        response_model=TaskTypeView,
+        status_code=status.HTTP_201_CREATED,
+    )
+    @app.post(
+        "/v1/task-types",
+        response_model=TaskTypeView,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def register_task_type(
+        payload: RegisterTaskTypeRequest,
+        request: Request,
+    ) -> TaskTypeView:
+        _require_admin_actor(request)
+        registry = get_task_type_registry(request)
+        try:
+            definition = registry.register(
+                name=payload.name,
+                schema=payload.schema_document,
+                policy=payload.policy,
+            )
+        except ValueError as error:
+            raise_api_error(status.HTTP_400_BAD_REQUEST, str(error))
+        return _task_type_view(definition)
 
     @app.get("/v1/auth/tokens", response_model=ApiTokenListResponse)
     def list_tokens(

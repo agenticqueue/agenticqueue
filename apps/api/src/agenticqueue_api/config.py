@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 DEFAULT_DATABASE_URL = (
     "postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:54329/agenticqueue"
@@ -10,9 +11,11 @@ DEFAULT_DATABASE_URL = (
 DEFAULT_TOKEN_SIGNING_SECRET = "agenticqueue-dev-token-signing-secret"
 DEFAULT_EMBEDDING_DIMENSION = 768
 DEFAULT_VECTOR_IVFFLAT_LISTS = 100
+DEFAULT_TASK_TYPES_DIR = Path(__file__).resolve().parents[4] / "task_types"
 ASYNC_PREFIX = "postgresql+asyncpg://"
 SQLALCHEMY_SYNC_PREFIX = "postgresql+psycopg://"
 PSYCOPG_PREFIX = "postgresql://"
+TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 
 
 def get_database_url() -> str:
@@ -69,3 +72,19 @@ def get_vector_ivfflat_lists() -> int:
     return int(
         os.getenv("AGENTICQUEUE_VECTOR_IVFFLAT_LISTS", DEFAULT_VECTOR_IVFFLAT_LISTS)
     )
+
+
+def get_task_types_dir() -> Path:
+    """Return the task type registry directory."""
+
+    configured = os.getenv("AGENTICQUEUE_TASK_TYPES_DIR") or os.getenv("TASK_TYPES_DIR")
+    if configured:
+        return Path(configured)
+    return DEFAULT_TASK_TYPES_DIR
+
+
+def get_reload_enabled() -> bool:
+    """Return whether dev-time task type reloads are enabled."""
+
+    configured = os.getenv("AGENTICQUEUE_RELOAD") or os.getenv("RELOAD") or ""
+    return configured.strip().lower() in TRUE_ENV_VALUES

@@ -1,0 +1,7 @@
+autonomy_tier: 3
+capabilities:
+  - read_repo
+  - write_branch
+  - run_tests
+  - update_task
+hitl_required: false
