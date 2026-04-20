@@ -90,8 +90,8 @@ def _node_key_literal(entity_type: str, entity_id: uuid.UUID) -> sa.ColumnElemen
 
 
 def _node_key_expr(
-    entity_type_column: sa.ColumnElement[str],
-    entity_id_column: sa.ColumnElement[uuid.UUID],
+    entity_type_column: Any,
+    entity_id_column: Any,
 ) -> sa.ColumnElement[str]:
     return sa.func.concat(
         entity_type_column,
@@ -140,7 +140,9 @@ def _walk_direction(
                     _node_key_expr(base_next_type, base_next_id),
                 ],
                 type_=sa.String(),
-            ).label("path"),
+            ).label(
+                "path"
+            ),  # type: ignore[misc]
         )
         .where(base_match)
         .where(_active_edge_condition(base_edge))
@@ -327,7 +329,9 @@ def shortest_path(
             ),
         )
 
-    queue = deque([(start_ref, [start_ref], [])])
+    queue: deque[tuple[GraphEntityRef, list[GraphEntityRef], list[EdgeRelation]]] = (
+        deque([(start_ref, [start_ref], [])])
+    )
     visited: dict[tuple[str, uuid.UUID], int] = {
         (start_ref.entity_type, start_ref.entity_id): 0,
     }
