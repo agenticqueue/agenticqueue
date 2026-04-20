@@ -18,6 +18,7 @@ from agenticqueue_api.models import (
     LearningModel,
     LearningRecord,
 )
+from agenticqueue_api.schemas.learning import LearningStatus
 
 DEFAULT_MAX_DEPTH = 100
 DOWNSTREAM_DECISION_ENTITY_TYPES = frozenset({"task", "artifact", "run"})
@@ -402,6 +403,7 @@ def learnings_for(
     entity_id: uuid.UUID,
     *,
     scope: Literal["all", "task", "project", "global"] = "all",
+    include_inactive: bool = False,
 ) -> list[LearningModel]:
     scope_filter = _normalize_learning_scope(scope)
     edge = aliased(EdgeRecord)
@@ -428,6 +430,8 @@ def learnings_for(
         .where(_active_edge_condition(edge))
         .order_by(learning.created_at.asc(), learning.id.asc())
     )
+    if not include_inactive:
+        statement = statement.where(learning.status == LearningStatus.ACTIVE.value)
     if scope_filter is not None:
         statement = statement.where(learning.scope.in_(scope_filter))
 

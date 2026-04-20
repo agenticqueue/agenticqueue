@@ -44,6 +44,7 @@ from agenticqueue_api.models import (
 )
 from agenticqueue_api.models.shared import SchemaModel
 from agenticqueue_api.repo.graph import ensure_dependency_edge_is_acyclic
+from agenticqueue_api.schemas.learning import LearningStatus
 from agenticqueue_api.task_type_registry import SchemaLoadError, TaskTypeRegistry
 
 IMMUTABLE_FIELDS = frozenset({"id", "created_at", "updated_at"})
@@ -516,6 +517,18 @@ def _apply_filters(
     return statement
 
 
+def _apply_default_filters(
+    statement: Any,
+    config: CrudEntityConfig,
+    request: Request,
+) -> Any:
+    if config.resource_name == "learnings" and "status" not in request.query_params:
+        statement = statement.where(
+            config.record_type.status == LearningStatus.ACTIVE.value
+        )
+    return statement
+
+
 def _maybe_validate_edge(
     config: CrudEntityConfig,
     session: Session,
@@ -593,6 +606,7 @@ def _register_entity_routes(
         _require_scope(request, config.read_scope)
         statement = sa.select(config.record_type)
         statement = _apply_filters(statement, config, request)
+        statement = _apply_default_filters(statement, config, request)
         statement = statement.order_by(*_order_columns(config.record_type))
         return [
             _serialize_record(config, record).model_dump(mode="json")

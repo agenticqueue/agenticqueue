@@ -18,6 +18,10 @@ from agenticqueue_api.learnings.draft import (
     DraftStore,
     draft_learnings,
 )
+from agenticqueue_api.learnings.lifecycle import (
+    EXPIRATION_REVIEW_WINDOW_DAYS,
+    LearningLifecycleService,
+)
 from agenticqueue_api.schemas.learning import (
     LearningConfidence,
     LearningScope,
@@ -36,7 +40,9 @@ __all__ = [
     "DraftLearningView",
     "DraftRejectRequest",
     "DraftStore",
+    "EXPIRATION_REVIEW_WINDOW_DAYS",
     "LearningDedupeService",
+    "LearningLifecycleService",
     "LearningConfidence",
     "LearningScope",
     "LearningStatus",
