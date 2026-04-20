@@ -435,10 +435,17 @@ def test_auto_promote_candidates_returns_one_global_candidate_across_projects(
 
     candidates = LearningPromotionService(db_session).auto_promote_candidates()
 
+    first_record = db_session.get(LearningRecord, first.id)
+    second_record = db_session.get(LearningRecord, second.id)
+    third_record = db_session.get(LearningRecord, third.id)
+
+    assert first_record is not None
+    assert second_record is not None
+    assert third_record is not None
     assert [candidate.id for candidate in candidates] == [first.id]
-    assert db_session.get(LearningRecord, first.id).promotion_eligible is True
-    assert db_session.get(LearningRecord, second.id).promotion_eligible is False
-    assert db_session.get(LearningRecord, third.id).promotion_eligible is False
+    assert first_record.promotion_eligible is True
+    assert second_record.promotion_eligible is False
+    assert third_record.promotion_eligible is False
 
 
 def test_promote_learning_updates_scope_and_writes_audit_entry(
