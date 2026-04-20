@@ -67,7 +67,11 @@ def build_packets_router(get_db_session: Any) -> APIRouter:
         )
 
         with write_timeout(session, endpoint="v1.tasks.packet"):
-            packet = compile_packet(session, task.id)
+            packet = compile_packet(
+                session,
+                task.id,
+                packet_cache=getattr(request.app.state, "packet_cache", None),
+            )
             session.execute(
                 sa.insert(AuditLogRecord).values(
                     actor_id=session.info.get("agenticqueue_audit_actor_id"),

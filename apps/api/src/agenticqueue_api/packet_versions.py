@@ -9,6 +9,7 @@ import uuid
 from typing import Any, Mapping
 
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from agenticqueue_api.models import PacketVersionModel, PacketVersionRecord
@@ -108,8 +109,15 @@ def persist_packet_version(
         packet_hash=packet_hash,
         payload=payload,
     )
-    session.add(record)
-    session.flush()
+    try:
+        with session.begin_nested():
+            session.add(record)
+            session.flush()
+    except IntegrityError:
+        existing = get_packet_version_by_hash(session, packet_hash)
+        if existing is not None:
+            return existing
+        raise
     session.refresh(record)
     return PacketVersionModel.model_validate(record)
 

@@ -19,6 +19,9 @@ DEFAULT_TASK_TYPES_DIR = Path(__file__).resolve().parents[4] / "task_types"
 DEFAULT_POLICIES_DIR = Path(__file__).resolve().parents[4] / "policies"
 DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_PACKET_SCOPE_MAX_FILES = 200
+DEFAULT_PACKET_CACHE_MAX_ENTRIES = 200
+DEFAULT_PACKET_CACHE_TTL_SECONDS = 300
+DEFAULT_PACKET_PREFETCH_WIDTH = 2
 ASYNC_PREFIX = "postgresql+asyncpg://"
 SQLALCHEMY_SYNC_PREFIX = "postgresql+psycopg://"
 PSYCOPG_PREFIX = "postgresql://"
@@ -77,6 +80,28 @@ def get_sqlalchemy_sync_database_url() -> str:
     if url.startswith(SQLALCHEMY_SYNC_PREFIX):
         return url
     return url
+
+
+def get_direct_sync_database_url() -> str:
+    """Return a direct Postgres URL suitable for LISTEN/NOTIFY."""
+
+    parts = urlsplit(get_sync_database_url())
+    hostname = parts.hostname
+    port = parts.port
+    direct_hostname = "db" if hostname == "pgbouncer" else hostname
+    direct_port = 5432 if port == 6432 else 54329 if port == 64329 else port
+
+    netloc = ""
+    if parts.username:
+        netloc += parts.username
+        if parts.password:
+            netloc += f":{parts.password}"
+        netloc += "@"
+    if direct_hostname:
+        netloc += direct_hostname
+    if direct_port is not None:
+        netloc += f":{direct_port}"
+    return urlunsplit(parts._replace(netloc=netloc))
 
 
 def get_psycopg_connect_args() -> dict[str, int | None]:
@@ -175,6 +200,39 @@ def get_packet_scope_max_files() -> int:
         os.getenv(
             "AGENTICQUEUE_PACKET_SCOPE_MAX_FILES",
             DEFAULT_PACKET_SCOPE_MAX_FILES,
+        )
+    )
+
+
+def get_packet_cache_max_entries() -> int:
+    """Return the packet cache LRU capacity per worker."""
+
+    return int(
+        os.getenv(
+            "AGENTICQUEUE_PACKET_CACHE_MAX_ENTRIES",
+            DEFAULT_PACKET_CACHE_MAX_ENTRIES,
+        )
+    )
+
+
+def get_packet_cache_ttl_seconds() -> int:
+    """Return the packet cache TTL in seconds."""
+
+    return int(
+        os.getenv(
+            "AGENTICQUEUE_PACKET_CACHE_TTL_SECONDS",
+            DEFAULT_PACKET_CACHE_TTL_SECONDS,
+        )
+    )
+
+
+def get_packet_prefetch_width() -> int:
+    """Return the number of speculative packet prefetch slots."""
+
+    return int(
+        os.getenv(
+            "AGENTICQUEUE_PACKET_PREFETCH_WIDTH",
+            DEFAULT_PACKET_PREFETCH_WIDTH,
         )
     )
 

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import datetime as dt
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, cast
 from pathlib import Path
 
@@ -66,6 +67,7 @@ from agenticqueue_api.models import (
     TaskRecord,
 )
 from agenticqueue_api.models.shared import SchemaModel
+from agenticqueue_api.packet_cache import PacketCache
 from agenticqueue_api.routers import build_learnings_router, build_packets_router
 from agenticqueue_api.task_type_registry import TaskTypeDefinition, TaskTypeRegistry
 
@@ -359,13 +361,27 @@ def create_app(
     policies_dir: Path | None = None,
 ) -> FastAPI:
     """Create the FastAPI app with auth, CRUD, and task type routes."""
+    resolved_session_factory = session_factory or _default_session_factory()
+    packet_cache = PacketCache(session_factory=resolved_session_factory)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        del app
+        packet_cache.start()
+        try:
+            yield
+        finally:
+            packet_cache.close()
+
     app = FastAPI(
         title="AgenticQueue API",
         docs_url=None,
         redoc_url=None,
         openapi_url="/openapi.json",
+        lifespan=lifespan,
     )
-    app.state.session_factory = session_factory or _default_session_factory()
+    app.state.session_factory = resolved_session_factory
+    app.state.packet_cache = packet_cache
     app.state.task_type_registry = task_type_registry or _default_task_type_registry()
     app.add_middleware(IdempotencyKeyMiddleware)
     app.add_middleware(AgenticQueueAuthMiddleware)

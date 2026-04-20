@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 import re
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from pydantic import Field
@@ -46,6 +46,9 @@ from agenticqueue_api.repo import ancestors, neighbors
 from agenticqueue_api.repo_scope import resolve_repo_scope
 from agenticqueue_api.schemas.learning import LearningStatus
 from agenticqueue_api.task_type_registry import TaskTypeDefinition, TaskTypeRegistry
+
+if TYPE_CHECKING:
+    from agenticqueue_api.packet_cache import PacketCache
 
 DEFAULT_LEARNING_LIMIT = 5
 DEFAULT_PACKET_DECISION_MAX_HOPS = 3
@@ -463,8 +466,21 @@ def compile_packet(
     learning_limit: int = DEFAULT_LEARNING_LIMIT,
     task_type_registry: TaskTypeRegistry | None = None,
     policy_registry: PolicyRegistry | None = None,
+    packet_cache: PacketCache | None = None,
 ) -> dict[str, Any]:
     """Return the compiled packet as a JSON-serializable dict."""
+
+    cache_enabled = (
+        packet_cache is not None
+        and task_type_registry is None
+        and policy_registry is None
+    )
+    if cache_enabled:
+        assert packet_cache is not None
+        cached = packet_cache.get(task_id, learning_limit=learning_limit)
+        if cached is not None:
+            packet_cache.schedule_prefetch(task_id, learning_limit=learning_limit)
+            return cached
 
     packet = assemble_packet(
         session,
@@ -474,7 +490,17 @@ def compile_packet(
         policy_registry=policy_registry,
     )
     packet_version = persist_packet_version(session, task_id, packet)
-    return dict(packet_version.payload)
+    payload = dict(packet_version.payload)
+    if cache_enabled:
+        assert packet_cache is not None
+        packet_cache.put(
+            session,
+            task_id,
+            payload,
+            learning_limit=learning_limit,
+        )
+        packet_cache.schedule_prefetch(task_id, learning_limit=learning_limit)
+    return payload
 
 
 __all__ = [
