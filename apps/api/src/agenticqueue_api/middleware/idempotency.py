@@ -7,11 +7,13 @@ import hashlib
 import json
 import re
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import sqlalchemy as sa
 from fastapi.responses import JSONResponse
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -155,7 +157,7 @@ def cleanup_expired_idempotency_keys(
     result = session.execute(
         sa.delete(record_type).where(record_type.expires_at <= current_time)
     )
-    return int(result.rowcount or 0)
+    return int(cast(CursorResult[Any], result).rowcount or 0)
 
 
 def get_idempotency_stats(
@@ -203,7 +205,15 @@ def get_idempotency_stats(
 async def _consume_response_body(response: Response) -> bytes:
     """Read the response body from the response iterator."""
 
-    return b"".join([chunk async for chunk in response.body_iterator])
+    stream = cast(
+        AsyncIterator[bytes | str | memoryview],
+        getattr(response, "body_iterator"),
+    )
+    chunks = [
+        chunk.encode("utf-8") if isinstance(chunk, str) else bytes(chunk)
+        async for chunk in stream
+    ]
+    return b"".join(chunks)
 
 
 def _clone_response(response: Response, body: bytes) -> Response:
