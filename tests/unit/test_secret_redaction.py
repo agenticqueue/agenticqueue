@@ -162,8 +162,7 @@ def test_scan_json_payload_redacts_nested_values_and_counts_matches() -> None:
     )
     assert result.sanitized_payload["nested"][0] == "plain text"
     assert (
-        result.sanitized_payload["nested"][1]["token"]
-        == "[REDACTED:slack_bot_token]"
+        result.sanitized_payload["nested"][1]["token"] == "[REDACTED:slack_bot_token]"
     )
 
 
@@ -225,7 +224,9 @@ def test_secret_redaction_rewrites_payload_and_sets_request_context(
     assert len(body["redaction"]["original_sha256"]) == 64
 
 
-def test_secret_redaction_skips_get_invalid_json_and_missing_policy(tmp_path: Path) -> None:
+def test_secret_redaction_skips_get_invalid_json_and_missing_policy(
+    tmp_path: Path,
+) -> None:
     app = _build_app(tmp_path, hard_block_secrets=True)
     with TestClient(app) as client:
         health = client.get("/healthz")
@@ -350,7 +351,9 @@ def test_secret_redaction_internal_async_paths_cover_disconnect_and_replay(
     }
 
 
-def test_secret_redaction_missing_policy_pack_falls_back_to_default(tmp_path: Path) -> None:
+def test_secret_redaction_missing_policy_pack_falls_back_to_default(
+    tmp_path: Path,
+) -> None:
     middleware = SecretRedactionMiddleware(
         FastAPI(),
         policy_directory=_policy_dir(tmp_path, hard_block_secrets=False),

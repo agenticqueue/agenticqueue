@@ -14,12 +14,11 @@ depends_on = None
 
 def _create_append_only_function(include_redaction: bool) -> None:
     redaction_guard = (
-        'AND NEW.redaction IS NOT DISTINCT FROM OLD.redaction\n'
+        "AND NEW.redaction IS NOT DISTINCT FROM OLD.redaction\n"
         if include_redaction
         else ""
     )
-    op.execute(
-        f"""
+    op.execute(f"""
         CREATE OR REPLACE FUNCTION agenticqueue.prevent_audit_log_mutation()
         RETURNS trigger
         AS $$
@@ -41,8 +40,7 @@ def _create_append_only_function(include_redaction: bool) -> None:
           RAISE EXCEPTION 'audit_log is append-only';
         END;
         $$ LANGUAGE plpgsql;
-        """
-    )
+        """)
 
 
 def upgrade() -> None:

@@ -188,9 +188,7 @@ def seed_project(session_factory: sessionmaker[Session]) -> uuid.UUID:
 
 def task_payload(project_id: uuid.UUID) -> dict[str, object]:
     contract = _example_contract()
-    contract["spec"] = (
-        "Rotate [REDACTED] instead of using " + _fake_github_pat() + "."
-    )
+    contract["spec"] = "Rotate [REDACTED] instead of using " + _fake_github_pat() + "."
     return {
         "id": str(uuid.uuid4()),
         "project_id": str(project_id),

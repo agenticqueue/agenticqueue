@@ -400,7 +400,9 @@ def test_redaction_context_propagates_to_audit_rows(
                 "original_sha256": "a" * 64,
             },
         )
-        workspace = WorkspaceRecord(slug="redacted-workspace", name="Redacted Workspace")
+        workspace = WorkspaceRecord(
+            slug="redacted-workspace", name="Redacted Workspace"
+        )
         session.add(workspace)
         session.commit()
 
