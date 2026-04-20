@@ -242,6 +242,8 @@ jobs:
           "${{ steps.grype.outputs.cmd }}" db update
 
       - name: Generate vulnerability report
+        env:
+          GRYPE_DB_VALIDATE_AGE: "false"
         shell: bash
         run: |
           set -euo pipefail
