@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Callable, Iterator
+from typing import Callable, Iterator, cast
 
 import pytest
 import sqlalchemy as sa
@@ -293,8 +293,11 @@ def test_entity_model_round_trip_and_repo_crud(
 
     assert case.schema_cls.model_validate_json(payload.model_dump_json()) == payload
     if entity_name == "capability":
+        capability_payload = cast(CapabilityModel, payload)
         db_session.execute(
-            sa.delete(CapabilityRecord).where(CapabilityRecord.key == payload.key)
+            sa.delete(CapabilityRecord).where(
+                CapabilityRecord.key == capability_payload.key
+            )
         )
 
     created = case.create_fn(db_session, payload)
