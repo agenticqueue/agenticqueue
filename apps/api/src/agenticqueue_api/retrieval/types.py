@@ -10,7 +10,15 @@ from typing import Literal
 from agenticqueue_api.models.learning import LearningModel, LearningRecord
 from agenticqueue_api.models.task import TaskRecord
 
-TierName = Literal["surface_area", "graph", "metadata", "vector", "rerank"]
+TierName = Literal[
+    "surface_area",
+    "graph",
+    "metadata",
+    "fts",
+    "trgm",
+    "vector",
+    "rerank",
+]
 
 
 def _normalize_strings(values: tuple[str, ...]) -> tuple[str, ...]:

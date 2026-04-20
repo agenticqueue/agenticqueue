@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from agenticqueue_api.models.learning import LearningRecord
 from agenticqueue_api.models.task import TaskRecord
 from agenticqueue_api.retrieval.config import RetrievalConfig, get_retrieval_config
+from agenticqueue_api.retrieval.tiers.fts import fts_candidates
 from agenticqueue_api.retrieval.tiers.graph import (
     rank_candidates as graph_rank_candidates,
 )
@@ -20,7 +21,11 @@ from agenticqueue_api.retrieval.tiers.rerank import rerank_candidates
 from agenticqueue_api.retrieval.tiers.surface_area import (
     select_candidates as surface_candidates,
 )
-from agenticqueue_api.retrieval.tiers.vector import vector_candidates
+from agenticqueue_api.retrieval.tiers.trgm import trgm_candidates
+from agenticqueue_api.retrieval.tiers.vector import (
+    task_similarity_text,
+    vector_candidates,
+)
 from agenticqueue_api.retrieval.types import (
     RetrievalCandidate,
     RetrievalQuery,
@@ -69,34 +74,97 @@ class RetrievalService:
         tiers_fired.append("metadata")
         result_candidates = hot_candidates[: query.k]
 
-        if query.fuzzy_global_search and len(result_candidates) < query.k:
-            cold_candidates = vector_candidates(
-                self._session,
+        cold_candidates, cold_tiers = self._cold_candidates(
+            task=task,
+            candidates=candidates,
+            result_candidates=result_candidates,
+            query=query,
+            scope=scope,
+        )
+        if cold_candidates:
+            tiers_fired.extend(cold_tiers)
+            reranked = rerank_candidates(
                 task=task,
-                candidates=self._vector_pool(candidates, project_id=scope.project_id),
-                exclude_ids={candidate.learning.id for candidate in result_candidates},
-                limit=min(
-                    self._config.vector_candidate_limit,
-                    max(query.k - len(result_candidates), 1),
-                ),
+                candidates=self._merge_candidates(result_candidates, cold_candidates),
+                config=self._config,
+                limit=query.k,
             )
-            if cold_candidates:
-                tiers_fired.append("vector")
-                reranked = rerank_candidates(
-                    task=task,
-                    candidates=self._merge_candidates(
-                        result_candidates, cold_candidates
-                    ),
-                    config=self._config,
-                    limit=query.k,
-                )
-                result_candidates = reranked
-                tiers_fired.append("rerank")
+            result_candidates = reranked
+            tiers_fired.append("rerank")
 
         return RetrievalResult(
             items=[candidate.to_model() for candidate in result_candidates[: query.k]],
             tiers_fired=tiers_fired,
         )
+
+    def _cold_candidates(
+        self,
+        *,
+        task: TaskRecord,
+        candidates: list[RetrievalCandidate],
+        result_candidates: list[RetrievalCandidate],
+        query: RetrievalQuery,
+        scope,
+    ) -> tuple[list[RetrievalCandidate], list[str]]:
+        if not query.fuzzy_global_search or len(result_candidates) >= query.k:
+            return [], []
+
+        cold_limit = min(
+            self._config.vector_candidate_limit,
+            max(query.k - len(result_candidates), 1),
+        )
+        cold_pool = apply_metadata_filters(
+            self._vector_pool(candidates, project_id=scope.project_id),
+            layers=query.layers,
+            owners=scope.owners,
+            learning_types=scope.learning_types,
+            reference=task.created_at,
+            max_age_days=scope.max_age_days,
+        )
+        if not cold_pool:
+            return [], []
+
+        exclude_ids = {candidate.learning.id for candidate in result_candidates}
+        cold_candidates: list[RetrievalCandidate] = []
+        tiers_fired: list[str] = []
+        query_text = task_similarity_text(task)
+
+        fts_matches = fts_candidates(
+            self._session,
+            query_text=query_text,
+            candidates=cold_pool,
+            exclude_ids=exclude_ids,
+            limit=cold_limit,
+        )
+        if fts_matches:
+            cold_candidates = self._merge_candidates(cold_candidates, fts_matches)
+            tiers_fired.append("fts")
+
+        trgm_matches = trgm_candidates(
+            self._session,
+            query_text=task.title or query_text,
+            candidates=cold_pool,
+            exclude_ids=exclude_ids
+            | {candidate.learning.id for candidate in cold_candidates},
+            limit=max(cold_limit - len(cold_candidates), 0),
+        )
+        if trgm_matches:
+            cold_candidates = self._merge_candidates(cold_candidates, trgm_matches)
+            tiers_fired.append("trgm")
+
+        vector_matches = vector_candidates(
+            self._session,
+            task=task,
+            candidates=cold_pool,
+            exclude_ids=exclude_ids
+            | {candidate.learning.id for candidate in cold_candidates},
+            limit=max(cold_limit - len(cold_candidates), 0),
+        )
+        if vector_matches:
+            cold_candidates = self._merge_candidates(cold_candidates, vector_matches)
+            tiers_fired.append("vector")
+
+        return cold_candidates, tiers_fired
 
     def _candidate_pool(
         self,

@@ -626,13 +626,15 @@ def test_assemble_packet_marks_vector_tier_when_fuzzy_search_is_enabled(
         policy_registry=policy_registry,
     )
 
-    assert packet["retrieval_tiers_used"] == [
+    assert packet["retrieval_tiers_used"][:3] == [
         "surface_area",
         "graph",
         "metadata",
-        "vector",
-        "rerank",
     ]
+    assert "rerank" in packet["retrieval_tiers_used"]
+    assert any(
+        tier in packet["retrieval_tiers_used"] for tier in ("fts", "trgm", "vector")
+    )
     assert packet["open_questions"] == []
     assert len(packet["relevant_learnings"]) == 2
     assert {learning["title"] for learning in packet["relevant_learnings"]} == {
@@ -999,6 +1001,12 @@ def test_retrieval_service_handles_missing_tasks_and_empty_projects(
     assert result.items == []
     assert result.tiers_fired == ["surface_area", "graph", "metadata"]
 
+    fuzzy_result = service.retrieve(
+        RetrievalQuery(task_id=task_id, fuzzy_global_search=True)
+    )
+    assert fuzzy_result.items == []
+    assert fuzzy_result.tiers_fired == ["surface_area", "graph", "metadata"]
+
 
 def test_retrieval_service_candidate_pool_handles_detached_learnings(
     db_session: Session,
@@ -1111,7 +1119,7 @@ def test_retrieval_service_fixture_metrics_and_cold_path(
         actual_titles = {learning.title for learning in result.items}
         total_hits += len(actual_titles & expected_titles[domain])
         total_expected += 10
-        if "vector" not in result.tiers_fired:
+        if not any(tier in result.tiers_fired for tier in ("fts", "trgm", "vector")):
             hot_path_queries += 1
         assert result.tiers_fired == ["surface_area", "graph", "metadata"]
 
@@ -1142,13 +1150,9 @@ def test_retrieval_service_fixture_metrics_and_cold_path(
         actual_titles = {learning.title for learning in result.items}
         total_hits += len(actual_titles & expected_titles["vector"])
         total_expected += 10
-        assert result.tiers_fired == [
-            "surface_area",
-            "graph",
-            "metadata",
-            "vector",
-            "rerank",
-        ]
+        assert result.tiers_fired[:3] == ["surface_area", "graph", "metadata"]
+        assert "rerank" in result.tiers_fired
+        assert any(tier in result.tiers_fired for tier in ("fts", "trgm", "vector"))
 
     assert total_hits / total_expected >= 0.8
     assert hot_path_queries / 20 >= 0.9
