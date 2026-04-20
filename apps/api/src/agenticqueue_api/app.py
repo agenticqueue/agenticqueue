@@ -135,6 +135,14 @@ class RevokeCapabilityRequest(SchemaModel):
     grant_id: uuid.UUID
 
 
+class AuditVerifyResponse(SchemaModel):
+    """Verification result for the append-only audit ledger."""
+
+    chain_length: int
+    verified_count: int
+    first_break_id_or_null: uuid.UUID | None = None
+
+
 class TaskTypeView(SchemaModel):
     """Task type registry entry exposed over the API."""
 
@@ -282,6 +290,30 @@ def create_app(
     app.add_middleware(ContentSizeLimitMiddleware)
     install_exception_handlers(app)
     app.include_router(build_crud_router(get_db_session))
+
+    @app.get(
+        "/audit/verify",
+        include_in_schema=False,
+        response_model=AuditVerifyResponse,
+    )
+    @app.get("/v1/audit/verify", response_model=AuditVerifyResponse)
+    def verify_audit_log_chain(
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> AuditVerifyResponse:
+        _require_admin_actor(request)
+        report = session.execute(
+            sa.text(
+                """
+                SELECT
+                  chain_length,
+                  verified_count,
+                  first_break_id_or_null
+                FROM agenticqueue.verify_audit_log_chain()
+                """
+            )
+        ).mappings().one()
+        return AuditVerifyResponse.model_validate(dict(report))
 
     @app.get("/task-types", include_in_schema=False, response_model=list[TaskTypeView])
     @app.get("/v1/task-types", response_model=list[TaskTypeView])

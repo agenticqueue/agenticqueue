@@ -49,3 +49,6 @@ class AuditLogRecord(IdentifiedTable, CreatedTable, Base):
     after: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     trace_id: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
     redaction: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    chain_position: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    prev_hash: Mapped[bytes] = mapped_column(sa.LargeBinary(length=32), nullable=False)
+    row_hash: Mapped[bytes] = mapped_column(sa.LargeBinary(length=32), nullable=False)
