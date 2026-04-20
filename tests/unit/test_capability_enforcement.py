@@ -231,8 +231,8 @@ def seed_capability_grant(
 
 
 ALL_STANDARD_CAPABILITIES = tuple(CapabilityKey)
-REQUIRED_PROJECT_SCOPE = {"project_id": "matrix-project"}
-MISMATCHED_PROJECT_SCOPE = {"project_id": "other-project"}
+REQUIRED_PROJECT_SCOPE: dict[str, object] = {"project_id": "matrix-project"}
+MISMATCHED_PROJECT_SCOPE: dict[str, object] = {"project_id": "other-project"}
 
 
 def make_capability_request(actor: ActorModel) -> SimpleNamespace:
