@@ -1,7 +1,6 @@
 """Submission validation for task outputs."""
 
 from __future__ import annotations
-
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -10,6 +9,7 @@ from typing import Any
 
 from jsonschema import ValidationError as JsonSchemaValidationError  # type: ignore[import-untyped]
 from jsonschema.validators import Draft202012Validator  # type: ignore[import-untyped]
+from pydantic import ValidationError as PydanticValidationError
 
 from agenticqueue_api.dod import DodReport, run_dod_checks
 from agenticqueue_api.dod_checks.common import (
@@ -18,6 +18,7 @@ from agenticqueue_api.dod_checks.common import (
     GitHubClientProtocol,
 )
 from agenticqueue_api.models.task import TaskModel
+from agenticqueue_api.schemas.submit import validate_task_completion_submission
 from agenticqueue_api.task_type_registry import SchemaLoadError, TaskTypeRegistry
 
 _MISSING_PROPERTY_RE = re.compile(r"'([^']+)' is a required property")
@@ -75,10 +76,32 @@ class SubmissionValidator:
                 )
             )
 
+        try:
+            normalized_submission = validate_task_completion_submission(
+                submitted_output
+            )
+        except TypeError as error:
+            return ValidationResult(
+                errors=(
+                    ValidationIssue(
+                        rule="submission_payload_type",
+                        offending_field="submission",
+                        hint=str(error),
+                    ),
+                )
+            )
+        except PydanticValidationError as error:
+            return ValidationResult(
+                errors=tuple(
+                    self._issue_from_submit_error(item) for item in error.errors()
+                )
+            )
+
+        normalized_output = normalized_submission.model_dump(mode="json")
         issues: list[ValidationIssue] = []
         dod_report: DodReport | None = None
-        retry_signal = self._has_retry_signal(submitted_output, issues)
-        output = submitted_output.get("output")
+        retry_signal = self._has_retry_signal(normalized_output, issues)
+        output = normalized_output.get("output")
         if not isinstance(output, Mapping):
             issues.append(
                 ValidationIssue(
@@ -129,7 +152,7 @@ class SubmissionValidator:
                     issues.extend(self._dod_report_issues(dod_report))
 
         if "dod_checks" not in task.contract:
-            issues.extend(self._dod_issues(task, submitted_output.get("dod_results")))
+            issues.extend(self._dod_issues(task, normalized_output.get("dod_results")))
         return ValidationResult(errors=tuple(issues), dod_report=dod_report)
 
     def _schema_issues(
@@ -284,5 +307,32 @@ class SubmissionValidator:
         return ValidationIssue(
             rule=f"schema.{error.validator}",
             offending_field=".".join(path),
+            hint=hint,
+        )
+
+    def _issue_from_submit_error(self, error: Mapping[str, Any]) -> ValidationIssue:
+        location = [str(part) for part in error.get("loc", ()) if part != "__root__"]
+        offending_field = ".".join(location) if location else "submission"
+        error_type = str(error.get("type", "validation_error"))
+
+        if error_type == "extra_forbidden":
+            rule = "submission.extra_forbidden"
+            hint = f"Remove unexpected field '{offending_field}'."
+        elif error_type in {"bool_type", "int_type", "string_type", "date_type"}:
+            rule = f"submission.{error_type}"
+            hint = f"Provide the expected JSON type for '{offending_field}'."
+        elif error_type in {"string_too_long", "list_too_long", "dict_too_long"}:
+            rule = f"submission.{error_type}"
+            hint = f"Reduce the size of '{offending_field}'."
+        elif error_type == "value_error":
+            rule = "submission.value_error"
+            hint = str(error.get("msg", "Submission payload failed validation."))
+        else:
+            rule = f"submission.{error_type}"
+            hint = str(error.get("msg", "Submission payload failed validation."))
+
+        return ValidationIssue(
+            rule=rule,
+            offending_field=offending_field,
             hint=hint,
         )

@@ -137,9 +137,9 @@ def test_validate_submission_reports_structured_schema_errors() -> None:
 
     assert result.is_valid is False
     assert len(result.errors) == 1
-    assert result.errors[0].rule == "schema.required"
+    assert result.errors[0].rule == "submission.missing"
     assert result.errors[0].offending_field == "output.diff_url"
-    assert result.errors[0].hint == "Provide 'diff_url' in the submission output."
+    assert result.errors[0].hint == "Field required"
 
 
 def test_validate_submission_reports_semantic_artifact_and_dod_errors() -> None:
@@ -152,10 +152,8 @@ def test_validate_submission_reports_semantic_artifact_and_dod_errors() -> None:
     result = _validator().validate_submission(_make_task(), submission)
 
     assert result.is_valid is False
-    rules = {error.rule for error in result.errors}
-    assert "schema.minItems" in rules
-    assert "artifacts_required" in rules
-    assert "dod_checked_required" in rules
+    assert [error.rule for error in result.errors] == ["submission.too_short"]
+    assert result.errors[0].offending_field == "output.artifacts"
 
 
 def test_validate_submission_requires_learnings_after_retry_signal() -> None:
@@ -169,9 +167,8 @@ def test_validate_submission_requires_learnings_after_retry_signal() -> None:
     assert [error.rule for error in result.errors] == ["learnings_required"]
 
 
-def test_validate_submission_rejects_bad_flag_and_dod_shapes() -> None:
+def test_validate_submission_rejects_bad_dod_shapes() -> None:
     submission = _make_submission()
-    submission["had_failure"] = "yes"
     submission["dod_results"] = [
         "not-an-object",
         {"item": "", "checked": False},
@@ -183,12 +180,9 @@ def test_validate_submission_rejects_bad_flag_and_dod_shapes() -> None:
 
     assert result.is_valid is False
     rules = {error.rule for error in result.errors}
-    assert "retry_flag_type" in rules
-    assert "dod_result_type" in rules
-    assert "dod_result_item_required" in rules
-    assert "dod_result_checked_type" in rules
-    assert "dod_result_unknown_item" in rules
-    assert "dod_checked_required" in rules
+    assert "submission.model_type" in rules
+    assert "submission.string_too_short" in rules
+    assert "submission.bool_type" in rules
 
 
 def test_validate_submission_rejects_missing_output_and_dod_results() -> None:
@@ -199,9 +193,37 @@ def test_validate_submission_rejects_missing_output_and_dod_results() -> None:
 
     assert result.is_valid is False
     assert [error.rule for error in result.errors] == [
-        "submission_output_type",
-        "dod_results_type",
+        "submission.missing",
+        "submission.missing",
     ]
+    assert [error.offending_field for error in result.errors] == [
+        "output",
+        "dod_results",
+    ]
+
+
+def test_validate_submission_rejects_stringified_retry_flag_from_strict_schema() -> (
+    None
+):
+    submission = _make_submission()
+    submission["had_retry"] = "true"
+
+    result = _validator().validate_submission(_make_task(), submission)
+
+    assert result.is_valid is False
+    assert [error.rule for error in result.errors] == ["submission.bool_type"]
+    assert result.errors[0].offending_field == "had_retry"
+
+
+def test_validate_submission_rejects_extra_fields_from_strict_schema() -> None:
+    submission = _make_submission()
+    submission["output"]["learnings"][0]["unexpected"] = "nope"
+
+    result = _validator().validate_submission(_make_task(), submission)
+
+    assert result.is_valid is False
+    assert [error.rule for error in result.errors] == ["submission.extra_forbidden"]
+    assert result.errors[0].offending_field == "output.learnings.0.unexpected"
 
 
 def test_validate_submission_rejects_invalid_declarative_dod_contract(

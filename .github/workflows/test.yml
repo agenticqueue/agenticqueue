@@ -61,6 +61,10 @@ jobs:
         shell: bash
         run: alembic -c apps/api/alembic.ini upgrade head
 
+      - name: Audit strict submit schemas
+        shell: bash
+        run: python scripts/audit_strict_models.py
+
       - name: Run pytest
         shell: bash
         run: |
@@ -80,6 +84,7 @@ jobs:
             tests/unit/test_transitions.py \
             tests/unit/test_dod.py \
             tests/unit/test_capability_enforcement.py \
+            tests/unit/test_payload_caps.py \
             tests/unit/test_policy.py \
             --cov=agenticqueue_api.validator \
             --cov=agenticqueue_api.transitions \

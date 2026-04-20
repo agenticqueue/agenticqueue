@@ -20,3 +20,11 @@ repos:
       - id: trailing-whitespace
       - id: check-yaml
       - id: check-json
+
+  - repo: local
+    hooks:
+      - id: audit-strict-models
+        name: audit-strict-models
+        entry: python scripts/audit_strict_models.py
+        language: system
+        pass_filenames: false
