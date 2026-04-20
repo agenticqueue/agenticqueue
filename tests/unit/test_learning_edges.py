@@ -75,7 +75,7 @@ def make_edge_payload(
     dst_entity_type: str,
     dst_id: uuid.UUID,
 ) -> EdgeModel:
-    payload = {
+    payload: dict[str, object] = {
         "id": f"00000000-0000-0000-0000-{suffix:012d}",
         "src_entity_type": src_entity_type,
         "src_id": str(src_id),
@@ -246,4 +246,4 @@ def test_learnings_for_widens_scope_filters(db_session: Session) -> None:
 
 def test_learnings_for_rejects_unknown_scope(db_session: Session) -> None:
     with pytest.raises(ValueError, match="scope"):
-        learnings_for(db_session, TASK_ID, scope="workspace")
+        learnings_for(db_session, TASK_ID, scope="workspace")  # type: ignore[arg-type]
