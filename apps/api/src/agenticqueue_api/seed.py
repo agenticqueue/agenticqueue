@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 from typing import TypeVar
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pydantic import Field
 from sqlalchemy.orm import Session
 
@@ -28,7 +28,7 @@ from agenticqueue_api.models.shared import SchemaModel, TimestampedSchema
 
 DEFAULT_SEED_PATH = Path("examples") / "seed.yaml"
 
-SchemaT = TypeVar("SchemaT", bound=SchemaModel)
+SchemaT = TypeVar("SchemaT", bound=TimestampedSchema)
 RecordT = TypeVar("RecordT")
 
 
