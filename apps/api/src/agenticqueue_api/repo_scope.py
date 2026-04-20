@@ -55,7 +55,11 @@ def _sorted_files(paths: Iterable[Path]) -> list[Path]:
 def _expand_scope_entry(repo_root: Path, entry: str) -> list[Path]:
     if entry == "**" or entry.endswith("/**"):
         subtree_root = entry[:-3].rstrip("/")
-        target = repo_root if not subtree_root else (repo_root / Path(subtree_root)).resolve()
+        target = (
+            repo_root
+            if not subtree_root
+            else (repo_root / Path(subtree_root)).resolve()
+        )
         try:
             target.relative_to(repo_root)
         except ValueError as error:
