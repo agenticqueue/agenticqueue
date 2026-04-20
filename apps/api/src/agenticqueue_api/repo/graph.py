@@ -100,6 +100,10 @@ def _node_key_expr(
     )
 
 
+def _node_path_array(values: list[Any]) -> Any:
+    return pg_array(values, type_=sa.String())  # type: ignore[misc]
+
+
 def _walk_direction(
     session: Session,
     *,
@@ -134,15 +138,12 @@ def _walk_direction(
             base_next_type.label("entity_type"),
             base_next_id.label("entity_id"),
             sa.literal(1).label("depth"),
-            pg_array(
+            _node_path_array(
                 [
                     _node_key_literal(normalized_entity_type, entity_id),
                     _node_key_expr(base_next_type, base_next_id),
-                ],
-                type_=sa.String(),
-            ).label(
-                "path"
-            ),  # type: ignore[misc]
+                ]
+            ).label("path"),
         )
         .where(base_match)
         .where(_active_edge_condition(base_edge))
