@@ -124,7 +124,9 @@ def test_retry_transition_increments_attempt_count_and_emits_escalation() -> Non
     assert result.escalation == "max_retries_exceeded"
 
 
-def test_capability_guard_blocks_transition_when_required_capability_is_missing() -> None:
+def test_capability_guard_blocks_transition_when_required_capability_is_missing() -> (
+    None
+):
     result = apply_transition(
         _make_task(state="claimed"),
         "in_progress",
@@ -158,7 +160,9 @@ def test_policy_guards_block_autonomy_overreach_and_missing_human_approval() -> 
     assert autonomy_block.guard_blocked == "policy"
     assert autonomy_block.note == "Task autonomy tier 4 exceeds policy limit 3."
     assert approval_block.guard_blocked == "policy"
-    assert approval_block.note == "Transition to done requires human approval by policy."
+    assert (
+        approval_block.note == "Transition to done requires human approval by policy."
+    )
 
 
 def test_dod_guard_blocks_done_transition_when_report_has_failure() -> None:
@@ -208,7 +212,9 @@ def test_done_transition_succeeds_with_policy_approval_and_passing_dod_report() 
     assert result.escalation is None
 
 
-def test_blocked_escalation_requires_age_threshold_and_then_routes_to_ghost_triage() -> None:
+def test_blocked_escalation_requires_age_threshold_and_then_routes_to_ghost_triage() -> (
+    None
+):
     registry = _task_type_registry()
     now = dt.datetime(2026, 4, 20, 12, 0, tzinfo=dt.UTC)
 
@@ -253,7 +259,7 @@ def test_load_transition_policy_rejects_empty_transition_map(tmp_path: Path) -> 
         encoding="utf-8",
     )
     (task_types_dir / "coding-task.policy.yaml").write_text(
-        '\n'.join(
+        "\n".join(
             [
                 'version: "1.0.0"',
                 "hitl_required: true",

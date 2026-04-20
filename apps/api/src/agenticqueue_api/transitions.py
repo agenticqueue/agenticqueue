@@ -237,7 +237,11 @@ def apply_transition(
             ),
         )
 
-    if requested_state is TaskState.DONE and policy.hitl_required and not human_approved:
+    if (
+        requested_state is TaskState.DONE
+        and policy.hitl_required
+        and not human_approved
+    ):
         return TransitionResult(
             from_state=from_state.value,
             requested_state=requested_state.value,
