@@ -7,7 +7,7 @@ import uuid
 
 import sqlalchemy as sa
 from pydantic import Field, field_validator
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from agenticqueue_api.db import Base
@@ -18,6 +18,14 @@ from agenticqueue_api.models.shared import (
     jsonb_list_column,
 )
 from agenticqueue_api.pgvector import embedding_column, normalize_embedding
+from agenticqueue_api.search import (
+    SEARCH_DOCUMENT_COLUMN_NAME,
+    search_document_expression,
+    search_document_index_name,
+    search_text_expression,
+    search_text_trgm_index_name,
+    search_trigram_column_name,
+)
 
 
 class LearningModel(TimestampedSchema):
@@ -51,6 +59,21 @@ class LearningRecord(IdentifiedTable, TimestampedTable, Base):
     """SQLAlchemy model for a learning row."""
 
     __tablename__ = "learning"
+    __table_args__ = (
+        sa.Index(
+            search_document_index_name(__tablename__),
+            SEARCH_DOCUMENT_COLUMN_NAME,
+            postgresql_using="gin",
+        ),
+        sa.Index(
+            search_text_trgm_index_name(__tablename__),
+            search_trigram_column_name(__tablename__),
+            postgresql_using="gin",
+            postgresql_ops={
+                search_trigram_column_name(__tablename__): "gin_trgm_ops"
+            },
+        ),
+    )
 
     task_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
@@ -81,4 +104,14 @@ class LearningRecord(IdentifiedTable, TimestampedTable, Base):
     confidence: Mapped[str] = mapped_column(sa.String(32), nullable=False)
     status: Mapped[str] = mapped_column(sa.String(32), nullable=False)
     review_date: Mapped[dt.date | None] = mapped_column(sa.Date(), nullable=True)
+    search_text: Mapped[str] = mapped_column(
+        sa.Text(),
+        sa.Computed(search_text_expression(__tablename__), persisted=True),
+        nullable=False,
+    )
+    search_document: Mapped[str] = mapped_column(
+        TSVECTOR(),
+        sa.Computed(search_document_expression(__tablename__), persisted=True),
+        nullable=False,
+    )
     embedding: Mapped[list[float] | None] = embedding_column()
