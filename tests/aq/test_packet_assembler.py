@@ -5,7 +5,7 @@ from pathlib import Path
 import time
 from types import SimpleNamespace
 import uuid
-from typing import Any, Iterator
+from typing import Any, Iterator, cast
 
 import pytest
 import sqlalchemy as sa
@@ -724,12 +724,15 @@ def test_packet_compiler_helper_branches_and_vector_candidates(
     assert compiler_module._expected_output_schema(definition_bad_output) == {}
     assert (
         compiler_module._learning_similarity_text(
-            SimpleNamespace(
-                title="A",
-                action_rule="B",
-                what_happened="C",
-                what_learned="D",
-                evidence=["E"],
+            cast(
+                Any,
+                SimpleNamespace(
+                    title="A",
+                    action_rule="B",
+                    what_happened="C",
+                    what_learned="D",
+                    evidence=["E"],
+                ),
             )
         )
         == "A\nB\nC\nD\nE"
