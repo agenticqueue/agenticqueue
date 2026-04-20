@@ -349,7 +349,11 @@ def _failed_test_names(details: Mapping[str, Any]) -> list[str]:
         if isinstance(raw_tests, Sequence) and not isinstance(
             raw_tests, (str, bytes, bytearray)
         ):
-            failed.extend(_string_or_none(item) for item in raw_tests)
+            failed.extend(
+                item_text
+                for item in raw_tests
+                if (item_text := _string_or_none(item)) is not None
+            )
         if any(
             marker in tokens
             for marker in ("test_failed", "pytest_failed", "failing test")
