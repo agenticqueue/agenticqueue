@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from collections.abc import Iterator
+from unittest.mock import ANY, patch
 
 import pytest
 import sqlalchemy as sa
@@ -57,7 +57,6 @@ def test_docker_compose_sets_server_reset_query_always() -> None:
 
 def test_recursive_cte_timeout_returns_504_and_logs_fingerprint(
     session_factory: sessionmaker[Session],
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     seed_graph_chain(session_factory)
     token = seed_bearer_token(session_factory)
@@ -68,18 +67,18 @@ def test_recursive_cte_timeout_returns_504_and_logs_fingerprint(
         endpoint_label="v1.tests.graph-timeout",
     )
 
-    with TestClient(app) as client:
-        before_connections = count_backend_connections()
-        caplog.set_level(logging.WARNING, logger="agenticqueue_api.db")
-        response = client.get(
-            "/v1/tests/graph-timeout",
-            headers=auth_headers(token),
-        )
-        health_response = client.get(
-            "/v1/tests/db-health",
-            headers=auth_headers(token),
-        )
-        after_connections = count_backend_connections()
+    with patch("agenticqueue_api.db.logger.warning") as warning_mock:
+        with TestClient(app) as client:
+            before_connections = count_backend_connections()
+            response = client.get(
+                "/v1/tests/graph-timeout",
+                headers=auth_headers(token),
+            )
+            health_response = client.get(
+                "/v1/tests/db-health",
+                headers=auth_headers(token),
+            )
+            after_connections = count_backend_connections()
 
     assert response.status_code == 504
     assert response.json()["error_code"] == "gateway_timeout"
@@ -89,7 +88,10 @@ def test_recursive_cte_timeout_returns_504_and_logs_fingerprint(
     assert health_response.status_code == 200
     assert health_response.json() == {"ok": 1}
     assert after_connections <= before_connections + 1
-    assert any(
-        "statement-timeout endpoint=v1.tests.graph-timeout" in record.getMessage()
-        for record in caplog.records
+    warning_mock.assert_called_once_with(
+        "statement-timeout endpoint=%s sql_fingerprint=%s elapsed_ms=%s timeout_ms=%s",
+        "v1.tests.graph-timeout",
+        ANY,
+        ANY,
+        25,
     )
