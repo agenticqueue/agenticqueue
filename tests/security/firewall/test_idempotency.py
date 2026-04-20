@@ -38,7 +38,9 @@ class UTCDateTime(sa.TypeDecorator[dt.datetime]):
     impl = sa.String()
     cache_ok = True
 
-    def process_bind_param(self, value: dt.datetime | None, dialect: sa.Dialect) -> str | None:
+    def process_bind_param(
+        self, value: dt.datetime | None, dialect: sa.Dialect
+    ) -> str | None:
         del dialect
         if value is None:
             return None
@@ -80,7 +82,9 @@ class TempIdempotencyKeyRecord(TempBase):
         default=0,
         server_default="0",
     )
-    expires_at: Mapped[dt.datetime] = mapped_column(UTCDateTime(), nullable=False, index=True)
+    expires_at: Mapped[dt.datetime] = mapped_column(
+        UTCDateTime(), nullable=False, index=True
+    )
 
 
 @pytest.fixture(autouse=True)

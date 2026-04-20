@@ -40,7 +40,9 @@ class UTCDateTime(sa.TypeDecorator[dt.datetime]):
     impl = sa.String()
     cache_ok = True
 
-    def process_bind_param(self, value: dt.datetime | None, dialect: sa.Dialect) -> str | None:
+    def process_bind_param(
+        self, value: dt.datetime | None, dialect: sa.Dialect
+    ) -> str | None:
         del dialect
         if value is None:
             return None
@@ -71,7 +73,9 @@ class TempIdempotencyKeyRecord(TempBase):
         default=0,
         server_default="0",
     )
-    expires_at: Mapped[dt.datetime] = mapped_column(UTCDateTime(), nullable=False, index=True)
+    expires_at: Mapped[dt.datetime] = mapped_column(
+        UTCDateTime(), nullable=False, index=True
+    )
 
 
 class HeaderAuthMiddleware(BaseHTTPMiddleware):
@@ -127,7 +131,9 @@ class HeaderAuthMiddleware(BaseHTTPMiddleware):
                 ),
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        if token_state["expires_at"] is not None and token_state["expires_at"] <= dt.datetime.now(dt.UTC):
+        if token_state["expires_at"] is not None and token_state[
+            "expires_at"
+        ] <= dt.datetime.now(dt.UTC):
             return JSONResponse(
                 status_code=401,
                 content=error_payload(
@@ -299,7 +305,9 @@ def submission_payload_factory() -> Callable[[], dict[str, Any]]:
                         "action_rule": "Run submit middleware before route logic.",
                         "applies_when": "A mutating submit endpoint accepts JSON payloads from agents.",
                         "does_not_apply_when": "The route is read-only.",
-                        "evidence": ["tests/security/firewall/test_firewall_vectors.py"],
+                        "evidence": [
+                            "tests/security/firewall/test_firewall_vectors.py"
+                        ],
                         "scope": "project",
                         "confidence": "confirmed",
                         "status": "active",

@@ -212,8 +212,8 @@ def test_base64_zip_bomb_variant_returns_413(
 ) -> None:
     _, token = token_factory(handle="oversize-admin", actor_type="admin")
     payload = submission_payload_factory()
-    payload["output"]["learnings"][0]["what_happened"] = (
-        "A" * (DEFAULT_CONTENT_SIZE_LIMIT + 1024)
+    payload["output"]["learnings"][0]["what_happened"] = "A" * (
+        DEFAULT_CONTENT_SIZE_LIMIT + 1024
     )
 
     with TestClient(firewall_app_factory()) as client:
@@ -275,7 +275,11 @@ def test_chunked_zip_bomb_variant_returns_413() -> None:
     }
     chunk = b"A" * (DEFAULT_CONTENT_SIZE_LIMIT // 2)
     messages = [
-        {"type": "http.request", "body": codecs.BOM_UTF8 + b'{"blob":"', "more_body": True},
+        {
+            "type": "http.request",
+            "body": codecs.BOM_UTF8 + b'{"blob":"',
+            "more_body": True,
+        },
         {"type": "http.request", "body": chunk, "more_body": True},
         {"type": "http.request", "body": chunk, "more_body": True},
         {"type": "http.request", "body": b'"}', "more_body": False},
