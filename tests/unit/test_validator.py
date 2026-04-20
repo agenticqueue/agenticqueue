@@ -8,9 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from agenticqueue_api.config import get_task_types_dir
+from agenticqueue_api.schemas.submit import MAX_SUBMISSION_DEPTH
 from agenticqueue_api.models.task import TaskModel
 from agenticqueue_api.task_type_registry import TaskTypeRegistry
 from agenticqueue_api.validator import SubmissionValidator
+from jsonschema.validators import Draft202012Validator  # type: ignore[import-untyped]
 
 
 def _repo_root() -> Path:
@@ -224,6 +226,98 @@ def test_validate_submission_rejects_extra_fields_from_strict_schema() -> None:
     assert result.is_valid is False
     assert [error.rule for error in result.errors] == ["submission.extra_forbidden"]
     assert result.errors[0].offending_field == "output.learnings.0.unexpected"
+
+
+def test_validate_submission_rejects_unserializable_payload() -> None:
+    submission = _make_submission()
+    submission["output"]["artifacts"][0]["details"] = {"bad": {1, 2}}
+
+    result = _validator().validate_submission(_make_task(), submission)
+
+    assert result.is_valid is False
+    assert [error.rule for error in result.errors] == ["submission_payload_type"]
+
+
+def test_validate_submission_rejects_excessive_depth_from_strict_schema() -> None:
+    submission = _make_submission()
+    nested: dict[str, object] = {"level_0": "done"}
+    for index in range(MAX_SUBMISSION_DEPTH + 1):
+        nested = {f"level_{index + 1}": nested}
+    submission["output"]["artifacts"][0]["details"] = nested
+
+    result = _validator().validate_submission(_make_task(), submission)
+
+    assert result.is_valid is False
+    assert [error.rule for error in result.errors] == ["submission.value_error"]
+
+
+def test_validate_submission_rejects_overlong_strings_from_strict_schema() -> None:
+    submission = _make_submission()
+    submission["output"]["learnings"][0]["title"] = "x" * 1100
+
+    result = _validator().validate_submission(_make_task(), submission)
+
+    assert result.is_valid is False
+    assert [error.rule for error in result.errors] == ["submission.string_too_long"]
+
+
+def test_validate_submission_rejects_unknown_dod_items_and_requires_one_checked() -> (
+    None
+):
+    submission = _make_submission()
+    submission["dod_results"] = [{"item": "Unknown DoD", "checked": False}]
+
+    result = _validator().validate_submission(_make_task(), submission)
+
+    assert result.is_valid is False
+    rules = {error.rule for error in result.errors}
+    assert "dod_result_unknown_item" in rules
+    assert "dod_checked_required" in rules
+
+
+def test_validator_helper_maps_required_schema_errors() -> None:
+    validator = _validator()
+    schema_error = next(
+        Draft202012Validator(
+            {
+                "type": "object",
+                "required": ["diff_url"],
+            }
+        ).iter_errors({})
+    )
+
+    assert validator._schema_error_sort_key(schema_error) == (
+        tuple(),
+        "'diff_url' is a required property",
+    )
+    issue = validator._issue_from_schema_error(schema_error)
+
+    assert issue.rule == "schema.required"
+    assert issue.offending_field == "output.diff_url"
+    assert issue.hint == "Provide 'diff_url' in the submission output."
+
+
+def test_validator_helper_preserves_non_required_schema_errors() -> None:
+    validator = _validator()
+    schema_error = next(
+        Draft202012Validator(
+            {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "minLength": 3,
+                    }
+                },
+            }
+        ).iter_errors({"kind": "x"})
+    )
+
+    issue = validator._issue_from_schema_error(schema_error)
+
+    assert issue.rule == "schema.minLength"
+    assert issue.offending_field == "output.kind"
+    assert issue.hint == "'x' is too short"
 
 
 def test_validate_submission_rejects_invalid_declarative_dod_contract(

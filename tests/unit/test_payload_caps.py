@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable, MutableMapping
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from starlette.types import Message
 
 from agenticqueue_api.middleware.payload_limits import (
     ContentSizeLimitMiddleware,
@@ -92,10 +93,10 @@ def _build_app(counter: dict[str, int]) -> FastAPI:
 def _run_middleware_with_chunks(
     *,
     chunks: list[bytes],
-    scope: dict[str, Any],
+    scope: MutableMapping[str, Any],
     read_twice: bool = False,
-) -> list[dict[str, Any]]:
-    sent_messages: list[dict[str, Any]] = []
+) -> list[Message]:
+    sent_messages: list[Message] = []
     request_messages = [
         {
             "type": "http.request",
@@ -106,16 +107,16 @@ def _run_middleware_with_chunks(
     ]
     request_messages.append({"type": "http.disconnect"})
 
-    async def receive() -> dict[str, Any]:
+    async def receive() -> Message:
         return request_messages.pop(0)
 
-    async def send(message: dict[str, Any]) -> None:
+    async def send(message: Message) -> None:
         sent_messages.append(message)
 
     async def downstream_app(
-        _scope: dict[str, Any],
-        _receive: Callable[[], Any],
-        _send: Callable[[dict[str, Any]], Any],
+        _scope: MutableMapping[str, Any],
+        _receive: Callable[[], Awaitable[Message]],
+        _send: Callable[[Message], Awaitable[None]],
     ) -> None:
         first = await _receive()
         assert first["type"] == "http.request"
@@ -225,7 +226,14 @@ def test_disconnect_and_replay_paths_are_covered() -> None:
     disconnect_messages = _run_middleware_with_chunks(chunks=[], scope=scope)
     assert disconnect_messages == []
 
-    middleware = ContentSizeLimitMiddleware(lambda *_args: None)
+    async def no_op_app(
+        _scope: MutableMapping[str, Any],
+        _receive: Callable[[], Awaitable[Message]],
+        _send: Callable[[Message], Awaitable[None]],
+    ) -> None:
+        return None
+
+    middleware = ContentSizeLimitMiddleware(no_op_app)
     import asyncio
 
     assert asyncio.run(middleware._empty_receive()) == {

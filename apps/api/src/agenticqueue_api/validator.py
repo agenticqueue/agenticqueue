@@ -101,55 +101,37 @@ class SubmissionValidator:
         issues: list[ValidationIssue] = []
         dod_report: DodReport | None = None
         retry_signal = self._has_retry_signal(normalized_output, issues)
-        output = normalized_output.get("output")
-        if not isinstance(output, Mapping):
+        output = dict(normalized_output["output"])
+        issues.extend(self._schema_issues(task.task_type, output))
+
+        learnings = output["learnings"]
+        if retry_signal and len(learnings) == 0:
             issues.append(
                 ValidationIssue(
-                    rule="submission_output_type",
-                    offending_field="output",
-                    hint="Provide an 'output' object that matches the task type schema.",
+                    rule="learnings_required",
+                    offending_field="output.learnings",
+                    hint="Add at least one learning when the task had a failure, block, or retry.",
                 )
             )
-        else:
-            issues.extend(self._schema_issues(task.task_type, dict(output)))
-            artifacts = output.get("artifacts")
-            if isinstance(artifacts, list) and len(artifacts) == 0:
+        if "dod_checks" in task.contract:
+            try:
+                dod_report = run_dod_checks(
+                    task,
+                    output,
+                    registry=self._registry,
+                    artifact_root=self._artifact_root,
+                    github_client=self._github_client,
+                )
+            except DodCheckValidationError as error:
                 issues.append(
                     ValidationIssue(
-                        rule="artifacts_required",
-                        offending_field="output.artifacts",
-                        hint="Attach at least one artifact to the submission output.",
+                        rule="dod_checks_invalid",
+                        offending_field="contract.dod_checks",
+                        hint=str(error),
                     )
                 )
-
-            learnings = output.get("learnings")
-            if retry_signal and isinstance(learnings, list) and len(learnings) == 0:
-                issues.append(
-                    ValidationIssue(
-                        rule="learnings_required",
-                        offending_field="output.learnings",
-                        hint="Add at least one learning when the task had a failure, block, or retry.",
-                    )
-                )
-            if "dod_checks" in task.contract:
-                try:
-                    dod_report = run_dod_checks(
-                        task,
-                        output,
-                        registry=self._registry,
-                        artifact_root=self._artifact_root,
-                        github_client=self._github_client,
-                    )
-                except DodCheckValidationError as error:
-                    issues.append(
-                        ValidationIssue(
-                            rule="dod_checks_invalid",
-                            offending_field="contract.dod_checks",
-                            hint=str(error),
-                        )
-                    )
-                else:
-                    issues.extend(self._dod_report_issues(dod_report))
+            else:
+                issues.extend(self._dod_report_issues(dod_report))
 
         if "dod_checks" not in task.contract:
             issues.extend(self._dod_issues(task, normalized_output.get("dod_results")))
@@ -187,50 +169,13 @@ class SubmissionValidator:
         task: TaskModel,
         dod_results: Any,
     ) -> list[ValidationIssue]:
-        if not isinstance(dod_results, list):
-            return [
-                ValidationIssue(
-                    rule="dod_results_type",
-                    offending_field="dod_results",
-                    hint="Provide a list of {item, checked} DoD results.",
-                )
-            ]
-
         expected_items = set(task.definition_of_done)
         checked_any = False
         issues: list[ValidationIssue] = []
         for index, result in enumerate(dod_results):
             field_prefix = f"dod_results.{index}"
-            if not isinstance(result, Mapping):
-                issues.append(
-                    ValidationIssue(
-                        rule="dod_result_type",
-                        offending_field=field_prefix,
-                        hint="Each DoD result must be an object with item and checked fields.",
-                    )
-                )
-                continue
-
             item = result.get("item")
             checked = result.get("checked")
-            if not isinstance(item, str) or not item.strip():
-                issues.append(
-                    ValidationIssue(
-                        rule="dod_result_item_required",
-                        offending_field=f"{field_prefix}.item",
-                        hint="Provide the exact DoD item text for this result.",
-                    )
-                )
-                continue
-            if not isinstance(checked, bool):
-                issues.append(
-                    ValidationIssue(
-                        rule="dod_result_checked_type",
-                        offending_field=f"{field_prefix}.checked",
-                        hint="Use true or false for each DoD result.",
-                    )
-                )
-                continue
             if expected_items and item not in expected_items:
                 issues.append(
                     ValidationIssue(
@@ -272,20 +217,10 @@ class SubmissionValidator:
         submitted_output: Mapping[str, Any],
         issues: list[ValidationIssue],
     ) -> bool:
-        had_signal = False
-        for flag_name in _RETRY_FLAGS:
-            flag_value = submitted_output.get(flag_name, False)
-            if not isinstance(flag_value, bool):
-                issues.append(
-                    ValidationIssue(
-                        rule="retry_flag_type",
-                        offending_field=flag_name,
-                        hint=f"Use true or false for '{flag_name}'.",
-                    )
-                )
-                continue
-            had_signal = had_signal or flag_value
-        return had_signal
+        del issues
+        return any(
+            bool(submitted_output.get(flag_name, False)) for flag_name in _RETRY_FLAGS
+        )
 
     @staticmethod
     def _schema_error_sort_key(
