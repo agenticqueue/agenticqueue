@@ -198,7 +198,11 @@ def test_expired_token_returns_401(
 
     assert response.status_code == 401
     assert response.headers["WWW-Authenticate"] == "Bearer"
-    assert response.json() == {"detail": "Invalid bearer token"}
+    assert response.json() == {
+        "error_code": "unauthorized",
+        "message": "Invalid bearer token",
+        "details": None,
+    }
 
 
 def test_revoked_token_returns_401(
@@ -227,7 +231,11 @@ def test_revoked_token_returns_401(
     )
 
     assert response.status_code == 401
-    assert response.json() == {"detail": "Invalid bearer token"}
+    assert response.json() == {
+        "error_code": "unauthorized",
+        "message": "Invalid bearer token",
+        "details": None,
+    }
 
 
 def test_malformed_token_returns_401(
@@ -249,7 +257,11 @@ def test_malformed_token_returns_401(
     )
 
     assert response.status_code == 401
-    assert response.json() == {"detail": "Invalid bearer token"}
+    assert response.json() == {
+        "error_code": "unauthorized",
+        "message": "Invalid bearer token",
+        "details": None,
+    }
 
 
 def test_missing_authorization_header_returns_401(client: TestClient) -> None:
@@ -257,7 +269,11 @@ def test_missing_authorization_header_returns_401(client: TestClient) -> None:
 
     assert response.status_code == 401
     assert response.headers["WWW-Authenticate"] == "Bearer"
-    assert response.json() == {"detail": "Missing Authorization header"}
+    assert response.json() == {
+        "error_code": "unauthorized",
+        "message": "Missing Authorization header",
+        "details": None,
+    }
 
 
 def test_provision_endpoint_creates_token_and_returns_raw_value_once(
@@ -333,7 +349,11 @@ def test_revoke_endpoint_marks_token_and_blocks_future_use(
         headers={"Authorization": f"Bearer {raw_token}"},
     )
     assert list_response.status_code == 401
-    assert list_response.json() == {"detail": "Invalid bearer token"}
+    assert list_response.json() == {
+        "error_code": "unauthorized",
+        "message": "Invalid bearer token",
+        "details": None,
+    }
 
 
 def test_list_endpoint_returns_only_requesting_actor_tokens_without_raw_values(

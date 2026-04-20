@@ -17,6 +17,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from agenticqueue_api.config import get_token_signing_secret
+from agenticqueue_api.errors import error_payload
 from agenticqueue_api.models import (
     ActorModel,
     ActorRecord,
@@ -201,7 +202,7 @@ def authenticate_api_token(
 def _unauthorized_response(detail: str) -> JSONResponse:
     return JSONResponse(
         status_code=401,
-        content={"detail": detail},
+        content=error_payload(status_code=401, message=detail),
         headers=WWW_AUTHENTICATE_HEADER,
     )
 

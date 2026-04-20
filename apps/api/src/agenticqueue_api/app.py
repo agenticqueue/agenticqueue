@@ -27,6 +27,8 @@ from agenticqueue_api.capabilities import (
     revoke_capability_grant,
 )
 from agenticqueue_api.config import get_sqlalchemy_sync_database_url
+from agenticqueue_api.crud import build_crud_router
+from agenticqueue_api.errors import install_exception_handlers, raise_api_error
 from agenticqueue_api.models import (
     ActorModel,
     ActorRecord,
@@ -163,19 +165,14 @@ def _capability_grant_view(grant: CapabilityGrantModel) -> CapabilityGrantView:
 def _require_actor(request: Request) -> ActorModel:
     actor = getattr(request.state, "actor", None)
     if actor is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token"
-        )
+        raise_api_error(status.HTTP_401_UNAUTHORIZED, "Invalid bearer token")
     return cast(ActorModel, actor)
 
 
 def _require_admin_actor(request: Request) -> ActorModel:
     actor = _require_actor(request)
     if actor.actor_type != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin actor required",
-        )
+        raise_api_error(status.HTTP_403_FORBIDDEN, "Admin actor required")
     return actor
 
 
@@ -208,10 +205,12 @@ def create_app(
         title="AgenticQueue API",
         docs_url=None,
         redoc_url=None,
-        openapi_url=None,
+        openapi_url="/openapi.json",
     )
     app.state.session_factory = session_factory or _default_session_factory()
     app.add_middleware(AgenticQueueAuthMiddleware)
+    install_exception_handlers(app)
+    app.include_router(build_crud_router(get_db_session))
 
     @app.get("/v1/auth/tokens", response_model=ApiTokenListResponse)
     def list_tokens(
@@ -237,10 +236,7 @@ def create_app(
         _require_admin_actor(request)
         actor_exists = session.get(ActorRecord, payload.actor_id)
         if actor_exists is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Actor not found",
-            )
+            raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
 
         api_token, raw_token = issue_api_token(
             session,
@@ -261,22 +257,13 @@ def create_app(
         actor = _require_actor(request)
         existing = get_api_token(session, token_id)
         if existing is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Token not found",
-            )
+            raise_api_error(status.HTTP_404_NOT_FOUND, "Token not found")
         if actor.actor_type != "admin" and existing.actor_id != actor.id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Token not found",
-            )
+            raise_api_error(status.HTTP_404_NOT_FOUND, "Token not found")
 
         revoked = revoke_api_token(session, token_id)
         if revoked is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Token not found",
-            )
+            raise_api_error(status.HTTP_404_NOT_FOUND, "Token not found")
         return _token_view(revoked)
 
     @app.post(
@@ -292,10 +279,7 @@ def create_app(
         admin_actor = _require_admin_actor(request)
         actor_exists = session.get(ActorRecord, payload.actor_id)
         if actor_exists is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Actor not found",
-            )
+            raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
 
         try:
             grant = grant_capability(
@@ -307,10 +291,7 @@ def create_app(
                 expires_at=payload.expires_at,
             )
         except ValueError as error:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=str(error),
-            ) from error
+            raise_api_error(status.HTTP_404_NOT_FOUND, str(error))
         return _capability_grant_view(grant)
 
     @app.post("/v1/capabilities/revoke", response_model=CapabilityGrantView)
@@ -322,10 +303,7 @@ def create_app(
         _require_admin_actor(request)
         revoked_grant = revoke_capability_grant(session, payload.grant_id)
         if revoked_grant is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Capability grant not found",
-            )
+            raise_api_error(status.HTTP_404_NOT_FOUND, "Capability grant not found")
         return _capability_grant_view(revoked_grant)
 
     @app.get(
@@ -339,17 +317,11 @@ def create_app(
     ) -> ActorCapabilityListResponse:
         requesting_actor = _require_actor(request)
         if requesting_actor.actor_type != "admin" and requesting_actor.id != actor_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin actor required",
-            )
+            raise_api_error(status.HTTP_403_FORBIDDEN, "Admin actor required")
 
         target_actor = session.get(ActorRecord, actor_id)
         if target_actor is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Actor not found",
-            )
+            raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
 
         grants = list_capabilities_for_actor(session, actor_id)
         return ActorCapabilityListResponse(
