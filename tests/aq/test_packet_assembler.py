@@ -1017,8 +1017,8 @@ def test_retrieval_service_candidate_pool_handles_detached_learnings(
     assert candidates[0].learning.title == "Detached learning"
     assert candidates[0].source_task is None
 
-    scoped_candidates = service._candidate_pool(
-        project_id=uuid.UUID("00000000-0000-0000-0000-000000000957")
+    scoped_candidates = service._vector_pool(
+        candidates, project_id=uuid.UUID("00000000-0000-0000-0000-000000000957")
     )
     assert scoped_candidates == []
 

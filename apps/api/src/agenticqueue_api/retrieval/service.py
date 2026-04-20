@@ -130,9 +130,6 @@ class RetrievalService:
             source_task = (
                 tasks_by_id.get(learning.task_id) if learning.task_id else None
             )
-            if project_id is not None:
-                if source_task is None or source_task.project_id != project_id:
-                    continue
             candidates.append(
                 RetrievalCandidate(learning=learning, source_task=source_task)
             )
