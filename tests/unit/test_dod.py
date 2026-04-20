@@ -38,7 +38,9 @@ def _registry() -> TaskTypeRegistry:
     return registry
 
 
-def _task(*, dod_checks: list[dict[str, object]], definition_of_done: list[str]) -> TaskModel:
+def _task(
+    *, dod_checks: list[dict[str, object]], definition_of_done: list[str]
+) -> TaskModel:
     return TaskModel.model_validate(
         {
             "id": str(uuid.uuid4()),
@@ -281,8 +283,16 @@ def test_run_dod_checks_supports_partial_and_blocked_items(tmp_path: Path) -> No
     ("raw_checks", "expected"),
     [
         (None, "Task contract must declare a non-empty 'dod_checks' list."),
-        ([{"item": "x", "type": "shell", "cmd": "pytest"}], "shell exec disabled; see ADR-AQ-012"),
-        ([{"item": "x", "type": "wat"}], "Unknown DoD check type 'wat'. Valid types: " + ", ".join(VALID_CHECK_TYPES) + "."),
+        (
+            [{"item": "x", "type": "shell", "cmd": "pytest"}],
+            "shell exec disabled; see ADR-AQ-012",
+        ),
+        (
+            [{"item": "x", "type": "wat"}],
+            "Unknown DoD check type 'wat'. Valid types: "
+            + ", ".join(VALID_CHECK_TYPES)
+            + ".",
+        ),
     ],
 )
 def test_run_dod_checks_rejects_invalid_contracts(
@@ -319,7 +329,9 @@ def test_common_helpers_cover_bundle_and_selection_errors(tmp_path: Path) -> Non
     ):
         ArtifactBundle.from_output({})
 
-    with pytest.raises(DodCheckValidationError, match="Artifact entry 0 must be an object"):
+    with pytest.raises(
+        DodCheckValidationError, match="Artifact entry 0 must be an object"
+    ):
         ArtifactBundle.from_output({"artifacts": ["nope"]})
 
     with pytest.raises(
@@ -334,7 +346,9 @@ def test_common_helpers_cover_bundle_and_selection_errors(tmp_path: Path) -> Non
         DodCheckValidationError,
         match="positive timeout_seconds",
     ):
-        coerce_check_definition({"item": "x", "type": "path_exists", "timeout_seconds": 0})
+        coerce_check_definition(
+            {"item": "x", "type": "path_exists", "timeout_seconds": 0}
+        )
 
     with pytest.raises(DodCheckValidationError, match="Unsupported path_mode 'bad'"):
         select_artifacts(_bundle(tmp_path), path_expr="*", path_mode="bad")
@@ -347,120 +361,147 @@ def test_path_and_grep_handlers_cover_absence_modes_and_invalid_regex(
     patch_uri = str(tmp_path / "artifacts" / "diffs" / "aq-55.patch")
     missing_uri = str(tmp_path / "artifacts" / "diffs" / "missing.patch")
 
-    assert run_path_exists(
-        DodCheckDefinition(
-            item="exists",
-            check_type="path_exists",
-            fields={"item": "exists", "type": "path_exists", "path": patch_uri},
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.CHECKED
+    assert (
+        run_path_exists(
+            DodCheckDefinition(
+                item="exists",
+                check_type="path_exists",
+                fields={"item": "exists", "type": "path_exists", "path": patch_uri},
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.CHECKED
+    )
 
-    assert run_path_exists(
-        DodCheckDefinition(
-            item="exists",
-            check_type="path_exists",
-            fields={
-                "item": "exists",
-                "type": "path_exists",
-                "path": str(tmp_path / "artifacts" / "diffs" / "*.patch"),
-                "path_mode": "glob",
-            },
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.CHECKED
+    assert (
+        run_path_exists(
+            DodCheckDefinition(
+                item="exists",
+                check_type="path_exists",
+                fields={
+                    "item": "exists",
+                    "type": "path_exists",
+                    "path": str(tmp_path / "artifacts" / "diffs" / "*.patch"),
+                    "path_mode": "glob",
+                },
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.CHECKED
+    )
 
-    assert run_path_exists(
-        DodCheckDefinition(
-            item="missing",
-            check_type="path_exists",
-            fields={"item": "missing", "type": "path_exists", "path": missing_uri},
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_path_exists(
+            DodCheckDefinition(
+                item="missing",
+                check_type="path_exists",
+                fields={"item": "missing", "type": "path_exists", "path": missing_uri},
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    assert run_path_absent(
-        DodCheckDefinition(
-            item="absent",
-            check_type="path_absent",
-            fields={"item": "absent", "type": "path_absent", "path": missing_uri},
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.CHECKED
+    assert (
+        run_path_absent(
+            DodCheckDefinition(
+                item="absent",
+                check_type="path_absent",
+                fields={"item": "absent", "type": "path_absent", "path": missing_uri},
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.CHECKED
+    )
 
-    assert run_path_absent(
-        DodCheckDefinition(
-            item="absent",
-            check_type="path_absent",
-            fields={"item": "absent", "type": "path_absent", "path": patch_uri},
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_path_absent(
+            DodCheckDefinition(
+                item="absent",
+                check_type="path_absent",
+                fields={"item": "absent", "type": "path_absent", "path": patch_uri},
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    assert run_grep_present(
-        DodCheckDefinition(
-            item="grep",
-            check_type="grep_present",
-            fields={
-                "item": "grep",
-                "type": "grep_present",
-                "path": patch_uri,
-                "pattern": "/v1/tasks",
-            },
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.CHECKED
+    assert (
+        run_grep_present(
+            DodCheckDefinition(
+                item="grep",
+                check_type="grep_present",
+                fields={
+                    "item": "grep",
+                    "type": "grep_present",
+                    "path": patch_uri,
+                    "pattern": "/v1/tasks",
+                },
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.CHECKED
+    )
 
-    assert run_grep_present(
-        DodCheckDefinition(
-            item="grep",
-            check_type="grep_present",
-            fields={
-                "item": "grep",
-                "type": "grep_present",
-                "path": patch_uri,
-                "pattern": "missing",
-            },
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_grep_present(
+            DodCheckDefinition(
+                item="grep",
+                check_type="grep_present",
+                fields={
+                    "item": "grep",
+                    "type": "grep_present",
+                    "path": patch_uri,
+                    "pattern": "missing",
+                },
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    assert run_grep_absent(
-        DodCheckDefinition(
-            item="grep",
-            check_type="grep_absent",
-            fields={
-                "item": "grep",
-                "type": "grep_absent",
-                "path": patch_uri,
-                "pattern": "missing",
-            },
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.CHECKED
+    assert (
+        run_grep_absent(
+            DodCheckDefinition(
+                item="grep",
+                check_type="grep_absent",
+                fields={
+                    "item": "grep",
+                    "type": "grep_absent",
+                    "path": patch_uri,
+                    "pattern": "missing",
+                },
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.CHECKED
+    )
 
-    assert run_grep_absent(
-        DodCheckDefinition(
-            item="grep",
-            check_type="grep_absent",
-            fields={
-                "item": "grep",
-                "type": "grep_absent",
-                "path": patch_uri,
-                "pattern": "/v1/tasks",
-            },
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_grep_absent(
+            DodCheckDefinition(
+                item="grep",
+                check_type="grep_absent",
+                fields={
+                    "item": "grep",
+                    "type": "grep_absent",
+                    "path": patch_uri,
+                    "pattern": "/v1/tasks",
+                },
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
     with pytest.raises(DodCheckValidationError, match="Invalid grep regex"):
         run_grep_present(
@@ -487,20 +528,23 @@ def test_schema_test_count_and_artifact_size_handlers_cover_edge_cases(
     report_uri = str(tmp_path / "artifacts" / "tests" / "junit.xml")
     patch_uri = str(tmp_path / "artifacts" / "diffs" / "aq-55.patch")
 
-    assert run_schema_validates(
-        DodCheckDefinition(
-            item="schema",
-            check_type="schema_validates",
-            fields={
-                "item": "schema",
-                "type": "schema_validates",
-                "path": json_uri,
-                "schema_name": "coding-task",
-            },
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.CHECKED
+    assert (
+        run_schema_validates(
+            DodCheckDefinition(
+                item="schema",
+                check_type="schema_validates",
+                fields={
+                    "item": "schema",
+                    "type": "schema_validates",
+                    "path": json_uri,
+                    "schema_name": "coding-task",
+                },
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.CHECKED
+    )
 
     bad_json = tmp_path / "artifacts" / "contracts" / "bad.json"
     _write(bad_json, "{not-json")
@@ -508,20 +552,23 @@ def test_schema_test_count_and_artifact_size_handlers_cover_edge_cases(
         {"artifacts": [{"kind": "json", "uri": str(bad_json), "details": {}}]}
     )
     bad_context = DodCheckContext(bundle=bad_bundle, registry=_registry())
-    assert run_schema_validates(
-        DodCheckDefinition(
-            item="schema",
-            check_type="schema_validates",
-            fields={
-                "item": "schema",
-                "type": "schema_validates",
-                "path": str(bad_json),
-                "schema_name": "coding-task",
-            },
-            timeout_seconds=30,
-        ),
-        bad_context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_schema_validates(
+            DodCheckDefinition(
+                item="schema",
+                check_type="schema_validates",
+                fields={
+                    "item": "schema",
+                    "type": "schema_validates",
+                    "path": str(bad_json),
+                    "schema_name": "coding-task",
+                },
+                timeout_seconds=30,
+            ),
+            bad_context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
     with pytest.raises(DodCheckValidationError, match="Unknown task type"):
         run_schema_validates(
@@ -539,91 +586,112 @@ def test_schema_test_count_and_artifact_size_handlers_cover_edge_cases(
             context,
         )
 
-    assert run_test_count(
-        DodCheckDefinition(
-            item="tests",
-            check_type="test_count",
-            fields={
-                "item": "tests",
-                "type": "test_count",
-                "path": report_uri,
-                "min_count": 2,
-            },
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.CHECKED
+    assert (
+        run_test_count(
+            DodCheckDefinition(
+                item="tests",
+                check_type="test_count",
+                fields={
+                    "item": "tests",
+                    "type": "test_count",
+                    "path": report_uri,
+                    "min_count": 2,
+                },
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.CHECKED
+    )
 
-    assert run_test_count(
-        DodCheckDefinition(
-            item="tests",
-            check_type="test_count",
-            fields={
-                "item": "tests",
-                "type": "test_count",
-                "path": report_uri,
-                "min_count": 3,
-            },
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_test_count(
+            DodCheckDefinition(
+                item="tests",
+                check_type="test_count",
+                fields={
+                    "item": "tests",
+                    "type": "test_count",
+                    "path": report_uri,
+                    "min_count": 3,
+                },
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
     broken_xml = tmp_path / "artifacts" / "tests" / "broken.xml"
     _write(broken_xml, "<testsuite>")
     broken_context = DodCheckContext(
         bundle=ArtifactBundle.from_output(
-            {"artifacts": [{"kind": "test-report", "uri": str(broken_xml), "details": {}}]}
+            {
+                "artifacts": [
+                    {"kind": "test-report", "uri": str(broken_xml), "details": {}}
+                ]
+            }
         ),
         registry=_registry(),
     )
-    assert run_test_count(
-        DodCheckDefinition(
-            item="tests",
-            check_type="test_count",
-            fields={
-                "item": "tests",
-                "type": "test_count",
-                "path": str(broken_xml),
-                "min_count": 1,
-            },
-            timeout_seconds=30,
-        ),
-        broken_context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_test_count(
+            DodCheckDefinition(
+                item="tests",
+                check_type="test_count",
+                fields={
+                    "item": "tests",
+                    "type": "test_count",
+                    "path": str(broken_xml),
+                    "min_count": 1,
+                },
+                timeout_seconds=30,
+            ),
+            broken_context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    assert run_artifact_size(
-        DodCheckDefinition(
-            item="size",
-            check_type="artifact_size",
-            fields={
-                "item": "size",
-                "type": "artifact_size",
-                "path": patch_uri,
-                "min_bytes": 1,
-                "max_bytes": 200,
-            },
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.CHECKED
+    assert (
+        run_artifact_size(
+            DodCheckDefinition(
+                item="size",
+                check_type="artifact_size",
+                fields={
+                    "item": "size",
+                    "type": "artifact_size",
+                    "path": patch_uri,
+                    "min_bytes": 1,
+                    "max_bytes": 200,
+                },
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.CHECKED
+    )
 
-    assert run_artifact_size(
-        DodCheckDefinition(
-            item="size",
-            check_type="artifact_size",
-            fields={
-                "item": "size",
-                "type": "artifact_size",
-                "path": patch_uri,
-                "min_bytes": 500,
-            },
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_artifact_size(
+            DodCheckDefinition(
+                item="size",
+                check_type="artifact_size",
+                fields={
+                    "item": "size",
+                    "type": "artifact_size",
+                    "path": patch_uri,
+                    "min_bytes": 500,
+                },
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    with pytest.raises(DodCheckValidationError, match="requires 'min_bytes' and/or 'max_bytes'"):
+    with pytest.raises(
+        DodCheckValidationError, match="requires 'min_bytes' and/or 'max_bytes'"
+    ):
         run_artifact_size(
             DodCheckDefinition(
                 item="size",
@@ -659,65 +727,77 @@ def test_handlers_cover_missing_artifact_and_empty_bundle_paths(tmp_path: Path) 
         registry=_registry(),
     )
 
-    assert run_grep_present(
-        DodCheckDefinition(
-            item="grep",
-            check_type="grep_present",
-            fields={
-                "item": "grep",
-                "type": "grep_present",
-                "path": missing_uri,
-                "pattern": "anything",
-            },
-            timeout_seconds=30,
-        ),
-        empty_context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_grep_present(
+            DodCheckDefinition(
+                item="grep",
+                check_type="grep_present",
+                fields={
+                    "item": "grep",
+                    "type": "grep_present",
+                    "path": missing_uri,
+                    "pattern": "anything",
+                },
+                timeout_seconds=30,
+            ),
+            empty_context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    assert run_grep_absent(
-        DodCheckDefinition(
-            item="grep",
-            check_type="grep_absent",
-            fields={
-                "item": "grep",
-                "type": "grep_absent",
-                "path": missing_uri,
-                "pattern": "anything",
-            },
-            timeout_seconds=30,
-        ),
-        empty_context,
-    ).state == DodItemState.CHECKED
+    assert (
+        run_grep_absent(
+            DodCheckDefinition(
+                item="grep",
+                check_type="grep_absent",
+                fields={
+                    "item": "grep",
+                    "type": "grep_absent",
+                    "path": missing_uri,
+                    "pattern": "anything",
+                },
+                timeout_seconds=30,
+            ),
+            empty_context,
+        ).state
+        == DodItemState.CHECKED
+    )
 
-    assert run_schema_validates(
-        DodCheckDefinition(
-            item="schema",
-            check_type="schema_validates",
-            fields={
-                "item": "schema",
-                "type": "schema_validates",
-                "path": missing_uri,
-                "schema_name": "coding-task",
-            },
-            timeout_seconds=30,
-        ),
-        empty_context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_schema_validates(
+            DodCheckDefinition(
+                item="schema",
+                check_type="schema_validates",
+                fields={
+                    "item": "schema",
+                    "type": "schema_validates",
+                    "path": missing_uri,
+                    "schema_name": "coding-task",
+                },
+                timeout_seconds=30,
+            ),
+            empty_context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    assert run_test_count(
-        DodCheckDefinition(
-            item="tests",
-            check_type="test_count",
-            fields={
-                "item": "tests",
-                "type": "test_count",
-                "path": missing_uri,
-                "min_count": 1,
-            },
-            timeout_seconds=30,
-        ),
-        empty_context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_test_count(
+            DodCheckDefinition(
+                item="tests",
+                check_type="test_count",
+                fields={
+                    "item": "tests",
+                    "type": "test_count",
+                    "path": missing_uri,
+                    "min_count": 1,
+                },
+                timeout_seconds=30,
+            ),
+            empty_context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
     declared_missing_context = DodCheckContext(
         bundle=ArtifactBundle.from_output(
@@ -730,111 +810,131 @@ def test_handlers_cover_missing_artifact_and_empty_bundle_paths(tmp_path: Path) 
         registry=_registry(),
     )
 
-    assert run_path_exists(
-        DodCheckDefinition(
-            item="exists",
-            check_type="path_exists",
-            fields={"item": "exists", "type": "path_exists", "path": missing_uri},
-            timeout_seconds=30,
-        ),
-        declared_missing_context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_path_exists(
+            DodCheckDefinition(
+                item="exists",
+                check_type="path_exists",
+                fields={"item": "exists", "type": "path_exists", "path": missing_uri},
+                timeout_seconds=30,
+            ),
+            declared_missing_context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    assert run_grep_present(
-        DodCheckDefinition(
-            item="grep",
-            check_type="grep_present",
-            fields={
-                "item": "grep",
-                "type": "grep_present",
-                "path": missing_uri,
-                "pattern": "anything",
-            },
-            timeout_seconds=30,
-        ),
-        declared_missing_context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_grep_present(
+            DodCheckDefinition(
+                item="grep",
+                check_type="grep_present",
+                fields={
+                    "item": "grep",
+                    "type": "grep_present",
+                    "path": missing_uri,
+                    "pattern": "anything",
+                },
+                timeout_seconds=30,
+            ),
+            declared_missing_context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    assert run_grep_absent(
-        DodCheckDefinition(
-            item="grep",
-            check_type="grep_absent",
-            fields={
-                "item": "grep",
-                "type": "grep_absent",
-                "path": missing_uri,
-                "pattern": "anything",
-            },
-            timeout_seconds=30,
-        ),
-        declared_missing_context,
-    ).state == DodItemState.CHECKED
+    assert (
+        run_grep_absent(
+            DodCheckDefinition(
+                item="grep",
+                check_type="grep_absent",
+                fields={
+                    "item": "grep",
+                    "type": "grep_absent",
+                    "path": missing_uri,
+                    "pattern": "anything",
+                },
+                timeout_seconds=30,
+            ),
+            declared_missing_context,
+        ).state
+        == DodItemState.CHECKED
+    )
 
-    assert run_schema_validates(
-        DodCheckDefinition(
-            item="schema",
-            check_type="schema_validates",
-            fields={
-                "item": "schema",
-                "type": "schema_validates",
-                "path": missing_uri,
-                "schema_name": "coding-task",
-            },
-            timeout_seconds=30,
-        ),
-        declared_missing_context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_schema_validates(
+            DodCheckDefinition(
+                item="schema",
+                check_type="schema_validates",
+                fields={
+                    "item": "schema",
+                    "type": "schema_validates",
+                    "path": missing_uri,
+                    "schema_name": "coding-task",
+                },
+                timeout_seconds=30,
+            ),
+            declared_missing_context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    assert run_test_count(
-        DodCheckDefinition(
-            item="tests",
-            check_type="test_count",
-            fields={
-                "item": "tests",
-                "type": "test_count",
-                "path": missing_uri,
-                "min_count": 1,
-            },
-            timeout_seconds=30,
-        ),
-        declared_missing_context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_test_count(
+            DodCheckDefinition(
+                item="tests",
+                check_type="test_count",
+                fields={
+                    "item": "tests",
+                    "type": "test_count",
+                    "path": missing_uri,
+                    "min_count": 1,
+                },
+                timeout_seconds=30,
+            ),
+            declared_missing_context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    assert run_artifact_size(
-        DodCheckDefinition(
-            item="size",
-            check_type="artifact_size",
-            fields={
-                "item": "size",
-                "type": "artifact_size",
-                "path": missing_uri,
-                "min_bytes": 1,
-            },
-            timeout_seconds=30,
-        ),
-        empty_context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_artifact_size(
+            DodCheckDefinition(
+                item="size",
+                check_type="artifact_size",
+                fields={
+                    "item": "size",
+                    "type": "artifact_size",
+                    "path": missing_uri,
+                    "min_bytes": 1,
+                },
+                timeout_seconds=30,
+            ),
+            empty_context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    assert run_artifact_size(
-        DodCheckDefinition(
-            item="size",
-            check_type="artifact_size",
-            fields={
-                "item": "size",
-                "type": "artifact_size",
-                "path": missing_uri,
-                "min_bytes": 1,
-            },
-            timeout_seconds=30,
-        ),
-        declared_missing_context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_artifact_size(
+            DodCheckDefinition(
+                item="size",
+                check_type="artifact_size",
+                fields={
+                    "item": "size",
+                    "type": "artifact_size",
+                    "path": missing_uri,
+                    "min_bytes": 1,
+                },
+                timeout_seconds=30,
+            ),
+            declared_missing_context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
 
 def test_handlers_cover_remaining_error_branches(tmp_path: Path) -> None:
     context = _context(tmp_path)
     patch_uri = str(tmp_path / "artifacts" / "diffs" / "aq-55.patch")
-    json_uri = str(tmp_path / "artifacts" / "contracts" / "coding-task.json")
 
     with pytest.raises(DodCheckValidationError, match="Invalid grep regex"):
         run_grep_absent(
@@ -860,35 +960,41 @@ def test_handlers_cover_remaining_error_branches(tmp_path: Path) -> None:
         ),
         registry=_registry(),
     )
-    assert run_schema_validates(
-        DodCheckDefinition(
-            item="schema",
-            check_type="schema_validates",
-            fields={
-                "item": "schema",
-                "type": "schema_validates",
-                "path": str(invalid_schema),
-                "schema_name": "coding-task",
-            },
-            timeout_seconds=30,
-        ),
-        invalid_schema_context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_schema_validates(
+            DodCheckDefinition(
+                item="schema",
+                check_type="schema_validates",
+                fields={
+                    "item": "schema",
+                    "type": "schema_validates",
+                    "path": str(invalid_schema),
+                    "schema_name": "coding-task",
+                },
+                timeout_seconds=30,
+            ),
+            invalid_schema_context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
-    assert run_artifact_size(
-        DodCheckDefinition(
-            item="size",
-            check_type="artifact_size",
-            fields={
-                "item": "size",
-                "type": "artifact_size",
-                "path": patch_uri,
-                "max_bytes": 1,
-            },
-            timeout_seconds=30,
-        ),
-        context,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_artifact_size(
+            DodCheckDefinition(
+                item="size",
+                check_type="artifact_size",
+                fields={
+                    "item": "size",
+                    "type": "artifact_size",
+                    "path": patch_uri,
+                    "max_bytes": 1,
+                },
+                timeout_seconds=30,
+            ),
+            context,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
 
 def test_github_handlers_cover_success_failure_and_blocked() -> None:
@@ -897,172 +1003,202 @@ def test_github_handlers_cover_success_failure_and_blocked() -> None:
         registry=_registry(),
         github_client=FakeGitHubClient(check_conclusion="success", mergeable=True),
     )
-    assert run_ci_status(
-        DodCheckDefinition(
-            item="ci",
-            check_type="ci_status",
-            fields={
-                "item": "ci",
-                "type": "ci_status",
-                "repo": "agenticqueue/agenticqueue",
-                "sha": "abc123",
-                "check_name": "build",
-            },
-            timeout_seconds=30,
-        ),
-        context_success,
-    ).state == DodItemState.CHECKED
-    assert run_pr_mergeable(
-        DodCheckDefinition(
-            item="pr",
-            check_type="pr_mergeable",
-            fields={
-                "item": "pr",
-                "type": "pr_mergeable",
-                "repo": "agenticqueue/agenticqueue",
-                "pr_number": 5,
-            },
-            timeout_seconds=30,
-        ),
-        context_success,
-    ).state == DodItemState.CHECKED
+    assert (
+        run_ci_status(
+            DodCheckDefinition(
+                item="ci",
+                check_type="ci_status",
+                fields={
+                    "item": "ci",
+                    "type": "ci_status",
+                    "repo": "agenticqueue/agenticqueue",
+                    "sha": "abc123",
+                    "check_name": "build",
+                },
+                timeout_seconds=30,
+            ),
+            context_success,
+        ).state
+        == DodItemState.CHECKED
+    )
+    assert (
+        run_pr_mergeable(
+            DodCheckDefinition(
+                item="pr",
+                check_type="pr_mergeable",
+                fields={
+                    "item": "pr",
+                    "type": "pr_mergeable",
+                    "repo": "agenticqueue/agenticqueue",
+                    "pr_number": 5,
+                },
+                timeout_seconds=30,
+            ),
+            context_success,
+        ).state
+        == DodItemState.CHECKED
+    )
 
     context_failure = DodCheckContext(
         bundle=ArtifactBundle(files={}),
         registry=_registry(),
         github_client=FakeGitHubClient(check_conclusion="failure", mergeable=False),
     )
-    assert run_ci_status(
-        DodCheckDefinition(
-            item="ci",
-            check_type="ci_status",
-            fields={
-                "item": "ci",
-                "type": "ci_status",
-                "repo": "agenticqueue/agenticqueue",
-                "sha": "abc123",
-                "check_name": "build",
-            },
-            timeout_seconds=30,
-        ),
-        context_failure,
-    ).state == DodItemState.UNCHECKED_UNMET
-    assert run_pr_mergeable(
-        DodCheckDefinition(
-            item="pr",
-            check_type="pr_mergeable",
-            fields={
-                "item": "pr",
-                "type": "pr_mergeable",
-                "repo": "agenticqueue/agenticqueue",
-                "pr_number": 5,
-            },
-            timeout_seconds=30,
-        ),
-        context_failure,
-    ).state == DodItemState.UNCHECKED_UNMET
+    assert (
+        run_ci_status(
+            DodCheckDefinition(
+                item="ci",
+                check_type="ci_status",
+                fields={
+                    "item": "ci",
+                    "type": "ci_status",
+                    "repo": "agenticqueue/agenticqueue",
+                    "sha": "abc123",
+                    "check_name": "build",
+                },
+                timeout_seconds=30,
+            ),
+            context_failure,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
+    assert (
+        run_pr_mergeable(
+            DodCheckDefinition(
+                item="pr",
+                check_type="pr_mergeable",
+                fields={
+                    "item": "pr",
+                    "type": "pr_mergeable",
+                    "repo": "agenticqueue/agenticqueue",
+                    "pr_number": 5,
+                },
+                timeout_seconds=30,
+            ),
+            context_failure,
+        ).state
+        == DodItemState.UNCHECKED_UNMET
+    )
 
     context_pending = DodCheckContext(
         bundle=ArtifactBundle(files={}),
         registry=_registry(),
         github_client=FakeGitHubClient(check_conclusion=None, mergeable=None),
     )
-    assert run_ci_status(
-        DodCheckDefinition(
-            item="ci",
-            check_type="ci_status",
-            fields={
-                "item": "ci",
-                "type": "ci_status",
-                "repo": "agenticqueue/agenticqueue",
-                "sha": "abc123",
-                "check_name": "build",
-            },
-            timeout_seconds=30,
-        ),
-        context_pending,
-    ).state == DodItemState.UNCHECKED_BLOCKED
-    assert run_pr_mergeable(
-        DodCheckDefinition(
-            item="pr",
-            check_type="pr_mergeable",
-            fields={
-                "item": "pr",
-                "type": "pr_mergeable",
-                "repo": "agenticqueue/agenticqueue",
-                "pr_number": 5,
-            },
-            timeout_seconds=30,
-        ),
-        context_pending,
-    ).state == DodItemState.UNCHECKED_BLOCKED
+    assert (
+        run_ci_status(
+            DodCheckDefinition(
+                item="ci",
+                check_type="ci_status",
+                fields={
+                    "item": "ci",
+                    "type": "ci_status",
+                    "repo": "agenticqueue/agenticqueue",
+                    "sha": "abc123",
+                    "check_name": "build",
+                },
+                timeout_seconds=30,
+            ),
+            context_pending,
+        ).state
+        == DodItemState.UNCHECKED_BLOCKED
+    )
+    assert (
+        run_pr_mergeable(
+            DodCheckDefinition(
+                item="pr",
+                check_type="pr_mergeable",
+                fields={
+                    "item": "pr",
+                    "type": "pr_mergeable",
+                    "repo": "agenticqueue/agenticqueue",
+                    "pr_number": 5,
+                },
+                timeout_seconds=30,
+            ),
+            context_pending,
+        ).state
+        == DodItemState.UNCHECKED_BLOCKED
+    )
 
     context_blocked = DodCheckContext(
         bundle=ArtifactBundle(files={}),
         registry=_registry(),
         github_client=None,
     )
-    assert run_ci_status(
-        DodCheckDefinition(
-            item="ci",
-            check_type="ci_status",
-            fields={
-                "item": "ci",
-                "type": "ci_status",
-                "repo": "agenticqueue/agenticqueue",
-                "sha": "abc123",
-                "check_name": "build",
-            },
-            timeout_seconds=30,
-        ),
-        context_blocked,
-    ).state == DodItemState.UNCHECKED_BLOCKED
-    assert run_pr_mergeable(
-        DodCheckDefinition(
-            item="pr",
-            check_type="pr_mergeable",
-            fields={
-                "item": "pr",
-                "type": "pr_mergeable",
-                "repo": "agenticqueue/agenticqueue",
-                "pr_number": 5,
-            },
-            timeout_seconds=30,
-        ),
-        context_blocked,
-    ).state == DodItemState.UNCHECKED_BLOCKED
+    assert (
+        run_ci_status(
+            DodCheckDefinition(
+                item="ci",
+                check_type="ci_status",
+                fields={
+                    "item": "ci",
+                    "type": "ci_status",
+                    "repo": "agenticqueue/agenticqueue",
+                    "sha": "abc123",
+                    "check_name": "build",
+                },
+                timeout_seconds=30,
+            ),
+            context_blocked,
+        ).state
+        == DodItemState.UNCHECKED_BLOCKED
+    )
+    assert (
+        run_pr_mergeable(
+            DodCheckDefinition(
+                item="pr",
+                check_type="pr_mergeable",
+                fields={
+                    "item": "pr",
+                    "type": "pr_mergeable",
+                    "repo": "agenticqueue/agenticqueue",
+                    "pr_number": 5,
+                },
+                timeout_seconds=30,
+            ),
+            context_blocked,
+        ).state
+        == DodItemState.UNCHECKED_BLOCKED
+    )
 
     context_error = DodCheckContext(
         bundle=ArtifactBundle(files={}),
         registry=_registry(),
         github_client=FakeGitHubClient(raise_error=True),
     )
-    assert run_ci_status(
-        DodCheckDefinition(
-            item="ci",
-            check_type="ci_status",
-            fields={
-                "item": "ci",
-                "type": "ci_status",
-                "repo": "agenticqueue/agenticqueue",
-                "sha": "abc123",
-                "check_name": "build",
-            },
-            timeout_seconds=30,
-        ),
-        context_error,
-    ).state == DodItemState.UNCHECKED_BLOCKED
-    assert run_pr_mergeable(
-        DodCheckDefinition(
-            item="pr",
-            check_type="pr_mergeable",
-            fields={
-                "item": "pr",
-                "type": "pr_mergeable",
-                "repo": "agenticqueue/agenticqueue",
-                "pr_number": 5,
-            },
-            timeout_seconds=30,
-        ),
-        context_error,
-    ).state == DodItemState.UNCHECKED_BLOCKED
+    assert (
+        run_ci_status(
+            DodCheckDefinition(
+                item="ci",
+                check_type="ci_status",
+                fields={
+                    "item": "ci",
+                    "type": "ci_status",
+                    "repo": "agenticqueue/agenticqueue",
+                    "sha": "abc123",
+                    "check_name": "build",
+                },
+                timeout_seconds=30,
+            ),
+            context_error,
+        ).state
+        == DodItemState.UNCHECKED_BLOCKED
+    )
+    assert (
+        run_pr_mergeable(
+            DodCheckDefinition(
+                item="pr",
+                check_type="pr_mergeable",
+                fields={
+                    "item": "pr",
+                    "type": "pr_mergeable",
+                    "repo": "agenticqueue/agenticqueue",
+                    "pr_number": 5,
+                },
+                timeout_seconds=30,
+            ),
+            context_error,
+        ).state
+        == DodItemState.UNCHECKED_BLOCKED
+    )

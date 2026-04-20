@@ -19,7 +19,9 @@ def run(
 ) -> DodCheckResult:
     path_expr = require_string(definition, "path")
     path_mode = optional_string(definition, "path_mode", default="exact") or "exact"
-    artifacts = select_artifacts(context.bundle, path_expr=path_expr, path_mode=path_mode)
+    artifacts = select_artifacts(
+        context.bundle, path_expr=path_expr, path_mode=path_mode
+    )
     if not artifacts:
         return DodCheckResult(
             item=definition.item,
@@ -32,5 +34,6 @@ def run(
         item=definition.item,
         check_type=definition.check_type,
         state=DodItemState.UNCHECKED_UNMET,
-        note="Unexpected artifact(s): " + ", ".join(sorted(artifact.uri for artifact in artifacts)),
+        note="Unexpected artifact(s): "
+        + ", ".join(sorted(artifact.uri for artifact in artifacts)),
     )

@@ -15,7 +15,11 @@ from agenticqueue_api.dod_checks import (
     schema_validates,
     test_count,
 )
-from agenticqueue_api.dod_checks.common import DodCheckContext, DodCheckDefinition, DodCheckResult
+from agenticqueue_api.dod_checks.common import (
+    DodCheckContext,
+    DodCheckDefinition,
+    DodCheckResult,
+)
 
 CheckHandler = Callable[[DodCheckDefinition, DodCheckContext], DodCheckResult]
 

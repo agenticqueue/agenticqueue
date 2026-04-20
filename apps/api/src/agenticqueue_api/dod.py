@@ -12,7 +12,6 @@ from agenticqueue_api.dod_checks import CHECK_HANDLERS, VALID_CHECK_TYPES
 from agenticqueue_api.dod_checks.common import (
     ArtifactBundle,
     DodCheckContext,
-    DodCheckDefinition,
     DodCheckResult,
     DodCheckValidationError,
     DodItemState,

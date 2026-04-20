@@ -96,7 +96,11 @@ class ArtifactBundle:
             files[uri] = ArtifactFile(uri=uri, path=path, details=details)
 
         test_report = output.get("test_report")
-        if isinstance(test_report, str) and test_report.strip() and test_report not in files:
+        if (
+            isinstance(test_report, str)
+            and test_report.strip()
+            and test_report not in files
+        ):
             path = Path(test_report)
             if artifact_root is not None and not path.is_absolute():
                 path = artifact_root / path
@@ -244,7 +248,9 @@ def select_artifacts(
 
     uris = bundle.files.values()
     if path_mode == "glob":
-        return tuple(artifact for artifact in uris if fnmatchcase(artifact.uri, path_expr))
+        return tuple(
+            artifact for artifact in uris if fnmatchcase(artifact.uri, path_expr)
+        )
 
     if path_mode == "regex":
         try:
