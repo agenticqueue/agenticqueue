@@ -109,9 +109,7 @@ def _actor_payload(*, handle: str, actor_type: str = "agent") -> ActorModel:
     )
 
 
-def _mcp_call(
-    server, tool_name: str, arguments: dict[str, object]
-) -> dict[str, Any]:
+def _mcp_call(server, tool_name: str, arguments: dict[str, object]) -> dict[str, Any]:
     async def _invoke() -> dict[str, Any]:
         async with FastMCPClient(server) as client:
             result = await client.call_tool(tool_name, arguments)
