@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 
 import sqlalchemy as sa
@@ -25,11 +26,13 @@ from agenticqueue_api.retrieval.tiers.trgm import trgm_candidates
 from agenticqueue_api.retrieval.tiers.vector import (
     task_similarity_text,
     vector_candidates,
+    vector_text_candidates,
 )
 from agenticqueue_api.retrieval.types import (
     RetrievalCandidate,
     RetrievalQuery,
     RetrievalResult,
+    RetrievalSearchQuery,
 )
 from agenticqueue_api.schemas.learning import LearningStatus
 
@@ -91,6 +94,80 @@ class RetrievalService:
             )
             result_candidates = reranked
             tiers_fired.append("rerank")
+
+        return RetrievalResult(
+            items=[candidate.to_model() for candidate in result_candidates[: query.k]],
+            tiers_fired=tiers_fired,
+        )
+
+    def search(self, query: RetrievalSearchQuery) -> RetrievalResult:
+        scope = query.scope.normalized()
+        candidates = self._candidate_pool(project_id=None)
+        if scope.project_id is not None:
+            candidates = [
+                candidate
+                for candidate in candidates
+                if candidate.source_task is not None
+                and candidate.source_task.project_id == scope.project_id
+            ]
+
+        tiers_fired: list[str] = []
+        hot_candidates = surface_candidates(candidates, scope=scope)
+        tiers_fired.append("surface_area")
+        hot_candidates = apply_metadata_filters(
+            hot_candidates,
+            layers=query.layers,
+            owners=scope.owners,
+            learning_types=scope.learning_types,
+            reference=dt.datetime.now(dt.UTC),
+            max_age_days=scope.max_age_days,
+        )
+        tiers_fired.append("metadata")
+
+        result_candidates: list[RetrievalCandidate] = []
+        fts_matches = fts_candidates(
+            self._session,
+            query_text=query.query,
+            candidates=hot_candidates,
+            exclude_ids=set(),
+            limit=query.k,
+        )
+        if fts_matches:
+            result_candidates = self._merge_candidates(result_candidates, fts_matches)
+            tiers_fired.append("fts")
+
+        cold_limit = max(query.k - len(result_candidates), 0)
+        if query.fuzzy_global_search and cold_limit > 0:
+            trgm_matches = trgm_candidates(
+                self._session,
+                query_text=query.query,
+                candidates=hot_candidates,
+                exclude_ids={candidate.learning.id for candidate in result_candidates},
+                limit=cold_limit,
+            )
+            if trgm_matches:
+                result_candidates = self._merge_candidates(
+                    result_candidates,
+                    trgm_matches,
+                )
+                tiers_fired.append("trgm")
+
+            vector_matches = vector_text_candidates(
+                self._session,
+                query_text=query.query,
+                candidates=self._vector_pool(
+                    hot_candidates,
+                    project_id=scope.project_id,
+                ),
+                exclude_ids={candidate.learning.id for candidate in result_candidates},
+                limit=max(query.k - len(result_candidates), 0),
+            )
+            if vector_matches:
+                result_candidates = self._merge_candidates(
+                    result_candidates,
+                    vector_matches,
+                )
+                tiers_fired.append("vector")
 
         return RetrievalResult(
             items=[candidate.to_model() for candidate in result_candidates[: query.k]],

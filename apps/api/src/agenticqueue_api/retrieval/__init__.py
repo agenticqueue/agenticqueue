@@ -5,6 +5,7 @@ from agenticqueue_api.retrieval.types import (
     RetrievalCandidate,
     RetrievalQuery,
     RetrievalResult,
+    RetrievalSearchQuery,
     RetrievalScope,
     TierName,
 )
@@ -13,6 +14,7 @@ __all__ = [
     "RetrievalCandidate",
     "RetrievalQuery",
     "RetrievalResult",
+    "RetrievalSearchQuery",
     "RetrievalScope",
     "RetrievalService",
     "TierName",

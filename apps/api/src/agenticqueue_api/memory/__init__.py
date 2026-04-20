@@ -11,6 +11,7 @@ from agenticqueue_api.memory.layers import (
     MemoryItemRecord,
     MemoryLayer,
 )
+from agenticqueue_api.memory.sync import MemorySyncService
 
 __all__ = [
     "MEMORY_LAYER_SCOPE_HINTS",
@@ -20,4 +21,5 @@ __all__ = [
     "MemoryItemModel",
     "MemoryItemRecord",
     "MemoryLayer",
+    "MemorySyncService",
 ]

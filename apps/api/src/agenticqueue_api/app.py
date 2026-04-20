@@ -71,7 +71,11 @@ from agenticqueue_api.models import (
 )
 from agenticqueue_api.models.shared import SchemaModel
 from agenticqueue_api.packet_cache import PacketCache
-from agenticqueue_api.routers import build_learnings_router, build_packets_router
+from agenticqueue_api.routers import (
+    build_learnings_router,
+    build_memory_router,
+    build_packets_router,
+)
 from agenticqueue_api.roles import (
     assign_role,
     list_role_assignments_for_actor,
@@ -486,6 +490,7 @@ def create_app(
     app.add_middleware(ContentSizeLimitMiddleware)
     install_exception_handlers(app)
     app.include_router(build_learnings_router(get_db_session))
+    app.include_router(build_memory_router(get_db_session))
     app.include_router(build_packets_router(get_db_session))
     app.include_router(build_crud_router(get_db_session))
 

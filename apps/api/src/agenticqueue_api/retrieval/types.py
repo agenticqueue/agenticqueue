@@ -43,6 +43,17 @@ class RetrievalScope:
     learning_types: tuple[str, ...] = ()
     max_age_days: int | None = None
 
+    def normalized(self) -> RetrievalScope:
+        """Return the scope with deduplicated string filters."""
+
+        return RetrievalScope(
+            project_id=self.project_id,
+            surface_area=_normalize_strings(self.surface_area),
+            owners=_normalize_strings(self.owners),
+            learning_types=_normalize_strings(self.learning_types),
+            max_age_days=self.max_age_days,
+        )
+
     def with_defaults(self, task: TaskRecord) -> RetrievalScope:
         contract = task.contract or {}
         surface_area = self.surface_area
@@ -80,6 +91,27 @@ class RetrievalQuery:
 
 
 @dataclass(frozen=True)
+class RetrievalSearchQuery:
+    """Tiered retrieval query driven by free-text search."""
+
+    query: str
+    layers: tuple[str, ...] = ()
+    scope: RetrievalScope = field(default_factory=RetrievalScope)
+    k: int = 10
+    fuzzy_global_search: bool = True
+
+    def __post_init__(self) -> None:
+        query = self.query.strip()
+        if not query:
+            raise ValueError("query must not be empty")
+        if self.k < 1:
+            raise ValueError("k must be at least 1")
+        object.__setattr__(self, "query", query)
+        object.__setattr__(self, "layers", _normalize_strings(self.layers))
+        object.__setattr__(self, "scope", self.scope.normalized())
+
+
+@dataclass(frozen=True)
 class RetrievalCandidate:
     """One retrieved learning plus its source-task context."""
 
@@ -108,6 +140,7 @@ __all__ = [
     "RetrievalCandidate",
     "RetrievalQuery",
     "RetrievalResult",
+    "RetrievalSearchQuery",
     "RetrievalScope",
     "TierName",
 ]

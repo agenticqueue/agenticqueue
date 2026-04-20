@@ -91,4 +91,46 @@ def vector_candidates(
     return [candidate for _, candidate in matches[:limit]]
 
 
-__all__ = ["learning_similarity_text", "task_similarity_text", "vector_candidates"]
+def vector_text_candidates(
+    session,
+    *,
+    query_text: str,
+    candidates: list[RetrievalCandidate],
+    exclude_ids: set[uuid.UUID],
+    limit: int,
+) -> list[RetrievalCandidate]:
+    """Return the top-N vector candidates for one free-text query."""
+
+    if limit < 1:
+        return []
+
+    dedupe = LearningDedupeService(session)
+    query_embedding = dedupe.embed_text(query_text)
+    matches: list[tuple[float, RetrievalCandidate]] = []
+    for candidate in candidates:
+        if candidate.learning.id in exclude_ids:
+            continue
+        similarity = cosine_similarity(
+            query_embedding,
+            dedupe.embed_text(learning_similarity_text(candidate)),
+        )
+        if similarity <= 0.0:
+            continue
+        matches.append((similarity, replace(candidate, vector_similarity=similarity)))
+
+    matches.sort(
+        key=lambda item: (
+            -item[0],
+            item[1].learning.created_at,
+            str(item[1].learning.id),
+        ),
+    )
+    return [candidate for _, candidate in matches[:limit]]
+
+
+__all__ = [
+    "learning_similarity_text",
+    "task_similarity_text",
+    "vector_candidates",
+    "vector_text_candidates",
+]

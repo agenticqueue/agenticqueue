@@ -10,6 +10,7 @@ import typer
 from sqlalchemy.orm import Session, sessionmaker
 
 from agenticqueue_cli.commands.learnings import build_learnings_app
+from agenticqueue_cli.commands.memory import build_memory_app
 from agenticqueue_cli.commands.packet import register_packet_command
 from agenticqueue_cli.commands.roles import build_roles_app
 from agenticqueue_api.audit import set_session_audit_context
@@ -112,10 +113,12 @@ def learning_promote_command(
 
 
 learnings_app = build_learnings_app(session_factory=_default_session_factory())
+memory_app = build_memory_app(session_factory=_default_session_factory())
 roles_app = build_roles_app(session_factory=_default_session_factory())
 app.add_typer(idempotency_app, name="idempotency")
 app.add_typer(learning_app, name="learning")
 app.add_typer(learnings_app, name="learnings")
+app.add_typer(memory_app, name="memory")
 app.add_typer(roles_app, name="roles")
 register_packet_command(app, session_factory=_default_session_factory())
 
