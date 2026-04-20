@@ -84,7 +84,7 @@ def _hash_embed_text(text: str) -> list[float]:
     return [value / norm for value in vector]
 
 
-def _cosine_similarity(lhs: list[float], rhs: list[float]) -> float:
+def cosine_similarity(lhs: list[float], rhs: list[float]) -> float:
     if not lhs or not rhs or len(lhs) != len(rhs):
         return 0.0
 
@@ -153,6 +153,9 @@ class LearningDedupeService:
     def embed_learning_text(self, title: str, action_rule: str) -> list[float]:
         return self._embedding_for_text(build_dedupe_text(title, action_rule))
 
+    def embed_text(self, text: str) -> list[float]:
+        return self._embedding_for_text(text)
+
     def suggest(
         self,
         *,
@@ -175,7 +178,7 @@ class LearningDedupeService:
         best_similarity = 0.0
         for record in self._session.scalars(statement):
             record_embedding = self._embedding_for_record(record)
-            similarity = _cosine_similarity(draft_embedding, record_embedding)
+            similarity = cosine_similarity(draft_embedding, record_embedding)
             if similarity < self._threshold:
                 continue
             if best_match is None or similarity > best_similarity:
@@ -287,4 +290,5 @@ __all__ = [
     "LearningDedupeService",
     "MergeDecision",
     "build_dedupe_text",
+    "cosine_similarity",
 ]
