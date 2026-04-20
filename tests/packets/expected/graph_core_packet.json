@@ -54,7 +54,7 @@
     "Should packet invalidation flush downstream prefetched packets?",
     "Who owns packet TTL defaults?"
   ],
-  "packet_version_id": "dda60606-2237-5c08-93ea-0cefaec1c2d9",
+  "packet_version_id": "575968bc-f6c8-54fe-9fb1-3f2e3a6a0552",
   "permissions": {
     "autonomy_tier": 3,
     "capabilities": [
@@ -110,7 +110,7 @@
   ],
   "repo_scope": {
     "branch": "main",
-    "estimated_token_count": 5407,
+    "estimated_token_count": 4837,
     "file_scope": [
       "apps/api/src/agenticqueue_api/compiler.py",
       "task_types/coding-task.schema.json"
@@ -123,8 +123,9 @@
     ]
   },
   "retrieval_tiers_used": [
+    "surface_area",
     "graph",
-    "surface"
+    "metadata"
   ],
   "task": {
     "claimed_at": null,

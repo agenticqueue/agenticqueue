@@ -219,7 +219,7 @@ def test_get_task_packet_returns_packet_headers_and_fetch_audit(
     assert body["task_contract"]["repo"] == "github.com/agenticqueue/agenticqueue"
     assert response.headers["X-Packet-Version"] == body["packet_version_id"]
     assert response.headers["Cache-Control"] == PACKET_FETCH_CACHE_CONTROL
-    assert body["retrieval_tiers_used"] == ["graph", "surface"]
+    assert body["retrieval_tiers_used"] == ["surface_area", "graph", "metadata"]
 
     with session_factory() as session:
         rows = session.scalars(
@@ -237,7 +237,7 @@ def test_get_task_packet_returns_packet_headers_and_fetch_audit(
     assert rows[0].after == {
         "packet_version_id": body["packet_version_id"],
         "project_id": str(project_id),
-        "retrieval_tiers_used": ["graph", "surface"],
+        "retrieval_tiers_used": ["surface_area", "graph", "metadata"],
     }
 
 

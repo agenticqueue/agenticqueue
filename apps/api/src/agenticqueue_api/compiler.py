@@ -19,8 +19,6 @@ from agenticqueue_api.config import (
     get_repo_root,
     get_task_types_dir,
 )
-from agenticqueue_api.learnings import LearningDedupeService, rank_learnings_for_task
-from agenticqueue_api.learnings.dedupe import cosine_similarity
 from agenticqueue_api.models import (
     ArtifactModel,
     ArtifactRecord,
@@ -28,7 +26,6 @@ from agenticqueue_api.models import (
     DecisionRecord,
     EdgeRecord,
     LearningModel,
-    LearningRecord,
     TaskModel,
     TaskRecord,
 )
@@ -42,9 +39,9 @@ from agenticqueue_api.packet_versions import (
 )
 from agenticqueue_api.policy.loader import PolicyPack, PolicyRegistry, load_policy_pack
 from agenticqueue_api.policy.resolver import ResolvedPolicy, resolve_effective_policy
+from agenticqueue_api.retrieval import RetrievalQuery, RetrievalService
 from agenticqueue_api.repo import ancestors, neighbors
 from agenticqueue_api.repo_scope import resolve_repo_scope
-from agenticqueue_api.schemas.learning import LearningStatus
 from agenticqueue_api.task_type_registry import TaskTypeDefinition, TaskTypeRegistry
 
 if TYPE_CHECKING:
@@ -329,69 +326,6 @@ def _linked_artifacts(session: Session, task: TaskRecord) -> list[ArtifactModel]
     return [ArtifactModel.model_validate(record) for record in rows]
 
 
-def _learning_similarity_text(learning: LearningRecord) -> str:
-    return "\n".join(
-        value
-        for value in (
-            learning.title,
-            learning.action_rule,
-            learning.what_happened,
-            learning.what_learned,
-            *learning.evidence,
-        )
-        if value
-    )
-
-
-def _task_similarity_text(task: TaskRecord) -> str:
-    contract = task.contract or {}
-    return "\n".join(
-        value
-        for value in (
-            task.task_type,
-            task.title,
-            _normalize_string(task.description),
-            _normalize_string(contract.get("spec")),
-            *_normalize_string_list(contract.get("file_scope")),
-            *_normalize_string_list(contract.get("surface_area")),
-        )
-        if value
-    )
-
-
-def _vector_fallback_learnings(
-    session: Session,
-    task: TaskRecord,
-    *,
-    exclude_ids: set[uuid.UUID],
-    limit: int,
-) -> list[LearningModel]:
-    dedupe = LearningDedupeService(session)
-    task_embedding = dedupe.embed_text(_task_similarity_text(task))
-
-    candidates: list[tuple[float, LearningRecord]] = []
-    rows = session.scalars(
-        sa.select(LearningRecord)
-        .where(LearningRecord.status == LearningStatus.ACTIVE.value)
-        .order_by(LearningRecord.created_at.asc(), LearningRecord.id.asc())
-    )
-    for record in rows:
-        if record.id in exclude_ids:
-            continue
-        similarity = cosine_similarity(
-            task_embedding,
-            dedupe.embed_text(_learning_similarity_text(record)),
-        )
-        if similarity <= 0.0:
-            continue
-        candidates.append((similarity, record))
-
-    candidates.sort(
-        key=lambda item: (-item[0], item[1].created_at, str(item[1].id)),
-    )
-    return [LearningModel.model_validate(record) for _, record in candidates[:limit]]
-
-
 def assemble_packet(
     session: Session,
     task_id: uuid.UUID,
@@ -414,21 +348,17 @@ def assemble_packet(
         policy_registry=policies,
     )
 
-    relevant_learnings = rank_learnings_for_task(session, task.id, k=learning_limit)
-    retrieval_tiers_used = ["graph", "surface"]
-
-    fuzzy_global_search = bool(
-        resolved_policy.body.get("enable_fuzzy_global_search", False)
-    )
-    if fuzzy_global_search and len(relevant_learnings) < learning_limit:
-        vector_learnings = _vector_fallback_learnings(
-            session,
-            task,
-            exclude_ids={learning.id for learning in relevant_learnings},
-            limit=learning_limit - len(relevant_learnings),
+    retrieval_result = RetrievalService(session).retrieve(
+        RetrievalQuery(
+            task_id=task.id,
+            k=learning_limit,
+            fuzzy_global_search=bool(
+                resolved_policy.body.get("enable_fuzzy_global_search", False)
+            ),
         )
-        relevant_learnings = [*relevant_learnings, *vector_learnings]
-        retrieval_tiers_used.append("vector")
+    )
+    relevant_learnings = retrieval_result.items
+    retrieval_tiers_used = retrieval_result.tiers_fired
 
     packet = PacketV1(
         task=TaskModel.model_validate(task),

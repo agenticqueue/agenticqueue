@@ -1,0 +1,6 @@
+vector_candidate_limit: 50
+vector_project_scope_only: true
+rerank:
+  lexical_weight: 0.7
+  recency_weight: 0.2
+  access_count_weight: 0.1

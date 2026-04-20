@@ -282,7 +282,7 @@ def test_compile_packet_mcp_matches_rest_and_records_audit(
     assert rows[-1].after == {
         "packet_version_id": mcp_response["packet_version_id"],
         "project_id": str(project_id),
-        "retrieval_tiers_used": ["graph", "surface"],
+        "retrieval_tiers_used": ["surface_area", "graph", "metadata"],
     }
 
 
@@ -328,7 +328,7 @@ def test_compile_packet_mcp_accepts_admin_actor_without_explicit_grants(
     )
 
     assert response["task"]["id"] == str(task_id)
-    assert response["retrieval_tiers_used"] == ["graph", "surface"]
+    assert response["retrieval_tiers_used"] == ["surface_area", "graph", "metadata"]
 
 
 def test_compile_packet_mcp_requires_authentication(
