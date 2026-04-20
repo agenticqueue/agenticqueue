@@ -21,6 +21,13 @@ from agenticqueue_api.models.packet_version import (
 )
 from agenticqueue_api.models.policy import PolicyModel, PolicyRecord
 from agenticqueue_api.models.project import ProjectModel, ProjectRecord
+from agenticqueue_api.models.role import (
+    RoleAssignmentModel,
+    RoleAssignmentRecord,
+    RoleModel,
+    RoleName,
+    RoleRecord,
+)
 from agenticqueue_api.models.run import RunModel, RunRecord
 from agenticqueue_api.models.task import TaskModel, TaskRecord
 from agenticqueue_api.models.workspace import WorkspaceModel, WorkspaceRecord
@@ -53,6 +60,11 @@ __all__ = [
     "PolicyRecord",
     "ProjectModel",
     "ProjectRecord",
+    "RoleAssignmentModel",
+    "RoleAssignmentRecord",
+    "RoleModel",
+    "RoleName",
+    "RoleRecord",
     "RunModel",
     "RunRecord",
     "TaskModel",

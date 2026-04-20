@@ -14,6 +14,7 @@ from tests.timeout_support import role_timeout_is_persisted
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_CONFIG_PATH = REPO_ROOT / "apps" / "api" / "alembic.ini"
 ENTITY_TABLES = {
+    "actor_role_assignment",
     "api_token",
     "actor",
     "artifact",
@@ -29,6 +30,7 @@ ENTITY_TABLES = {
     "packet_version",
     "policy",
     "project",
+    "role",
     "run",
     "task",
     "workspace",
@@ -36,8 +38,8 @@ ENTITY_TABLES = {
 PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
 PRE_IDEMPOTENCY_TABLES = ENTITY_TABLES - {"idempotency_key"}
-PRE_LATEST_ENTITY_TABLES = ENTITY_TABLES
-PRE_LATEST_REVISION = "20260420_17"
+PRE_LATEST_ENTITY_TABLES = ENTITY_TABLES - {"actor_role_assignment", "role"}
+PRE_LATEST_REVISION = "20260420_18"
 LEARNING_COLUMNS = {
     "action_rule",
     "applies_when",
@@ -172,6 +174,28 @@ def assert_capability_grant_columns(expected_columns: set[str]) -> None:
             assert {row[0] for row in cursor.fetchall()} == expected_columns
 
 
+def assert_role_columns(expected_columns: set[str]) -> None:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'agenticqueue' AND table_name = 'role' "
+                "ORDER BY column_name"
+            )
+            assert {row[0] for row in cursor.fetchall()} == expected_columns
+
+
+def assert_actor_role_assignment_columns(expected_columns: set[str]) -> None:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'agenticqueue' AND table_name = 'actor_role_assignment' "
+                "ORDER BY column_name"
+            )
+            assert {row[0] for row in cursor.fetchall()} == expected_columns
+
+
 def assert_learning_columns(expected_columns: set[str]) -> None:
     with psycopg.connect(get_sync_database_url()) as connection:
         with connection.cursor() as cursor:
@@ -247,6 +271,13 @@ def assert_seeded_capability_keys(expected_keys: set[str]) -> None:
             assert {row[0] for row in cursor.fetchall()} == expected_keys
 
 
+def assert_seeded_role_names(expected_names: set[str]) -> None:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT name FROM agenticqueue.role ORDER BY name")
+            assert {row[0] for row in cursor.fetchall()} == expected_names
+
+
 def assert_base_state() -> None:
     with psycopg.connect(get_sync_database_url()) as connection:
         with connection.cursor() as cursor:
@@ -303,8 +334,24 @@ def test_migration_reaches_head_with_extensions() -> None:
             "expires_at",
             "granted_by_actor_id",
             "id",
+            "role_assignment_id",
             "revoked_at",
             "scope",
+            "updated_at",
+        }
+    )
+    assert_role_columns(
+        {"capabilities", "created_at", "description", "id", "name", "scope", "updated_at"}
+    )
+    assert_actor_role_assignment_columns(
+        {
+            "actor_id",
+            "created_at",
+            "expires_at",
+            "granted_by_actor_id",
+            "id",
+            "revoked_at",
+            "role_id",
             "updated_at",
         }
     )
@@ -341,6 +388,9 @@ def test_migration_reaches_head_with_extensions() -> None:
             "write_learning",
         }
     )
+    assert_seeded_role_names(
+        {"admin", "bot", "contributor", "maintainer", "read-only", "reviewer"}
+    )
     assert_audit_log_columns(
         {
             "action",
@@ -372,7 +422,7 @@ def test_latest_migration_is_reversible() -> None:
     assert_foundation_state(PRE_LATEST_REVISION)
     assert_entity_tables(PRE_LATEST_ENTITY_TABLES)
     assert_memory_item_indexes(expected_present=True)
-    assert_learning_columns(LEARNING_COLUMNS)
+    assert_learning_columns(LEARNING_COLUMNS_WITH_SEARCH)
     assert_capability_columns(
         {
             "created_at",
@@ -449,8 +499,24 @@ def test_latest_migration_is_reversible() -> None:
             "expires_at",
             "granted_by_actor_id",
             "id",
+            "role_assignment_id",
             "revoked_at",
             "scope",
+            "updated_at",
+        }
+    )
+    assert_role_columns(
+        {"capabilities", "created_at", "description", "id", "name", "scope", "updated_at"}
+    )
+    assert_actor_role_assignment_columns(
+        {
+            "actor_id",
+            "created_at",
+            "expires_at",
+            "granted_by_actor_id",
+            "id",
+            "revoked_at",
+            "role_id",
             "updated_at",
         }
     )
@@ -486,6 +552,12 @@ def test_latest_migration_is_reversible() -> None:
             "write_branch",
             "write_learning",
         }
+    )
+    assert_seeded_role_names(
+        {"admin", "bot", "contributor", "maintainer", "read-only", "reviewer"}
+    )
+    assert_seeded_role_names(
+        {"admin", "bot", "contributor", "maintainer", "read-only", "reviewer"}
     )
     assert_audit_log_columns(
         {
@@ -530,8 +602,24 @@ def test_full_migration_stack_is_reversible_to_base() -> None:
             "expires_at",
             "granted_by_actor_id",
             "id",
+            "role_assignment_id",
             "revoked_at",
             "scope",
+            "updated_at",
+        }
+    )
+    assert_role_columns(
+        {"capabilities", "created_at", "description", "id", "name", "scope", "updated_at"}
+    )
+    assert_actor_role_assignment_columns(
+        {
+            "actor_id",
+            "created_at",
+            "expires_at",
+            "granted_by_actor_id",
+            "id",
+            "revoked_at",
+            "role_id",
             "updated_at",
         }
     )
@@ -567,6 +655,9 @@ def test_full_migration_stack_is_reversible_to_base() -> None:
             "write_branch",
             "write_learning",
         }
+    )
+    assert_seeded_role_names(
+        {"admin", "bot", "contributor", "maintainer", "read-only", "reviewer"}
     )
     assert_embedding_columns_and_indexes(
         expected_tables=set(EMBEDDING_TABLES) | {"memory_item"},

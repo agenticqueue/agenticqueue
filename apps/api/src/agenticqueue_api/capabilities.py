@@ -126,6 +126,7 @@ def grant_capability(
     capability: CapabilityKey,
     scope: dict[str, object] | None = None,
     granted_by_actor_id: uuid.UUID | None = None,
+    role_assignment_id: uuid.UUID | None = None,
     expires_at: dt.datetime | None = None,
 ) -> CapabilityGrantModel:
     """Create a capability grant for an actor."""
@@ -141,6 +142,7 @@ def grant_capability(
         capability_id=capability_record.id,
         scope={} if scope is None else dict(scope),
         granted_by_actor_id=granted_by_actor_id,
+        role_assignment_id=role_assignment_id,
         expires_at=expires_at,
         revoked_at=None,
     )

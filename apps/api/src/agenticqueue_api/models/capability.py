@@ -112,6 +112,7 @@ class CapabilityGrantRecord(IdentifiedTable, TimestampedTable, Base):
     __table_args__ = (
         sa.Index("ix_capability_grant_actor_id", "actor_id"),
         sa.Index("ix_capability_grant_capability_id", "capability_id"),
+        sa.Index("ix_capability_grant_role_assignment_id", "role_assignment_id"),
     )
 
     actor_id: Mapped[uuid.UUID] = mapped_column(
@@ -128,6 +129,11 @@ class CapabilityGrantRecord(IdentifiedTable, TimestampedTable, Base):
     granted_by_actor_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         sa.ForeignKey("agenticqueue.actor.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    role_assignment_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("agenticqueue.actor_role_assignment.id", ondelete="SET NULL"),
         nullable=True,
     )
     expires_at: Mapped[dt.datetime | None] = mapped_column(

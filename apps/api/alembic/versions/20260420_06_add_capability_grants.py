@@ -131,18 +131,19 @@ def upgrade() -> None:
         schema="agenticqueue",
     )
 
-    capability_table = sa.table(
-        "capability",
-        sa.column("key", sa.String()),
-        sa.column("description", sa.Text()),
+    insert_capability = sa.text(
+        """
+        INSERT INTO agenticqueue.capability (key, description)
+        VALUES (:key, :description)
+        """
     )
-    op.bulk_insert(
-        capability_table,
-        [
-            {"key": key, "description": description}
-            for key, description in STANDARD_CAPABILITIES
-        ],
-    )
+    for key, description in STANDARD_CAPABILITIES:
+        op.execute(
+            insert_capability.bindparams(
+                key=key,
+                description=description,
+            )
+        )
     op.execute("""
         INSERT INTO agenticqueue.capability (key, description)
         SELECT DISTINCT legacy.capability_key, 'Imported legacy capability'

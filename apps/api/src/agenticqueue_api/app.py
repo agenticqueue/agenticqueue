@@ -64,11 +64,20 @@ from agenticqueue_api.models import (
     CapabilityGrantModel,
     CapabilityKey,
     LearningRecord,
+    RoleAssignmentModel,
+    RoleModel,
+    RoleName,
     TaskRecord,
 )
 from agenticqueue_api.models.shared import SchemaModel
 from agenticqueue_api.packet_cache import PacketCache
 from agenticqueue_api.routers import build_learnings_router, build_packets_router
+from agenticqueue_api.roles import (
+    assign_role,
+    list_role_assignments_for_actor,
+    list_roles,
+    revoke_role_assignment,
+)
 from agenticqueue_api.task_type_registry import TaskTypeDefinition, TaskTypeRegistry
 
 
@@ -153,6 +162,62 @@ class RevokeCapabilityRequest(SchemaModel):
     grant_id: uuid.UUID
 
 
+class RoleView(SchemaModel):
+    """Seeded RBAC role exposed over REST."""
+
+    id: uuid.UUID
+    name: str
+    description: str
+    capabilities: list[CapabilityKey] = Field(default_factory=list)
+    scope: dict[str, Any] = Field(default_factory=dict)
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+class RoleListResponse(SchemaModel):
+    """List of seeded roles."""
+
+    roles: list[RoleView]
+
+
+class RoleAssignmentView(SchemaModel):
+    """One actor-role assignment returned from the API."""
+
+    id: uuid.UUID
+    actor_id: uuid.UUID
+    role_id: uuid.UUID
+    role_name: str
+    description: str
+    capabilities: list[CapabilityKey] = Field(default_factory=list)
+    scope: dict[str, Any] = Field(default_factory=dict)
+    granted_by_actor_id: uuid.UUID | None = None
+    expires_at: dt.datetime | None = None
+    revoked_at: dt.datetime | None = None
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+class ActorRoleListResponse(SchemaModel):
+    """Active role assignments for one actor."""
+
+    actor: ActorSummary
+    roles: list[RoleAssignmentView]
+
+
+class AssignRoleRequest(SchemaModel):
+    """Payload for assigning one role to an actor."""
+
+    actor_id: uuid.UUID
+    role_name: RoleName
+    expires_at: dt.datetime | None = None
+
+
+class RevokeRoleRequest(SchemaModel):
+    """Payload for revoking one role assignment."""
+
+    assignment_id: uuid.UUID
+
+
 class AuditVerifyResponse(SchemaModel):
     """Verification result for the append-only audit ledger."""
 
@@ -235,6 +300,35 @@ def _capability_grant_view(grant: CapabilityGrantModel) -> CapabilityGrantView:
         revoked_at=grant.revoked_at,
         created_at=grant.created_at,
         updated_at=grant.updated_at,
+    )
+
+
+def _role_view(role: RoleModel) -> RoleView:
+    return RoleView(
+        id=role.id,
+        name=role.name,
+        description=role.description,
+        capabilities=role.capabilities,
+        scope=role.scope,
+        created_at=role.created_at,
+        updated_at=role.updated_at,
+    )
+
+
+def _role_assignment_view(assignment: RoleAssignmentModel) -> RoleAssignmentView:
+    return RoleAssignmentView(
+        id=assignment.id,
+        actor_id=assignment.actor_id,
+        role_id=assignment.role_id,
+        role_name=assignment.role_name,
+        description=assignment.description,
+        capabilities=assignment.capabilities,
+        scope=assignment.scope,
+        granted_by_actor_id=assignment.granted_by_actor_id,
+        expires_at=assignment.expires_at,
+        revoked_at=assignment.revoked_at,
+        created_at=assignment.created_at,
+        updated_at=assignment.updated_at,
     )
 
 
@@ -573,6 +667,75 @@ def create_app(
         return ActorCapabilityListResponse(
             actor=_actor_summary(ActorModel.model_validate(target_actor)),
             capabilities=[_capability_grant_view(grant) for grant in grants],
+        )
+
+    @app.get("/v1/roles", response_model=RoleListResponse)
+    def list_roles_endpoint(
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> RoleListResponse:
+        _require_admin_actor(request)
+        return RoleListResponse(roles=[_role_view(role) for role in list_roles(session)])
+
+    @app.post(
+        "/v1/roles/assign",
+        response_model=RoleAssignmentView,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def assign_role_endpoint(
+        payload: AssignRoleRequest,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> RoleAssignmentView:
+        with write_timeout(session, endpoint="v1.roles.assign"):
+            admin_actor = _require_admin_actor(request)
+            actor_exists = session.get(ActorRecord, payload.actor_id)
+            if actor_exists is None:
+                raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
+
+            try:
+                assignment = assign_role(
+                    session,
+                    actor_id=payload.actor_id,
+                    role_name=payload.role_name,
+                    granted_by_actor_id=admin_actor.id,
+                    expires_at=payload.expires_at,
+                )
+            except ValueError as error:
+                raise_api_error(status.HTTP_404_NOT_FOUND, str(error))
+            return _role_assignment_view(assignment)
+
+    @app.post("/v1/roles/revoke", response_model=RoleAssignmentView)
+    def revoke_role_endpoint(
+        payload: RevokeRoleRequest,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> RoleAssignmentView:
+        with write_timeout(session, endpoint="v1.roles.revoke"):
+            _require_admin_actor(request)
+            assignment = revoke_role_assignment(session, payload.assignment_id)
+            if assignment is None:
+                raise_api_error(status.HTTP_404_NOT_FOUND, "Role assignment not found")
+            return _role_assignment_view(assignment)
+
+    @app.get("/v1/actors/{actor_id}/roles", response_model=ActorRoleListResponse)
+    def list_actor_roles(
+        actor_id: uuid.UUID,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> ActorRoleListResponse:
+        requesting_actor = _require_actor(request)
+        if requesting_actor.actor_type != "admin" and requesting_actor.id != actor_id:
+            raise_api_error(status.HTTP_403_FORBIDDEN, "Admin actor required")
+
+        target_actor = session.get(ActorRecord, actor_id)
+        if target_actor is None:
+            raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
+
+        assignments = list_role_assignments_for_actor(session, actor_id)
+        return ActorRoleListResponse(
+            actor=_actor_summary(ActorModel.model_validate(target_actor)),
+            roles=[_role_assignment_view(assignment) for assignment in assignments],
         )
 
     def _draft_store_or_error(
