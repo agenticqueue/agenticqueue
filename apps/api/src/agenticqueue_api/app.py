@@ -66,7 +66,7 @@ from agenticqueue_api.models import (
     TaskRecord,
 )
 from agenticqueue_api.models.shared import SchemaModel
-from agenticqueue_api.routers import build_learnings_router
+from agenticqueue_api.routers import build_learnings_router, build_packets_router
 from agenticqueue_api.task_type_registry import TaskTypeDefinition, TaskTypeRegistry
 
 
@@ -376,6 +376,7 @@ def create_app(
     app.add_middleware(ContentSizeLimitMiddleware)
     install_exception_handlers(app)
     app.include_router(build_learnings_router(get_db_session))
+    app.include_router(build_packets_router(get_db_session))
     app.include_router(build_crud_router(get_db_session))
 
     @app.get(
