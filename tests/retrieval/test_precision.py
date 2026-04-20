@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 import uuid
@@ -440,7 +441,7 @@ def engine() -> Engine:
 
 
 @pytest.fixture
-def session(engine: Engine) -> Session:
+def session(engine: Engine) -> Iterator[Session]:
     _truncate_tables(engine)
     connection = engine.connect()
     transaction = connection.begin()
@@ -524,12 +525,14 @@ def test_precision_golden_corpus_meets_baseline(session: Session) -> None:
     precision_at_10 = sum(precision_at_10_scores) / len(precision_at_10_scores)
     worst_cases = _worst_case_summary(case_metrics)
 
-    assert (
-        precision_at_5 >= PRECISION_AT_5_FLOOR
-    ), f"Precision@5 dropped to {precision_at_5:.2f}; worst cases: {worst_cases}"
-    assert (
-        precision_at_10 >= PRECISION_AT_10_FLOOR
-    ), f"Precision@10 dropped to {precision_at_10:.2f}; worst cases: {worst_cases}"
+    if precision_at_5 < PRECISION_AT_5_FLOOR:
+        raise AssertionError(
+            f"Precision@5 dropped to {precision_at_5:.2f}; worst cases: {worst_cases}"
+        )
+    if precision_at_10 < PRECISION_AT_10_FLOOR:
+        raise AssertionError(
+            f"Precision@10 dropped to {precision_at_10:.2f}; worst cases: {worst_cases}"
+        )
     assert precision_at_5 >= BASELINE_PRECISION_AT_5 - MAX_REGRESSION_POINTS, (
         f"Precision@5 regressed below the 2pp budget: {precision_at_5:.2f}; "
         f"worst cases: {worst_cases}"
