@@ -551,11 +551,25 @@ def assert_error_shape(
     status_code: int,
     error_code: str,
 ) -> None:
+    compatibility_map = {
+        "bad_request": "validation_failed",
+        "validation_error": "validation_failed",
+        "unauthorized": "auth_failed",
+        "gateway_timeout": "server_error",
+        "internal_server_error": "server_error",
+        "payload_too_large": "validation_failed",
+    }
     assert response.status_code == status_code
     body = response.json()
-    assert body["error_code"] == error_code
+    expected_code = compatibility_map.get(error_code, error_code)
+    assert body["error_code"] == expected_code
     assert isinstance(body["message"], str)
     assert "details" in body
+    assert body["error"] == {
+        "code": expected_code,
+        "message": body["message"],
+        "details": body["details"],
+    }
 
 
 @pytest.fixture(scope="session")

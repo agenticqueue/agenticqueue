@@ -10,7 +10,7 @@ from typing import Any, Callable, cast
 
 import pydantic
 import sqlalchemy as sa
-from fastapi import APIRouter, Body, Depends, Request, Response, status
+from fastapi import APIRouter, Body, Depends, Query, Request, Response, status
 from jsonschema import ValidationError as JsonSchemaValidationError  # type: ignore[import-untyped]
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -43,6 +43,17 @@ from agenticqueue_api.models import (
     WorkspaceRecord,
 )
 from agenticqueue_api.models.shared import SchemaModel
+from agenticqueue_api.pagination import (
+    DEFAULT_LIST_LIMIT,
+    LIMIT_HEADER,
+    MAX_LIST_LIMIT,
+    NEXT_CURSOR_HEADER,
+    RESERVED_QUERY_PARAMS,
+    apply_cursor_clause,
+    coerce_cursor_value,
+    decode_cursor,
+    encode_cursor,
+)
 from agenticqueue_api.repo.graph import ensure_dependency_edge_is_acyclic
 from agenticqueue_api.schemas.learning import LearningStatus
 from agenticqueue_api.task_type_registry import SchemaLoadError, TaskTypeRegistry
@@ -471,8 +482,8 @@ def _order_columns(record_type: type[Any]) -> list[Any]:
     order = []
     for column_name in ("created_at", "updated_at", "id"):
         if column_name in columns:
-            order.append(columns[column_name].asc())
-    return order or [columns[0].asc()]
+            order.append(columns[column_name])
+    return order or [columns[0]]
 
 
 def _coerce_filter_value(column: Any, raw_value: str) -> Any:
@@ -519,6 +530,8 @@ def _apply_filters(
     request: Request,
 ) -> Any:
     for field_name, raw_value in request.query_params.multi_items():
+        if field_name in RESERVED_QUERY_PARAMS:
+            continue
         if field_name not in config.record_type.__table__.columns:
             raise_api_error(
                 status.HTTP_400_BAD_REQUEST,
@@ -531,6 +544,18 @@ def _apply_filters(
             getattr(config.record_type, field_name) == coerced_value
         )
     return statement
+
+
+def _decode_cursor_values(cursor: str, columns: list[Any]) -> list[Any]:
+    raw_values = decode_cursor(cursor, expected_size=len(columns))
+    coerced_values = []
+    for column, raw_value in zip(columns, raw_values):
+        coerced_values.append(coerce_cursor_value(raw_value, column.type.python_type))
+    return coerced_values
+
+
+def _record_cursor_values(record: Any, columns: list[Any]) -> list[Any]:
+    return [getattr(record, column.name) for column in columns]
 
 
 def _apply_default_filters(
@@ -617,16 +642,36 @@ def _register_entity_routes(
 
     def list_entities(
         request: Request,
+        response: Response,
+        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
+        cursor: str | None = Query(default=None),
         session: Session = Depends(get_db_session),
     ) -> list[dict[str, Any]]:
         _require_scope(request, config.read_scope)
         statement = sa.select(config.record_type)
         statement = _apply_filters(statement, config, request)
         statement = _apply_default_filters(statement, config, request)
-        statement = statement.order_by(*_order_columns(config.record_type))
+        order_columns = _order_columns(config.record_type)
+        cursor_values = None if cursor is None else _decode_cursor_values(
+            cursor, order_columns
+        )
+        statement = apply_cursor_clause(
+            statement,
+            columns=order_columns,
+            cursor_values=cursor_values,
+        )
+        statement = statement.order_by(*(column.asc() for column in order_columns))
+        statement = statement.limit(limit + 1)
+        records = session.scalars(statement).all()
+        page_records = records[:limit]
+        response.headers[LIMIT_HEADER] = str(limit)
+        if len(records) > limit and page_records:
+            response.headers[NEXT_CURSOR_HEADER] = encode_cursor(
+                _record_cursor_values(page_records[-1], order_columns)
+            )
         return [
             _serialize_record(config, record).model_dump(mode="json")
-            for record in session.scalars(statement).all()
+            for record in page_records
         ]
 
     def update_entity(

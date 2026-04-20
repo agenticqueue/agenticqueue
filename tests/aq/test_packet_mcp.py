@@ -343,11 +343,9 @@ def test_compile_packet_mcp_requires_authentication(
 
     response = _mcp_call(mcp, "compile_packet", {"task_id": str(task_id)})
 
-    assert response == {
-        "error_code": "unauthorized",
-        "message": "Missing Authorization header",
-        "details": None,
-    }
+    assert response["error_code"] == "auth_failed"
+    assert response["message"] == "Missing Authorization header"
+    assert response["details"] is None
 
 
 def test_compile_packet_mcp_rejects_invalid_token(
@@ -366,11 +364,9 @@ def test_compile_packet_mcp_rejects_invalid_token(
         {"task_id": str(task_id), "token": "not-a-real-token"},
     )
 
-    assert response == {
-        "error_code": "unauthorized",
-        "message": "Invalid bearer token",
-        "details": None,
-    }
+    assert response["error_code"] == "auth_failed"
+    assert response["message"] == "Invalid bearer token"
+    assert response["details"] is None
 
 
 def test_compile_packet_mcp_rejects_missing_capability_with_audit(
@@ -391,13 +387,11 @@ def test_compile_packet_mcp_rejects_missing_capability_with_audit(
         {"task_id": str(task_id), "token": token},
     )
 
-    assert response == {
-        "error_code": "forbidden",
-        "message": "Capability grant required",
-        "details": {
-            "missing_capabilities": ["read_repo", "query_graph"],
-            "required_scope": {"project_id": str(project_id)},
-        },
+    assert response["error_code"] == "forbidden"
+    assert response["message"] == "Capability grant required"
+    assert response["details"] == {
+        "missing_capabilities": ["read_repo", "query_graph"],
+        "required_scope": {"project_id": str(project_id)},
     }
 
     with session_factory() as session:
@@ -432,8 +426,6 @@ def test_compile_packet_mcp_returns_404_for_missing_task(
         {"task_id": str(uuid.uuid4()), "token": token},
     )
 
-    assert response == {
-        "error_code": "not_found",
-        "message": "Task not found",
-        "details": None,
-    }
+    assert response["error_code"] == "not_found"
+    assert response["message"] == "Task not found"
+    assert response["details"] is None

@@ -22,6 +22,9 @@ DEFAULT_PACKET_SCOPE_MAX_FILES = 200
 DEFAULT_PACKET_CACHE_MAX_ENTRIES = 200
 DEFAULT_PACKET_CACHE_TTL_SECONDS = 300
 DEFAULT_PACKET_PREFETCH_WIDTH = 2
+DEFAULT_MAX_BODY_BYTES = 1024 * 1024
+DEFAULT_RATE_LIMIT_RPS = 100
+DEFAULT_RATE_LIMIT_BURST = 500
 ASYNC_PREFIX = "postgresql+asyncpg://"
 SQLALCHEMY_SYNC_PREFIX = "postgresql+psycopg://"
 PSYCOPG_PREFIX = "postgresql://"
@@ -173,6 +176,30 @@ def get_task_types_dir() -> Path:
     if configured:
         return Path(configured)
     return DEFAULT_TASK_TYPES_DIR
+
+
+def get_max_body_bytes() -> int:
+    """Return the default HTTP request body cap in bytes."""
+
+    return int(
+        os.getenv("AGENTICQUEUE_MAX_BODY_BYTES", DEFAULT_MAX_BODY_BYTES)
+    )
+
+
+def get_rate_limit_rps() -> int:
+    """Return the per-actor sustained request budget."""
+
+    return int(
+        os.getenv("AGENTICQUEUE_RATE_LIMIT_RPS", DEFAULT_RATE_LIMIT_RPS)
+    )
+
+
+def get_rate_limit_burst() -> int:
+    """Return the per-actor burst request budget."""
+
+    return int(
+        os.getenv("AGENTICQUEUE_RATE_LIMIT_BURST", DEFAULT_RATE_LIMIT_BURST)
+    )
 
 
 def get_policies_dir() -> Path:

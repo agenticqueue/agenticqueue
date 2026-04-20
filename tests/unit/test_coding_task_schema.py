@@ -244,7 +244,7 @@ def test_coding_task_missing_spec_raises_validation_error_and_api_422(
         json=_task_payload(project_id, invalid),
     )
     assert response.status_code == 422
-    assert response.json()["error_code"] == "validation_error"
+    assert response.json()["error_code"] == "validation_failed"
 
 
 def test_coding_task_rejects_autonomy_tier_outside_allowed_enum(

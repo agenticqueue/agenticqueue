@@ -359,11 +359,10 @@ def test_unauthenticated_grant_returns_401(client: TestClient) -> None:
 
     assert response.status_code == 401
     assert response.headers["WWW-Authenticate"] == "Bearer"
-    assert response.json() == {
-        "error_code": "unauthorized",
-        "message": "Missing Authorization header",
-        "details": None,
-    }
+    body = response.json()
+    assert body["error_code"] == "auth_failed"
+    assert body["message"] == "Missing Authorization header"
+    assert body["details"] is None
 
 
 def test_unauthenticated_revoke_returns_401(client: TestClient) -> None:
@@ -374,11 +373,10 @@ def test_unauthenticated_revoke_returns_401(client: TestClient) -> None:
 
     assert response.status_code == 401
     assert response.headers["WWW-Authenticate"] == "Bearer"
-    assert response.json() == {
-        "error_code": "unauthorized",
-        "message": "Missing Authorization header",
-        "details": None,
-    }
+    body = response.json()
+    assert body["error_code"] == "auth_failed"
+    assert body["message"] == "Missing Authorization header"
+    assert body["details"] is None
 
 
 def test_capability_helpers_cover_missing_and_include_inactive(

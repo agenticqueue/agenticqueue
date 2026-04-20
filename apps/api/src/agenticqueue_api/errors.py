@@ -13,15 +13,16 @@ from starlette.requests import Request
 from agenticqueue_api.db import StatementTimeoutError
 
 ERROR_CODE_BY_STATUS = {
-    status.HTTP_400_BAD_REQUEST: "bad_request",
-    status.HTTP_401_UNAUTHORIZED: "unauthorized",
+    status.HTTP_400_BAD_REQUEST: "validation_failed",
+    status.HTTP_401_UNAUTHORIZED: "auth_failed",
     status.HTTP_403_FORBIDDEN: "forbidden",
     status.HTTP_404_NOT_FOUND: "not_found",
     status.HTTP_409_CONFLICT: "conflict",
-    status.HTTP_413_CONTENT_TOO_LARGE: "payload_too_large",
-    status.HTTP_422_UNPROCESSABLE_CONTENT: "validation_error",
-    status.HTTP_504_GATEWAY_TIMEOUT: "gateway_timeout",
-    status.HTTP_500_INTERNAL_SERVER_ERROR: "internal_server_error",
+    status.HTTP_413_CONTENT_TOO_LARGE: "validation_failed",
+    status.HTTP_422_UNPROCESSABLE_CONTENT: "validation_failed",
+    status.HTTP_429_TOO_MANY_REQUESTS: "rate_limited",
+    status.HTTP_504_GATEWAY_TIMEOUT: "server_error",
+    status.HTTP_500_INTERNAL_SERVER_ERROR: "server_error",
 }
 
 
@@ -34,8 +35,15 @@ def error_payload(
 ) -> dict[str, Any]:
     """Build the standard API error payload."""
 
+    code = error_code or ERROR_CODE_BY_STATUS.get(status_code, "server_error")
     return {
-        "error_code": error_code or ERROR_CODE_BY_STATUS.get(status_code, "error"),
+        "error": {
+            "code": code,
+            "message": message,
+            "details": details,
+        },
+        # Compatibility aliases for pre-hardening tests and clients.
+        "error_code": code,
         "message": message,
         "details": details,
     }
@@ -63,6 +71,26 @@ def raise_api_error(
 
 def _normalize_http_exception(exc: HTTPException) -> dict[str, Any]:
     detail = exc.detail
+    if isinstance(detail, dict) and {
+        "error",
+        "error_code",
+        "message",
+        "details",
+    }.issubset(detail.keys()):
+        return detail
+    if isinstance(detail, dict) and "error" in detail:
+        error = detail["error"]
+        if isinstance(error, dict):
+            return error_payload(
+                status_code=exc.status_code,
+                message=str(error.get("message", "Request failed")),
+                error_code=(
+                    None
+                    if error.get("code") is None
+                    else str(error.get("code"))
+                ),
+                details=error.get("details"),
+            )
     if isinstance(detail, dict) and {
         "error_code",
         "message",

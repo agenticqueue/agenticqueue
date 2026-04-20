@@ -5,12 +5,12 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 import datetime as dt
 import uuid
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from typing import Any, cast
 from pathlib import Path
 
 import sqlalchemy as sa
-from fastapi import Body, Depends, FastAPI, Request, status
+from fastapi import Body, Depends, FastAPI, Query, Request, Response, status
 from pydantic import ConfigDict, Field, ValidationError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -33,8 +33,11 @@ from agenticqueue_api.capabilities import (
     revoke_capability_grant,
 )
 from agenticqueue_api.config import (
+    get_max_body_bytes,
     get_policies_dir,
     get_psycopg_connect_args,
+    get_rate_limit_burst,
+    get_rate_limit_rps,
     get_reload_enabled,
     get_sqlalchemy_sync_database_url,
     get_task_types_dir,
@@ -43,8 +46,11 @@ from agenticqueue_api.crud import build_crud_router
 from agenticqueue_api.db import write_timeout
 from agenticqueue_api.errors import install_exception_handlers, raise_api_error
 from agenticqueue_api.middleware import (
+    ActorRateLimitMiddleware,
     ContentSizeLimitMiddleware,
     IdempotencyKeyMiddleware,
+    RequestIdMiddleware,
+    REQUEST_ID_HEADER,
     SecretRedactionMiddleware,
 )
 from agenticqueue_api.learnings import (
@@ -71,6 +77,15 @@ from agenticqueue_api.models import (
 )
 from agenticqueue_api.models.shared import SchemaModel
 from agenticqueue_api.packet_cache import PacketCache
+from agenticqueue_api.pagination import (
+    DEFAULT_LIST_LIMIT,
+    LIMIT_HEADER,
+    MAX_LIST_LIMIT,
+    NEXT_CURSOR_HEADER,
+    coerce_cursor_value,
+    decode_cursor,
+    encode_cursor,
+)
 from agenticqueue_api.routers import (
     build_learnings_router,
     build_memory_router,
@@ -346,6 +361,38 @@ def _task_type_view(definition: TaskTypeDefinition) -> TaskTypeView:
     )
 
 
+def _paginate_sequence(
+    values: Sequence[Any],
+    *,
+    response: Response,
+    limit: int,
+    cursor: str | None,
+    key_types: list[type[Any]],
+    key_fn: Callable[[Any], list[Any]],
+) -> list[Any]:
+    cursor_values = None
+    if cursor is not None:
+        raw_values = decode_cursor(cursor, expected_size=len(key_types))
+        cursor_values = [
+            coerce_cursor_value(raw_value, key_type)
+            for raw_value, key_type in zip(raw_values, key_types)
+        ]
+
+    page = []
+    for value in values:
+        if cursor_values is not None and tuple(key_fn(value)) <= tuple(cursor_values):
+            continue
+        page.append(value)
+        if len(page) > limit:
+            break
+
+    response.headers[LIMIT_HEADER] = str(limit)
+    if len(page) > limit:
+        response.headers[NEXT_CURSOR_HEADER] = encode_cursor(key_fn(page[limit - 1]))
+        return page[:limit]
+    return page
+
+
 def _require_actor(request: Request) -> ActorModel:
     actor = getattr(request.state, "actor", None)
     if actor is None:
@@ -429,13 +476,19 @@ _require_learning_promotion_capability = require_capability(
 def get_db_session(request: Request) -> Iterator[Session]:
     session = request.app.state.session_factory()
     actor = getattr(request.state, "actor", None)
-    trace_id = request.headers.get("X-Trace-Id") or str(uuid.uuid4())
+    request_id = (
+        getattr(request.state, "request_id", None)
+        or request.headers.get(REQUEST_ID_HEADER)
+        or request.headers.get("X-Trace-Id")
+        or str(uuid.uuid4())
+    )
+    request.state.request_id = request_id
     redaction = getattr(request.state, "secret_redaction_context", None)
-    request.state.trace_id = trace_id
+    request.state.trace_id = request_id
     set_session_audit_context(
         session,
         actor_id=None if actor is None else actor.id,
-        trace_id=trace_id,
+        trace_id=request_id,
     )
     set_session_redaction_context(session, redaction=redaction)
     try:
@@ -482,12 +535,21 @@ def create_app(
     app.state.packet_cache = packet_cache
     app.state.task_type_registry = task_type_registry or _default_task_type_registry()
     app.add_middleware(IdempotencyKeyMiddleware)
-    app.add_middleware(AgenticQueueAuthMiddleware)
     app.add_middleware(
         SecretRedactionMiddleware,
         policy_directory=policies_dir or get_policies_dir(),
     )
-    app.add_middleware(ContentSizeLimitMiddleware)
+    app.add_middleware(
+        ActorRateLimitMiddleware,
+        rate_per_second=get_rate_limit_rps(),
+        burst_size=get_rate_limit_burst(),
+    )
+    app.add_middleware(AgenticQueueAuthMiddleware)
+    app.add_middleware(
+        ContentSizeLimitMiddleware,
+        default_limit=get_max_body_bytes(),
+    )
+    app.add_middleware(RequestIdMiddleware)
     install_exception_handlers(app)
     app.include_router(build_learnings_router(get_db_session))
     app.include_router(build_memory_router(get_db_session))
@@ -517,10 +579,24 @@ def create_app(
 
     @app.get("/task-types", include_in_schema=False, response_model=list[TaskTypeView])
     @app.get("/v1/task-types", response_model=list[TaskTypeView])
-    def list_task_types(request: Request) -> list[TaskTypeView]:
+    def list_task_types(
+        request: Request,
+        response: Response,
+        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
+        cursor: str | None = Query(default=None),
+    ) -> list[TaskTypeView]:
         _require_actor(request)
         registry = get_task_type_registry(request)
-        return [_task_type_view(definition) for definition in registry.list()]
+        definitions = sorted(registry.list(), key=lambda definition: definition.name)
+        page = _paginate_sequence(
+            definitions,
+            response=response,
+            limit=limit,
+            cursor=cursor,
+            key_types=[str],
+            key_fn=lambda definition: [definition.name],
+        )
+        return [_task_type_view(definition) for definition in page]
 
     @app.post(
         "/task-types",
@@ -551,13 +627,25 @@ def create_app(
 
     @app.get("/v1/auth/tokens", response_model=ApiTokenListResponse)
     def list_tokens(
-        request: Request, session: Session = Depends(get_db_session)
+        request: Request,
+        response: Response,
+        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
+        cursor: str | None = Query(default=None),
+        session: Session = Depends(get_db_session),
     ) -> ApiTokenListResponse:
         actor = _require_actor(request)
         tokens = list_api_tokens_for_actor(session, actor.id)
+        page = _paginate_sequence(
+            tokens,
+            response=response,
+            limit=limit,
+            cursor=cursor,
+            key_types=[str, str],
+            key_fn=lambda token: [token.created_at.isoformat(), str(token.id)],
+        )
         return ApiTokenListResponse(
             actor=_actor_summary(actor),
-            tokens=[_token_view(token) for token in tokens],
+            tokens=[_token_view(token) for token in page],
         )
 
     @app.post(
@@ -658,6 +746,9 @@ def create_app(
     def list_capability_grants(
         actor_id: uuid.UUID,
         request: Request,
+        response: Response,
+        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
+        cursor: str | None = Query(default=None),
         session: Session = Depends(get_db_session),
     ) -> ActorCapabilityListResponse:
         requesting_actor = _require_actor(request)
@@ -669,20 +760,41 @@ def create_app(
             raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
 
         grants = list_capabilities_for_actor(session, actor_id)
+        page = _paginate_sequence(
+            grants,
+            response=response,
+            limit=limit,
+            cursor=cursor,
+            key_types=[str, str],
+            key_fn=lambda grant: [grant.created_at.isoformat(), str(grant.id)],
+        )
         return ActorCapabilityListResponse(
             actor=_actor_summary(ActorModel.model_validate(target_actor)),
-            capabilities=[_capability_grant_view(grant) for grant in grants],
+            capabilities=[_capability_grant_view(grant) for grant in page],
         )
 
     @app.get("/v1/roles", response_model=RoleListResponse)
     def list_roles_endpoint(
         request: Request,
+        response: Response,
+        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
+        cursor: str | None = Query(default=None),
         session: Session = Depends(get_db_session),
     ) -> RoleListResponse:
         _require_admin_actor(request)
-        return RoleListResponse(
-            roles=[_role_view(role) for role in list_roles(session)]
+        roles = sorted(
+            list_roles(session),
+            key=lambda role: (role.created_at.isoformat(), str(role.id)),
         )
+        page = _paginate_sequence(
+            roles,
+            response=response,
+            limit=limit,
+            cursor=cursor,
+            key_types=[str, str],
+            key_fn=lambda role: [role.created_at.isoformat(), str(role.id)],
+        )
+        return RoleListResponse(roles=[_role_view(role) for role in page])
 
     @app.post(
         "/v1/roles/assign",
@@ -729,6 +841,9 @@ def create_app(
     def list_actor_roles(
         actor_id: uuid.UUID,
         request: Request,
+        response: Response,
+        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
+        cursor: str | None = Query(default=None),
         session: Session = Depends(get_db_session),
     ) -> ActorRoleListResponse:
         requesting_actor = _require_actor(request)
@@ -740,9 +855,20 @@ def create_app(
             raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
 
         assignments = list_role_assignments_for_actor(session, actor_id)
+        page = _paginate_sequence(
+            assignments,
+            response=response,
+            limit=limit,
+            cursor=cursor,
+            key_types=[str, str],
+            key_fn=lambda assignment: [
+                assignment.created_at.isoformat(),
+                str(assignment.id),
+            ],
+        )
         return ActorRoleListResponse(
             actor=_actor_summary(ActorModel.model_validate(target_actor)),
-            roles=[_role_assignment_view(assignment) for assignment in assignments],
+            roles=[_role_assignment_view(assignment) for assignment in page],
         )
 
     def _draft_store_or_error(

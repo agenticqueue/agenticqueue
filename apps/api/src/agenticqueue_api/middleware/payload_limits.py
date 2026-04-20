@@ -11,7 +11,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from agenticqueue_api.errors import error_payload
 
-DEFAULT_CONTENT_SIZE_LIMIT: Final = 256 * 1024
+DEFAULT_CONTENT_SIZE_LIMIT: Final = 1024 * 1024
 UPLOAD_CONTENT_SIZE_LIMIT: Final = 10 * 1024 * 1024
 MAX_PAYLOAD_DEPTH: Final = 10
 _MUTATING_METHODS = frozenset({"POST", "PATCH"})

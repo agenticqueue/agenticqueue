@@ -81,7 +81,7 @@ def test_recursive_cte_timeout_returns_504_and_logs_fingerprint(
             after_connections = count_backend_connections()
 
     assert response.status_code == 504
-    assert response.json()["error_code"] == "gateway_timeout"
+    assert response.json()["error_code"] == "server_error"
     assert response.json()["details"]["endpoint"] == "v1.tests.graph-timeout"
     assert response.json()["details"]["sql_fingerprint"] is not None
     assert response.json()["details"]["timeout_ms"] == 25

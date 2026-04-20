@@ -467,13 +467,11 @@ def test_each_capability_denies_missing_grants(
             )
 
     assert exc_info.value.status_code == 403
-    assert exc_info.value.detail == {
-        "error_code": "forbidden",
-        "message": "Capability grant required",
-        "details": {
-            "missing_capability": capability.value,
-            "required_scope": REQUIRED_PROJECT_SCOPE,
-        },
+    assert exc_info.value.detail["error_code"] == "forbidden"
+    assert exc_info.value.detail["message"] == "Capability grant required"
+    assert exc_info.value.detail["details"] == {
+        "missing_capability": capability.value,
+        "required_scope": REQUIRED_PROJECT_SCOPE,
     }
 
 
@@ -505,13 +503,11 @@ def test_each_capability_rejects_scope_mismatches(
             )
 
     assert exc_info.value.status_code == 403
-    assert exc_info.value.detail == {
-        "error_code": "forbidden",
-        "message": "Capability grant required",
-        "details": {
-            "missing_capability": capability.value,
-            "required_scope": REQUIRED_PROJECT_SCOPE,
-        },
+    assert exc_info.value.detail["error_code"] == "forbidden"
+    assert exc_info.value.detail["message"] == "Capability grant required"
+    assert exc_info.value.detail["details"] == {
+        "missing_capability": capability.value,
+        "required_scope": REQUIRED_PROJECT_SCOPE,
     }
 
 
@@ -549,13 +545,11 @@ def test_each_capability_rejects_revoked_grants(
             )
 
     assert exc_info.value.status_code == 403
-    assert exc_info.value.detail == {
-        "error_code": "forbidden",
-        "message": "Capability grant required",
-        "details": {
-            "missing_capability": capability.value,
-            "required_scope": REQUIRED_PROJECT_SCOPE,
-        },
+    assert exc_info.value.detail["error_code"] == "forbidden"
+    assert exc_info.value.detail["message"] == "Capability grant required"
+    assert exc_info.value.detail["details"] == {
+        "missing_capability": capability.value,
+        "required_scope": REQUIRED_PROJECT_SCOPE,
     }
 
 
