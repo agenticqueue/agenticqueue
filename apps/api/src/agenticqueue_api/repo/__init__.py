@@ -30,8 +30,24 @@ from agenticqueue_api.repo.entities import (
     get_task,
     get_workspace,
 )
+from agenticqueue_api.repo.graph import (
+    CycleError,
+    GraphEntityRef,
+    GraphPath,
+    GraphTraversalHit,
+    ancestors,
+    descendants,
+    downstream_of_decision,
+    neighbors,
+    shortest_path,
+)
 
 __all__ = [
+    "CycleError",
+    "GraphEntityRef",
+    "GraphPath",
+    "GraphTraversalHit",
+    "ancestors",
     "create_actor",
     "create_artifact",
     "create_audit_log",
@@ -45,6 +61,8 @@ __all__ = [
     "create_run",
     "create_task",
     "create_workspace",
+    "descendants",
+    "downstream_of_decision",
     "get_actor",
     "get_artifact",
     "get_audit_log",
@@ -60,4 +78,6 @@ __all__ = [
     "get_run",
     "get_task",
     "get_workspace",
+    "neighbors",
+    "shortest_path",
 ]

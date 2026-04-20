@@ -38,6 +38,7 @@ from agenticqueue_api.models import (
     WorkspaceRecord,
 )
 from agenticqueue_api.models.shared import SchemaModel
+from agenticqueue_api.repo.graph import ensure_dependency_edge_is_acyclic
 
 SchemaT = TypeVar("SchemaT", bound=SchemaModel)
 RecordT = TypeVar("RecordT")
@@ -117,6 +118,15 @@ def get_decision(session: Session, entity_id: uuid.UUID) -> DecisionModel | None
 
 
 def create_edge(session: Session, payload: EdgeModel) -> EdgeModel:
+    if payload.relation is EdgeRelation.DEPENDS_ON and payload.is_active:
+        ensure_dependency_edge_is_acyclic(
+            session,
+            src_entity_type=payload.src_entity_type,
+            src_entity_id=payload.src_id,
+            dst_entity_type=payload.dst_entity_type,
+            dst_entity_id=payload.dst_id,
+        )
+
     record = EdgeRecord(
         id=payload.id,
         created_at=payload.created_at,
