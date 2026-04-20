@@ -24,7 +24,12 @@ from agenticqueue_api.models import (
     TaskModel,
     WorkspaceModel,
 )
-from agenticqueue_api.repo import create_actor, create_project, create_task, create_workspace
+from agenticqueue_api.repo import (
+    create_actor,
+    create_project,
+    create_task,
+    create_workspace,
+)
 from agenticqueue_api.routers.packets import (
     PACKET_FETCH_ACTION,
     PACKET_FETCH_CACHE_CONTROL,
@@ -84,7 +89,9 @@ def _actor_payload(*, handle: str) -> ActorModel:
     return ActorModel.model_validate(
         {
             "id": str(
-                uuid.uuid5(uuid.NAMESPACE_URL, f"https://agenticqueue.ai/tests/{handle}")
+                uuid.uuid5(
+                    uuid.NAMESPACE_URL, f"https://agenticqueue.ai/tests/{handle}"
+                )
             ),
             "handle": handle,
             "actor_type": "agent",

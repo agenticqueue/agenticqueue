@@ -13,7 +13,12 @@ from agenticqueue_api.capabilities import ensure_actor_has_capability
 from agenticqueue_api.compiler import PacketV1, compile_packet
 from agenticqueue_api.db import write_timeout
 from agenticqueue_api.errors import raise_api_error
-from agenticqueue_api.models import ActorModel, AuditLogRecord, CapabilityKey, TaskRecord
+from agenticqueue_api.models import (
+    ActorModel,
+    AuditLogRecord,
+    CapabilityKey,
+    TaskRecord,
+)
 
 PACKET_FETCH_CACHE_CONTROL = "private, no-store"
 PACKET_FETCH_ACTION = "PACKET_FETCH"
