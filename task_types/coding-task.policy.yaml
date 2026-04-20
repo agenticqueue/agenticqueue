@@ -6,3 +6,49 @@ capabilities:
   - write_branch
   - run_tests
   - update_task
+body:
+  transitions:
+    queued:
+      - claimed
+      - parked
+    claimed:
+      - in_progress
+      - blocked
+      - parked
+    in_progress:
+      - submitted
+      - blocked
+      - parked
+    submitted:
+      - validated
+      - rejected
+      - blocked
+      - parked
+    validated:
+      - done
+      - blocked
+      - parked
+    rejected:
+      - queued
+      - blocked
+      - parked
+    blocked:
+      - queued
+      - needs_ghost_triage
+      - parked
+    parked:
+      - queued
+  required_capabilities:
+    claimed:
+      - read_repo
+    in_progress:
+      - write_branch
+    submitted:
+      - run_tests
+    done:
+      - update_task
+  retry:
+    max_retries: 3
+  escalation:
+    blocked_hours: 24
+    target_state: needs_ghost_triage
