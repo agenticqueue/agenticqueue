@@ -62,7 +62,16 @@ def make_edge_payload(**overrides: object) -> EdgeModel:
 def test_edge_model_accepts_all_supported_relation_types(
     relation: EdgeRelation,
 ) -> None:
-    payload = make_edge_payload(relation=relation.value, metadata=None)
+    overrides: dict[str, object] = {"relation": relation.value, "metadata": None}
+    if relation is EdgeRelation.LEARNED_FROM:
+        overrides.update(
+            {
+                "src_entity_type": "learning",
+                "src_id": "00000000-0000-0000-0000-000000000399",
+            }
+        )
+
+    payload = make_edge_payload(**overrides)
     assert payload.relation is relation
     assert payload.metadata == {}
     assert payload.is_active is True

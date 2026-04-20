@@ -139,8 +139,12 @@ def test_learned_from_edges_reject_invalid_entity_pairs(
         )
 
 
-def test_learnings_for_returns_linked_learnings_for_each_entity(db_session: Session) -> None:
-    task_learning = create_learning(db_session, make_learning_payload(611, scope="task"))
+def test_learnings_for_returns_linked_learnings_for_each_entity(
+    db_session: Session,
+) -> None:
+    task_learning = create_learning(
+        db_session, make_learning_payload(611, scope="task")
+    )
     decision_learning = create_learning(
         db_session,
         make_learning_payload(612, scope="task"),
@@ -193,7 +197,9 @@ def test_learnings_for_returns_linked_learnings_for_each_entity(db_session: Sess
 
 
 def test_learnings_for_widens_scope_filters(db_session: Session) -> None:
-    task_learning = create_learning(db_session, make_learning_payload(621, scope="task"))
+    task_learning = create_learning(
+        db_session, make_learning_payload(621, scope="task")
+    )
     project_learning = create_learning(
         db_session,
         make_learning_payload(622, scope="project"),
@@ -218,7 +224,9 @@ def test_learnings_for_widens_scope_filters(db_session: Session) -> None:
             ),
         )
 
-    assert [learning.id for learning in learnings_for(db_session, TASK_ID, scope="task")] == [
+    assert [
+        learning.id for learning in learnings_for(db_session, TASK_ID, scope="task")
+    ] == [
         task_learning.id,
     ]
     assert [
@@ -227,7 +235,9 @@ def test_learnings_for_widens_scope_filters(db_session: Session) -> None:
     assert [
         learning.id for learning in learnings_for(db_session, TASK_ID, scope="global")
     ] == [task_learning.id, project_learning.id, global_learning.id]
-    assert [learning.id for learning in learnings_for(db_session, TASK_ID, scope="all")] == [
+    assert [
+        learning.id for learning in learnings_for(db_session, TASK_ID, scope="all")
+    ] == [
         task_learning.id,
         project_learning.id,
         global_learning.id,
