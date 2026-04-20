@@ -9,14 +9,12 @@ from typing import Any
 import sqlalchemy as sa
 
 from agenticqueue_api.db import Base
-from agenticqueue_api.models import (
-    CapabilityGrantRecord,
-    DecisionRecord,
-    EdgeRecord,
-    LearningRecord,
-    PolicyRecord,
-    TaskRecord,
-)
+from agenticqueue_api.models.capability import CapabilityGrantRecord
+from agenticqueue_api.models.decision import DecisionRecord
+from agenticqueue_api.models.edge import EdgeRecord
+from agenticqueue_api.models.learning import LearningRecord
+from agenticqueue_api.models.policy import PolicyRecord
+from agenticqueue_api.models.task import TaskRecord
 from agenticqueue_api.packet_cache import PACKET_INVALIDATION_CHANNEL
 
 

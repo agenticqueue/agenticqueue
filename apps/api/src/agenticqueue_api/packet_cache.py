@@ -22,7 +22,7 @@ from agenticqueue_api.config import (
     get_packet_cache_ttl_seconds,
     get_packet_prefetch_width,
 )
-from agenticqueue_api.models import TaskRecord
+from agenticqueue_api.models.task import TaskRecord
 
 PACKET_INVALIDATION_CHANNEL = "packet_invalidate"
 _FINISHED_STATES = ("done", "cancelled")
