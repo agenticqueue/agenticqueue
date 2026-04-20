@@ -41,4 +41,3 @@ def compile_packet(
             for learning in rank_learnings_for_task(session, task.id, k=limit)
         ],
     }
-
