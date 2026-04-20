@@ -34,7 +34,9 @@ def test_resolve_repo_scope_expands_globs_directories_and_exact_paths(
         "src/auth/login.py",
         "src/auth/models.py",
     ]
-    expected_bytes = sum((repo_root / path).stat().st_size for path in resolved.file_scope)
+    expected_bytes = sum(
+        (repo_root / path).stat().st_size for path in resolved.file_scope
+    )
     assert resolved.estimated_token_count == math.ceil(expected_bytes / 4)
 
 

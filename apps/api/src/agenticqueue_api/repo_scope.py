@@ -33,9 +33,7 @@ def _validate_scope_entry(entry: str) -> str:
     if not normalized:
         raise ValueError("file_scope entries must not be empty")
     scope_path = PurePosixPath(normalized)
-    has_windows_drive = (
-        len(scope_path.parts) > 0 and scope_path.parts[0].endswith(":")
-    )
+    has_windows_drive = len(scope_path.parts) > 0 and scope_path.parts[0].endswith(":")
     if scope_path.is_absolute() or has_windows_drive:
         raise ValueError(f"file_scope entry must be repo-relative: {entry}")
     if any(part == ".." for part in scope_path.parts):
@@ -65,7 +63,9 @@ def _expand_scope_entry(repo_root: Path, entry: str) -> list[Path]:
     try:
         target.relative_to(repo_root)
     except ValueError as error:
-        raise ValueError(f"file_scope entry must stay inside the repo: {entry}") from error
+        raise ValueError(
+            f"file_scope entry must stay inside the repo: {entry}"
+        ) from error
 
     if target.is_file():
         return [target]
