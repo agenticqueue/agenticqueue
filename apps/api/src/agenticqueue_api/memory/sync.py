@@ -37,7 +37,9 @@ class MemorySyncService:
         # AQ-83 reserves `paths=[...]` for partial walks that must not prune.
         # AQ-86 treats `full_sync=True` as "these roots are authoritative", so
         # the ingest layer receives `paths=None` to enable prune semantics.
-        partial_paths = None if full_sync else [path.as_posix() for path in source_paths]
+        partial_paths = (
+            None if full_sync else [path.as_posix() for path in source_paths]
+        )
 
         return MemoryIngestService(self._session).ingest(
             layer=layer,
@@ -64,11 +66,7 @@ class MemorySyncService:
 
             if root.is_dir():
                 for candidate in sorted(
-                    (
-                        path.resolve()
-                        for path in root.rglob("*")
-                        if path.is_file()
-                    ),
+                    (path.resolve() for path in root.rglob("*") if path.is_file()),
                     key=lambda path: path.as_posix(),
                 ):
                     key = candidate.as_posix()

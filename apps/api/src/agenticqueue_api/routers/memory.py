@@ -146,7 +146,9 @@ def authenticate_surface_token(
     """Authenticate a non-HTTP memory surface and attach audit context."""
 
     if token is None or not token.strip():
-        raise _surface_error(status.HTTP_401_UNAUTHORIZED, "Missing Authorization header")
+        raise _surface_error(
+            status.HTTP_401_UNAUTHORIZED, "Missing Authorization header"
+        )
 
     authenticated = authenticate_api_token(session, token.strip())
     if authenticated is None:
