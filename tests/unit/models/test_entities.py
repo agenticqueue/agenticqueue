@@ -311,6 +311,12 @@ def test_entity_model_round_trip_and_repo_crud(
         task_payload = cast(TaskModel, payload)
         created_task = cast(TaskModel, created)
         payload = task_payload.model_copy(update={"sequence": created_task.sequence})
+    if entity_name == "audit_log":
+        audit_payload = cast(AuditLogModel, payload)
+        created_audit = cast(AuditLogModel, created)
+        payload = audit_payload.model_copy(
+            update={"created_at": created_audit.created_at}
+        )
 
     assert created == payload
     assert loaded == payload

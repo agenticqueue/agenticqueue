@@ -28,8 +28,8 @@ if "pgvector.sqlalchemy" not in sys.modules:
         def get_col_spec(self, **kw: object) -> str:
             return f"vector({self.dimensions})"
 
-    pgvector_sqlalchemy_module.Vector = Vector
-    pgvector_module.sqlalchemy = pgvector_sqlalchemy_module
+    setattr(pgvector_sqlalchemy_module, "Vector", Vector)
+    setattr(pgvector_module, "sqlalchemy", pgvector_sqlalchemy_module)
     sys.modules["pgvector"] = pgvector_module
     sys.modules["pgvector.sqlalchemy"] = pgvector_sqlalchemy_module
 

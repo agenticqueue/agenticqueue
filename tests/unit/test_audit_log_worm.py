@@ -26,8 +26,8 @@ if "pgvector.sqlalchemy" not in sys.modules:
         def get_col_spec(self, **kw: object) -> str:
             return f"vector({self.dimensions})"
 
-    pgvector_sqlalchemy_module.Vector = Vector
-    pgvector_module.sqlalchemy = pgvector_sqlalchemy_module
+    setattr(pgvector_sqlalchemy_module, "Vector", Vector)
+    setattr(pgvector_module, "sqlalchemy", pgvector_sqlalchemy_module)
     sys.modules["pgvector"] = pgvector_module
     sys.modules["pgvector.sqlalchemy"] = pgvector_sqlalchemy_module
 
@@ -195,12 +195,13 @@ def test_audit_log_rows_link_prev_hash_and_row_hash(
         session.add(second_workspace)
         session.commit()
 
-        chain_rows = session.scalars(
-            sa.select(AuditLogRecord).order_by(
-                AuditLogRecord.chain_position.asc(),
+        chain_rows = list(
+            session.scalars(
+                sa.select(AuditLogRecord).order_by(
+                    AuditLogRecord.chain_position.asc(),
+                )
             )
         )
-        chain_rows = list(chain_rows)
 
     assert len(chain_rows) >= 3
     assert chain_rows[0].prev_hash == ZERO_HASH
