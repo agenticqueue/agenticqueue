@@ -36,20 +36,20 @@ from agenticqueue_api.models.edge import EdgeRelation
 from agenticqueue_api.models.shared import SchemaModel
 from agenticqueue_api.policy.loader import PolicyPack, PolicyRegistry, load_policy_pack
 from agenticqueue_api.policy.resolver import ResolvedPolicy, resolve_effective_policy
-from agenticqueue_api.repo import ancestors
+from agenticqueue_api.repo import ancestors, neighbors
 from agenticqueue_api.schemas.learning import LearningStatus
 from agenticqueue_api.task_type_registry import TaskTypeDefinition, TaskTypeRegistry
 
 DEFAULT_LEARNING_LIMIT = 5
-DEFAULT_GRAPH_DEPTH = 2
+DEFAULT_PACKET_DECISION_MAX_HOPS = 3
+DEFAULT_PACKET_DECISION_MAX_NODES = 25
 DEFAULT_POLICY_NAME = "default-coding"
-GRAPH_RELEVANCE_EDGE_TYPES = (
+PACKET_DECISION_TASK_EDGE_TYPES = (
     EdgeRelation.DEPENDS_ON,
+)
+PACKET_DECISION_NEIGHBOR_EDGE_TYPES = (
     EdgeRelation.INFORMED_BY,
     EdgeRelation.IMPLEMENTS,
-    EdgeRelation.DERIVED_FROM,
-    EdgeRelation.TRIGGERED,
-    EdgeRelation.PARENT_OF,
     EdgeRelation.SUPERSEDES,
 )
 OPEN_QUESTIONS_HEADING_RE = re.compile(r"^#{2,6}\s+Open Questions\s*$")
@@ -214,44 +214,95 @@ def _expected_output_schema(definition: TaskTypeDefinition) -> dict[str, Any]:
     return output_schema
 
 
-def _decision_ids(session: Session, task: TaskRecord) -> set[uuid.UUID]:
+def _anchor_task_ids(
+    session: Session,
+    task_id: uuid.UUID,
+    *,
+    max_hops: int,
+) -> set[uuid.UUID]:
+    task_ids = {task_id}
+    hits = ancestors(
+        session,
+        "task",
+        task_id,
+        edge_types=PACKET_DECISION_TASK_EDGE_TYPES,
+        max_depth=max_hops,
+    )
+    task_ids.update(hit.entity_id for hit in hits if hit.entity_type == "task")
+    return task_ids
+
+
+def packet_decisions(
+    session: Session,
+    task_id: uuid.UUID,
+    *,
+    max_hops: int = DEFAULT_PACKET_DECISION_MAX_HOPS,
+    max_nodes: int = DEFAULT_PACKET_DECISION_MAX_NODES,
+) -> list[DecisionModel]:
+    """Return graph-relevant decisions for one task, newest first."""
+
+    if max_hops < 1:
+        raise ValueError("max_hops must be at least 1")
+    if max_nodes < 1:
+        raise ValueError("max_nodes must be at least 1")
+
+    task = session.get(TaskRecord, task_id)
+    if task is None:
+        raise KeyError(str(task_id))
+
     decision_ids = set(
         session.scalars(
             sa.select(DecisionRecord.id).where(DecisionRecord.task_id == task.id)
         )
     )
-    has_relevant_edge = session.scalar(
+    has_dependency_ancestors = session.scalar(
         sa.select(EdgeRecord.id)
         .where(EdgeRecord.dst_entity_type == "task")
         .where(EdgeRecord.dst_id == task.id)
-        .where(EdgeRecord.relation.in_(GRAPH_RELEVANCE_EDGE_TYPES))
+        .where(EdgeRecord.relation.in_(PACKET_DECISION_TASK_EDGE_TYPES))
         .limit(1)
     )
-    if has_relevant_edge is not None:
-        hits = ancestors(
+    if has_dependency_ancestors is None and not decision_ids:
+        return []
+
+    if has_dependency_ancestors is not None:
+        anchor_task_ids = _anchor_task_ids(session, task.id, max_hops=max_hops)
+        decision_ids.update(
+            session.scalars(
+                sa.select(DecisionRecord.id).where(
+                    DecisionRecord.task_id.in_(anchor_task_ids)
+                )
+            )
+        )
+    if not decision_ids:
+        return []
+
+    for decision_id in tuple(decision_ids):
+        hits = neighbors(
             session,
-            "task",
-            task.id,
-            edge_types=GRAPH_RELEVANCE_EDGE_TYPES,
-            max_depth=DEFAULT_GRAPH_DEPTH,
+            "decision",
+            decision_id,
+            depth=max_hops,
+            edge_types=PACKET_DECISION_NEIGHBOR_EDGE_TYPES,
         )
         decision_ids.update(
             hit.entity_id for hit in hits if hit.entity_type == "decision"
         )
-    return decision_ids
-
-
-def _relevant_decisions(session: Session, task: TaskRecord) -> list[DecisionModel]:
-    decision_ids = _decision_ids(session, task)
-    if not decision_ids:
-        return []
 
     rows = session.scalars(
         sa.select(DecisionRecord)
         .where(DecisionRecord.id.in_(decision_ids))
-        .order_by(DecisionRecord.decided_at.asc(), DecisionRecord.id.asc())
+        .order_by(DecisionRecord.decided_at.desc(), DecisionRecord.id.desc())
+        .limit(max_nodes)
     )
     return [DecisionModel.model_validate(record) for record in rows]
+
+
+def _relevant_decisions(session: Session, task: TaskRecord) -> list[DecisionModel]:
+    decisions = packet_decisions(session, task.id)
+    if not decisions:
+        return []
+    return decisions
 
 
 def _linked_artifacts(session: Session, task: TaskRecord) -> list[ArtifactModel]:
@@ -415,4 +466,5 @@ __all__ = [
     "PacketV1",
     "assemble_packet",
     "compile_packet",
+    "packet_decisions",
 ]
