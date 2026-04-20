@@ -53,6 +53,21 @@ def _sorted_files(paths: Iterable[Path]) -> list[Path]:
 
 
 def _expand_scope_entry(repo_root: Path, entry: str) -> list[Path]:
+    if entry == "**" or entry.endswith("/**"):
+        subtree_root = entry[:-3].rstrip("/")
+        target = repo_root if not subtree_root else (repo_root / Path(subtree_root)).resolve()
+        try:
+            target.relative_to(repo_root)
+        except ValueError as error:
+            raise ValueError(
+                f"file_scope entry must stay inside the repo: {entry}"
+            ) from error
+        if target.is_dir():
+            matches = _sorted_files(target.rglob("*"))
+            if matches:
+                return matches
+        raise ValueError(f"file_scope entry did not match any files: {entry}")
+
     if _contains_glob(entry):
         matches = _sorted_files(repo_root.glob(entry))
         if matches:
