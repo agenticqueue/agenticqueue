@@ -213,7 +213,9 @@ def _load_corpus() -> list[CorpusCase]:
             raise AssertionError(f"duplicate corpus id: {case.id}")
         seen_ids.add(case.id)
         if case.expected_family not in FAMILY_FIXTURES:
-            raise AssertionError(f"unknown family for {case.id}: {case.expected_family}")
+            raise AssertionError(
+                f"unknown family for {case.id}: {case.expected_family}"
+            )
     return cases
 
 
@@ -342,7 +344,9 @@ def _seed_family(
         )
 
 
-def _query_shape(case: CorpusCase, family: FamilyFixture) -> tuple[str, str, list[str], list[str]]:
+def _query_shape(
+    case: CorpusCase, family: FamilyFixture
+) -> tuple[str, str, list[str], list[str]]:
     if case.mode == "surface_exact":
         return (
             f"Exercise {family.slug} via a direct surface-area hit.",
@@ -420,7 +424,9 @@ def _precision_at_k(
     return hits / denominator
 
 
-def _worst_case_summary(case_metrics: list[tuple[str, float, float, list[str], list[str]]]) -> str:
+def _worst_case_summary(
+    case_metrics: list[tuple[str, float, float, list[str], list[str]]],
+) -> str:
     worst = sorted(case_metrics, key=lambda item: (item[1], item[2], item[0]))[:5]
     return "; ".join(
         f"{case_id}: p@5={p5:.2f}, p@10={p10:.2f}, tiers={','.join(tiers)}, top5={top5}"
@@ -518,12 +524,12 @@ def test_precision_golden_corpus_meets_baseline(session: Session) -> None:
     precision_at_10 = sum(precision_at_10_scores) / len(precision_at_10_scores)
     worst_cases = _worst_case_summary(case_metrics)
 
-    assert precision_at_5 >= PRECISION_AT_5_FLOOR, (
-        f"Precision@5 dropped to {precision_at_5:.2f}; worst cases: {worst_cases}"
-    )
-    assert precision_at_10 >= PRECISION_AT_10_FLOOR, (
-        f"Precision@10 dropped to {precision_at_10:.2f}; worst cases: {worst_cases}"
-    )
+    assert (
+        precision_at_5 >= PRECISION_AT_5_FLOOR
+    ), f"Precision@5 dropped to {precision_at_5:.2f}; worst cases: {worst_cases}"
+    assert (
+        precision_at_10 >= PRECISION_AT_10_FLOOR
+    ), f"Precision@10 dropped to {precision_at_10:.2f}; worst cases: {worst_cases}"
     assert precision_at_5 >= BASELINE_PRECISION_AT_5 - MAX_REGRESSION_POINTS, (
         f"Precision@5 regressed below the 2pp budget: {precision_at_5:.2f}; "
         f"worst cases: {worst_cases}"
