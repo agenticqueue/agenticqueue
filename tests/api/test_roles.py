@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Iterator
+from typing import cast
 
 import pytest
 import sqlalchemy as sa
@@ -141,6 +142,13 @@ def auth_headers(token: str) -> dict[str, str]:
     }
 
 
+def contributor_capabilities() -> tuple[CapabilityKey, ...]:
+    return cast(
+        tuple[CapabilityKey, ...],
+        STANDARD_ROLE_DEFINITIONS[RoleName.CONTRIBUTOR]["capabilities"],
+    )
+
+
 def test_admin_can_list_roles_and_manage_role_assignments_over_rest(
     client: TestClient,
     session_factory: sessionmaker[Session],
@@ -188,10 +196,7 @@ def test_admin_can_list_roles_and_manage_role_assignments_over_rest(
     assert assigned["actor_id"] == str(target_actor.id)
     assert assigned["role_name"] == RoleName.CONTRIBUTOR.value
     assert set(assigned["capabilities"]) == {
-        capability.value
-        for capability in STANDARD_ROLE_DEFINITIONS[RoleName.CONTRIBUTOR][
-            "capabilities"
-        ]
+        capability.value for capability in contributor_capabilities()
     }
 
     actor_roles_response = client.get(
@@ -210,12 +215,7 @@ def test_admin_can_list_roles_and_manage_role_assignments_over_rest(
     assert capability_response.status_code == 200
     assert {
         item["capability"] for item in capability_response.json()["capabilities"]
-    } == {
-        capability.value
-        for capability in STANDARD_ROLE_DEFINITIONS[RoleName.CONTRIBUTOR][
-            "capabilities"
-        ]
-    }
+    } == {capability.value for capability in contributor_capabilities()}
 
     revoke_response = client.post(
         "/v1/roles/revoke",

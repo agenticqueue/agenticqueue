@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Iterator
+from typing import cast
 
 import pytest
 import sqlalchemy as sa
@@ -125,7 +126,9 @@ def test_seeded_roles_match_the_standard_catalog(
         role = roles[role_name.value]
         assert role.description == definition["description"]
         assert role.scope == definition["scope"]
-        assert role.capabilities == list(definition["capabilities"])
+        assert role.capabilities == list(
+            cast(tuple[CapabilityKey, ...], definition["capabilities"])
+        )
 
 
 def test_assigning_admin_role_materializes_all_current_capabilities_and_revokes_cleanly(
