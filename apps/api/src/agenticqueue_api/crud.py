@@ -373,8 +373,10 @@ def _apply_schema_to_record(
     config: CrudEntityConfig,
     record: Any,
     payload: SchemaModel,
+    *,
+    exclude_none: bool = False,
 ) -> None:
-    for field_name, value in payload.model_dump().items():
+    for field_name, value in payload.model_dump(exclude_none=exclude_none).items():
         setattr(record, _record_attr_name(config, field_name), value)
 
 
@@ -555,7 +557,7 @@ def _register_entity_routes(
         _maybe_validate_edge(config, session, validated)
 
         record = config.record_type()
-        _apply_schema_to_record(config, record, validated)
+        _apply_schema_to_record(config, record, validated, exclude_none=True)
         session.add(record)
         try:
             session.flush()

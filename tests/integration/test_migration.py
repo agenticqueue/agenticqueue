@@ -33,7 +33,7 @@ ENTITY_TABLES = {
 PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
 PRE_IDEMPOTENCY_TABLES = ENTITY_TABLES - {"idempotency_key"}
-PRE_LATEST_REVISION = "20260420_08"
+PRE_LATEST_REVISION = "20260420_09"
 
 
 def alembic_config() -> Config:
@@ -306,6 +306,7 @@ def test_latest_migration_is_reversible() -> None:
             "entity_id",
             "entity_type",
             "id",
+            "redaction",
             "trace_id",
         }
     )

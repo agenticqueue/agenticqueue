@@ -50,7 +50,7 @@ def _create_entity(
     schema_type: type[SchemaT],
     payload: SchemaT,
 ) -> SchemaT:
-    record = record_type(**payload.model_dump())  # type: ignore[call-arg]
+    record = record_type(**payload.model_dump(exclude_none=True))  # type: ignore[call-arg]
     session.add(record)
     session.flush()
     session.refresh(record)

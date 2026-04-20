@@ -100,6 +100,10 @@ ENTITY_FIXTURES = {
         "task_type": "coding-task",
         "title": "Land entity models",
         "state": "in_progress",
+        "priority": 0,
+        "labels": [],
+        "claimed_by_actor_id": None,
+        "claimed_at": None,
         "description": "Implement Phase 1 entities.",
         "contract": {"summary": "Create Phase 1 entities"},
         "definition_of_done": ["Create models", "Add CRUD tests"],
@@ -302,6 +306,10 @@ def test_entity_model_round_trip_and_repo_crud(
 
     created = case.create_fn(db_session, payload)
     loaded = case.get_fn(db_session, payload.id)
+
+    if entity_name == "task":
+        task_payload = cast(TaskModel, payload)
+        payload = task_payload.model_copy(update={"sequence": created.sequence})
 
     assert created == payload
     assert loaded == payload

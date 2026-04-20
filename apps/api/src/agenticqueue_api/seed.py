@@ -152,11 +152,12 @@ def _upsert_entity(
 ) -> SchemaT:
     record = session.get(record_type, payload.id)
     if record is None:
-        record = record_type(**payload.model_dump())  # type: ignore[call-arg]
+        record = record_type(**payload.model_dump(exclude_none=True))  # type: ignore[call-arg]
         session.add(record)
     else:
         for field_name, value in payload.model_dump(
-            exclude={"id", "created_at", "updated_at"}
+            exclude={"id", "created_at", "updated_at"},
+            exclude_none=True,
         ).items():
             setattr(record, field_name, value)
 

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from typing import Any
 
 import sqlalchemy as sa
 from pydantic import Field
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,6 +21,8 @@ from agenticqueue_api.models.shared import (
     jsonb_list_column,
 )
 
+TASK_SEQUENCE = sa.Sequence("task_sequence_seq", schema="agenticqueue")
+
 
 class TaskModel(TimestampedSchema):
     """Pydantic schema for a task."""
@@ -28,6 +32,11 @@ class TaskModel(TimestampedSchema):
     task_type: str
     title: str
     state: str
+    priority: int = 0
+    labels: list[str] = Field(default_factory=list)
+    sequence: int | None = None
+    claimed_by_actor_id: uuid.UUID | None = None
+    claimed_at: dt.datetime | None = None
     description: str | None = None
     contract: dict[str, Any] = Field(default_factory=dict)
     definition_of_done: list[str] = Field(default_factory=list)
@@ -51,6 +60,34 @@ class TaskRecord(IdentifiedTable, TimestampedTable, Base):
     task_type: Mapped[str] = mapped_column(sa.String(80), nullable=False)
     title: Mapped[str] = mapped_column(sa.String(255), nullable=False)
     state: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    priority: Mapped[int] = mapped_column(
+        sa.SmallInteger(),
+        nullable=False,
+        default=0,
+        server_default=sa.text("0"),
+    )
+    labels: Mapped[list[str]] = mapped_column(
+        postgresql.ARRAY(sa.String(length=120)),
+        nullable=False,
+        default=list,
+        server_default=sa.text("ARRAY[]::varchar[]"),
+    )
+    sequence: Mapped[int] = mapped_column(
+        sa.BigInteger(),
+        TASK_SEQUENCE,
+        nullable=False,
+        unique=True,
+        server_default=TASK_SEQUENCE.next_value(),
+    )
+    claimed_by_actor_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("agenticqueue.actor.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    claimed_at: Mapped[dt.datetime | None] = mapped_column(
+        sa.DateTime(timezone=True),
+        nullable=True,
+    )
     description: Mapped[str | None] = mapped_column(sa.Text(), nullable=True)
     contract: Mapped[dict[str, Any]] = jsonb_dict_column()
     definition_of_done: Mapped[list[str]] = jsonb_list_column()

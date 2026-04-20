@@ -41,6 +41,12 @@ from agenticqueue_api.repo.graph import (
     neighbors,
     shortest_path,
 )
+from agenticqueue_api.repo.queue import (
+    claim_next,
+    claim_next_timed,
+    reclaim_claim,
+    release_claim,
+)
 
 __all__ = [
     "CycleError",
@@ -48,6 +54,8 @@ __all__ = [
     "GraphPath",
     "GraphTraversalHit",
     "ancestors",
+    "claim_next",
+    "claim_next_timed",
     "create_actor",
     "create_artifact",
     "create_audit_log",
@@ -79,5 +87,7 @@ __all__ = [
     "get_task",
     "get_workspace",
     "neighbors",
+    "reclaim_claim",
+    "release_claim",
     "shortest_path",
 ]

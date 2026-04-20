@@ -75,6 +75,10 @@ jobs:
             echo "No Python tests yet; skipping pytest."
           fi
 
+      - name: Run claim concurrency integration test
+        shell: bash
+        run: pytest tests/integration/test_claim_concurrency_integration.py -x --timeout=120
+
       - name: Enforce Phase 2 safety coverage gate
         shell: bash
         run: |
