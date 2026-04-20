@@ -1,0 +1,60 @@
+{
+  "repo": "github.com/agenticqueue/agenticqueue",
+  "branch": "main",
+  "file_scope": [
+    "apps/api/src/agenticqueue_api/app.py",
+    "apps/api/src/agenticqueue_api/task_type_registry.py",
+    "tests/unit/test_coding_task_schema.py"
+  ],
+  "surface_area": [
+    "apps/api/src/agenticqueue_api/task_type_registry.py",
+    "task_types/coding-task.schema.json",
+    "contract-engine"
+  ],
+  "spec": "## Goal\nAdd a read-only endpoint that returns one task by id.\n\n## Constraints\n- Reuse the existing CRUD router pattern.\n- Return the TaskModel payload unchanged.\n- Keep the route behind task:read.\n",
+  "dod_checklist": [
+    "GET /v1/tasks/{id} returns 200 with the task payload.",
+    "Missing task id returns 404.",
+    "OpenAPI includes the route."
+  ],
+  "autonomy_tier": 3,
+  "output": {
+    "diff_url": "artifacts/diffs/aq-52.patch",
+    "test_report": "artifacts/tests/aq-52-pytest.txt",
+    "artifacts": [
+      {
+        "kind": "patch",
+        "uri": "artifacts/diffs/aq-52.patch",
+        "details": {
+          "format": "unified-diff"
+        }
+      },
+      {
+        "kind": "test-report",
+        "uri": "artifacts/tests/aq-52-pytest.txt",
+        "details": {
+          "runner": "pytest"
+        }
+      }
+    ],
+    "learnings": [
+      {
+        "title": "Schema contracts must encode explicit output artifacts",
+        "type": "pattern",
+        "what_happened": "A coding-task contract was ambiguous about which execution artifacts had to be returned.",
+        "what_learned": "Typed output fields keep validators and downstream agents aligned.",
+        "action_rule": "Model required output artifacts explicitly in the contract schema.",
+        "applies_when": "A task handoff depends on downstream validation or reuse.",
+        "does_not_apply_when": "The task is exploratory and has no durable outputs.",
+        "evidence": [
+          "docs/contracts/coding-task.md#output"
+        ],
+        "scope": "project",
+        "confidence": "confirmed",
+        "status": "active",
+        "owner": "agenticqueue-core",
+        "review_date": "2026-05-01"
+      }
+    ]
+  }
+}

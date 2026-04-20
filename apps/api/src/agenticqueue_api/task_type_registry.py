@@ -159,6 +159,23 @@ class TaskTypeRegistry:
         with self._lock:
             return [self._definitions[name] for name in sorted(self._definitions)]
 
+    def get(self, name: str) -> TaskTypeDefinition:
+        """Return one task type definition by name."""
+
+        normalized = _validate_task_type_name(name)
+        self.maybe_reload()
+        with self._lock:
+            definition = self._definitions.get(normalized)
+            if definition is None:
+                raise SchemaLoadError(f"Unknown task type: {normalized}")
+            return definition
+
+    def validate_contract(self, name: str, payload: dict[str, Any]) -> None:
+        """Validate one task contract payload against its task type schema."""
+
+        definition = self.get(name)
+        Draft202012Validator(definition.schema).validate(payload)
+
     def register(
         self,
         *,

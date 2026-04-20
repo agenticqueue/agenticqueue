@@ -2,34 +2,200 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "coding-task",
   "type": "object",
-  "required": [
-    "surface_area",
-    "deliverable",
-    "verification"
-  ],
-  "properties": {
-    "surface_area": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      },
-      "minItems": 1
-    },
-    "deliverable": {
+  "$defs": {
+    "nonEmptyString": {
       "type": "string",
       "minLength": 1
     },
-    "verification": {
+    "artifact": {
+      "type": "object",
+      "required": [
+        "kind",
+        "uri"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "uri": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "details": {
+          "type": "object",
+          "default": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "learning": {
+      "type": "object",
+      "required": [
+        "title",
+        "type",
+        "what_happened",
+        "what_learned",
+        "action_rule",
+        "applies_when",
+        "does_not_apply_when",
+        "evidence",
+        "scope",
+        "confidence",
+        "status",
+        "owner",
+        "review_date"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "type": {
+          "enum": [
+            "pitfall",
+            "pattern",
+            "decision-followup",
+            "tooling",
+            "repo-behavior",
+            "user-preference",
+            "process-rule"
+          ]
+        },
+        "what_happened": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "what_learned": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "action_rule": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "applies_when": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "does_not_apply_when": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "minItems": 1
+        },
+        "scope": {
+          "enum": [
+            "task",
+            "project",
+            "global"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "tentative",
+            "confirmed",
+            "validated"
+          ]
+        },
+        "status": {
+          "enum": [
+            "active",
+            "superseded",
+            "expired"
+          ]
+        },
+        "owner": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "review_date": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "repo",
+    "branch",
+    "file_scope",
+    "surface_area",
+    "spec",
+    "dod_checklist",
+    "autonomy_tier",
+    "output"
+  ],
+  "properties": {
+    "repo": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "branch": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "file_scope": {
       "type": "array",
       "items": {
-        "type": "string",
-        "minLength": 1
+        "$ref": "#/$defs/nonEmptyString"
       },
       "minItems": 1
     },
-    "notes": {
-      "type": "string"
+    "surface_area": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      },
+      "minItems": 1
+    },
+    "spec": {
+      "type": "string",
+      "minLength": 1,
+      "contentMediaType": "text/markdown"
+    },
+    "dod_checklist": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonEmptyString"
+      },
+      "minItems": 1
+    },
+    "autonomy_tier": {
+      "type": "integer",
+      "enum": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "output": {
+      "type": "object",
+      "required": [
+        "diff_url",
+        "test_report",
+        "artifacts",
+        "learnings"
+      ],
+      "properties": {
+        "diff_url": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "test_report": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifact"
+          },
+          "minItems": 1
+        },
+        "learnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/learning"
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

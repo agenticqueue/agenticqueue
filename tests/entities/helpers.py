@@ -210,7 +210,7 @@ def deps(session_factory: sessionmaker[Session]) -> Dependencies:
                     "title": "Linked Task",
                     "state": "queued",
                     "description": "Dependency task",
-                    "contract": {"surface_area": ["src/api"]},
+                    "contract": make_coding_task_contract(surface_area=["src/api"]),
                     "definition_of_done": ["done"],
                     "created_at": "2026-04-20T00:00:00+00:00",
                     "updated_at": "2026-04-20T00:00:00+00:00",
@@ -353,7 +353,7 @@ def seed_task(
                     "title": title,
                     "state": "queued",
                     "description": "Seed task",
-                    "contract": {"surface_area": ["src/api"]},
+                    "contract": make_coding_task_contract(surface_area=["src/api"]),
                     "definition_of_done": ["done"],
                     "created_at": "2026-04-20T00:00:00+00:00",
                     "updated_at": "2026-04-20T00:00:00+00:00",
@@ -491,6 +491,52 @@ def actor_is_active(
         return record.is_active
 
 
+def make_coding_task_contract(*, surface_area: list[str]) -> dict[str, Any]:
+    return {
+        "repo": "github.com/agenticqueue/agenticqueue",
+        "branch": "main",
+        "file_scope": [
+            "apps/api/src/agenticqueue_api/app.py",
+            "apps/api/src/agenticqueue_api/task_type_registry.py",
+        ],
+        "surface_area": surface_area,
+        "spec": "## Goal\nShip the requested coding-task change.\n",
+        "dod_checklist": [
+            "Code change landed.",
+            "Tests pass.",
+        ],
+        "autonomy_tier": 3,
+        "output": {
+            "diff_url": "artifacts/diffs/test.patch",
+            "test_report": "artifacts/tests/test.txt",
+            "artifacts": [
+                {
+                    "kind": "patch",
+                    "uri": "artifacts/diffs/test.patch",
+                    "details": {"format": "unified-diff"},
+                }
+            ],
+            "learnings": [
+                {
+                    "title": "Capture reusable contract learnings",
+                    "type": "pattern",
+                    "what_happened": "A task contract needed explicit output artifacts.",
+                    "what_learned": "Explicit output artifacts make validation deterministic.",
+                    "action_rule": "Add concrete output fields to coding-task contracts.",
+                    "applies_when": "A validator consumes task outputs.",
+                    "does_not_apply_when": "The task has no durable outputs.",
+                    "evidence": ["tests/entities/helpers.py"],
+                    "scope": "project",
+                    "confidence": "confirmed",
+                    "status": "active",
+                    "owner": "tests",
+                    "review_date": "2026-05-01",
+                }
+            ],
+        },
+    }
+
+
 def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
@@ -577,7 +623,7 @@ def core_specs_by_resource() -> dict[str, CrudSpec]:
                 "title": "Task Alpha",
                 "state": "queued",
                 "description": "Task create path",
-                "contract": {"surface_area": ["src/api/task"]},
+                "contract": make_coding_task_contract(surface_area=["src/api/task"]),
                 "definition_of_done": ["done"],
                 "created_at": "2026-04-20T00:00:00+00:00",
                 "updated_at": "2026-04-20T00:00:00+00:00",

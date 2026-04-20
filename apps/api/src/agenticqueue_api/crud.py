@@ -11,6 +11,7 @@ from typing import Any, Callable
 import pydantic
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Request, Response, status
+from jsonschema import ValidationError as JsonSchemaValidationError  # type: ignore[import-untyped]
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -40,6 +41,7 @@ from agenticqueue_api.models import (
 )
 from agenticqueue_api.models.shared import SchemaModel
 from agenticqueue_api.repo.graph import ensure_dependency_edge_is_acyclic
+from agenticqueue_api.task_type_registry import SchemaLoadError, TaskTypeRegistry
 
 IMMUTABLE_FIELDS = frozenset({"id", "created_at", "updated_at"})
 
@@ -191,6 +193,42 @@ def _validate_payload(
         )
 
 
+def _validate_task_contract(
+    request: Request,
+    config: CrudEntityConfig,
+    payload: SchemaModel,
+) -> None:
+    if not (config.resource_name == "tasks" and isinstance(payload, TaskModel)):
+        return
+
+    registry = getattr(request.app.state, "task_type_registry", None)
+    if not isinstance(registry, TaskTypeRegistry):
+        raise_api_error(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "Task type registry not configured",
+        )
+
+    try:
+        registry.validate_contract(payload.task_type, payload.contract)
+    except SchemaLoadError as error:
+        raise_api_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Task contract validation failed",
+            details={"task_type": payload.task_type, "reason": str(error)},
+        )
+    except JsonSchemaValidationError as error:
+        raise_api_error(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Task contract validation failed",
+            details={
+                "task_type": payload.task_type,
+                "message": error.message,
+                "path": list(error.path),
+                "schema_path": [str(part) for part in error.schema_path],
+            },
+        )
+
+
 def _validate_patch(
     config: CrudEntityConfig,
     existing: SchemaModel,
@@ -310,6 +348,7 @@ def _register_entity_routes(
     ) -> SchemaModel:
         _require_scope(request, config.write_scope)
         validated = _validate_payload(config, payload)
+        _validate_task_contract(request, config, validated)
         _maybe_validate_edge(config, session, validated)
 
         record = config.record_type()
@@ -357,6 +396,7 @@ def _register_entity_routes(
         _require_scope(request, config.write_scope)
         record = _get_record_or_404(session, config, entity_id)
         validated = _validate_patch(config, _serialize_record(config, record), payload)
+        _validate_task_contract(request, config, validated)
         _maybe_validate_edge(config, session, validated)
         _apply_schema_to_record(config, record, validated)
         try:
