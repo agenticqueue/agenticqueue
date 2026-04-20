@@ -156,6 +156,71 @@
       },
       "minItems": 1
     },
+    "dod_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "item",
+          "type"
+        ],
+        "properties": {
+          "item": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "type": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "path": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "path_mode": {
+            "enum": [
+              "exact",
+              "glob",
+              "regex"
+            ]
+          },
+          "pattern": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "schema_name": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "min_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "min_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "repo": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "sha": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "check_name": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "pr_number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "timeout_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
     "autonomy_tier": {
       "type": "integer",
       "enum": [

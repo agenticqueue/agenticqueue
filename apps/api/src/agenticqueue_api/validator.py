@@ -5,11 +5,18 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from jsonschema import ValidationError as JsonSchemaValidationError  # type: ignore[import-untyped]
 from jsonschema.validators import Draft202012Validator  # type: ignore[import-untyped]
 
+from agenticqueue_api.dod import DodReport, run_dod_checks
+from agenticqueue_api.dod_checks.common import (
+    DodCheckValidationError,
+    DodItemState,
+    GitHubClientProtocol,
+)
 from agenticqueue_api.models.task import TaskModel
 from agenticqueue_api.task_type_registry import SchemaLoadError, TaskTypeRegistry
 
@@ -31,6 +38,7 @@ class ValidationResult:
     """Validation outcome for one task submission."""
 
     errors: tuple[ValidationIssue, ...]
+    dod_report: DodReport | None = None
 
     @property
     def is_valid(self) -> bool:
@@ -40,8 +48,16 @@ class ValidationResult:
 class SubmissionValidator:
     """Validate task submissions against their task-type contract."""
 
-    def __init__(self, registry: TaskTypeRegistry) -> None:
+    def __init__(
+        self,
+        registry: TaskTypeRegistry,
+        *,
+        artifact_root: Path | None = None,
+        github_client: GitHubClientProtocol | None = None,
+    ) -> None:
         self._registry = registry
+        self._artifact_root = artifact_root
+        self._github_client = github_client
 
     def validate_submission(
         self,
@@ -54,12 +70,13 @@ class SubmissionValidator:
                     ValidationIssue(
                         rule="submission_payload_type",
                         offending_field="submission",
-                        hint="Submit a JSON object with output, dod_results, and retry flags.",
+                        hint="Submit a JSON object with output artifacts and retry flags.",
                     ),
                 )
             )
 
         issues: list[ValidationIssue] = []
+        dod_report: DodReport | None = None
         retry_signal = self._has_retry_signal(submitted_output, issues)
         output = submitted_output.get("output")
         if not isinstance(output, Mapping):
@@ -91,8 +108,29 @@ class SubmissionValidator:
                         hint="Add at least one learning when the task had a failure, block, or retry.",
                     )
                 )
-        issues.extend(self._dod_issues(task, submitted_output.get("dod_results")))
-        return ValidationResult(errors=tuple(issues))
+            if "dod_checks" in task.contract:
+                try:
+                    dod_report = run_dod_checks(
+                        task,
+                        output,
+                        registry=self._registry,
+                        artifact_root=self._artifact_root,
+                        github_client=self._github_client,
+                    )
+                except DodCheckValidationError as error:
+                    issues.append(
+                        ValidationIssue(
+                            rule="dod_checks_invalid",
+                            offending_field="contract.dod_checks",
+                            hint=str(error),
+                        )
+                    )
+                else:
+                    issues.extend(self._dod_report_issues(dod_report))
+
+        if "dod_checks" not in task.contract:
+            issues.extend(self._dod_issues(task, submitted_output.get("dod_results")))
+        return ValidationResult(errors=tuple(issues), dod_report=dod_report)
 
     def _schema_issues(
         self,
@@ -188,6 +226,20 @@ class SubmissionValidator:
                     rule="dod_checked_required",
                     offending_field="dod_results",
                     hint="Mark at least one DoD item as checked before submitting.",
+                )
+            )
+        return issues
+
+    def _dod_report_issues(self, dod_report: DodReport) -> list[ValidationIssue]:
+        issues: list[ValidationIssue] = []
+        for index, result in enumerate(dod_report.checklist):
+            if result.state == DodItemState.CHECKED:
+                continue
+            issues.append(
+                ValidationIssue(
+                    rule=f"dod_{result.state}",
+                    offending_field=f"definition_of_done.{index}",
+                    hint=f"{result.item}: {result.note}",
                 )
             )
         return issues

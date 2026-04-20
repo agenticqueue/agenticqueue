@@ -17,6 +17,26 @@
     "Missing task id returns 404.",
     "OpenAPI includes the route."
   ],
+  "dod_checks": [
+    {
+      "item": "GET /v1/tasks/{id} returns 200 with the task payload.",
+      "type": "grep_present",
+      "path": "artifacts/tests/aq-52-pytest.txt",
+      "pattern": "test_get_task_returns_200"
+    },
+    {
+      "item": "Missing task id returns 404.",
+      "type": "grep_present",
+      "path": "artifacts/tests/aq-52-pytest.txt",
+      "pattern": "test_missing_task_returns_404"
+    },
+    {
+      "item": "OpenAPI includes the route.",
+      "type": "grep_present",
+      "path": "artifacts/diffs/aq-52.patch",
+      "pattern": "/v1/tasks/\\{id\\}"
+    }
+  ],
   "autonomy_tier": 3,
   "output": {
     "diff_url": "artifacts/diffs/aq-52.patch",

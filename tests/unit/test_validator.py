@@ -22,8 +22,14 @@ def _example_contract() -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _make_task(*, task_type: str = "coding-task") -> TaskModel:
+def _make_task(
+    *,
+    task_type: str = "coding-task",
+    declarative_dod: bool = False,
+) -> TaskModel:
     contract = _example_contract()
+    if not declarative_dod:
+        contract.pop("dod_checks", None)
     return TaskModel.model_validate(
         {
             "id": str(uuid.uuid4()),
@@ -40,10 +46,29 @@ def _make_task(*, task_type: str = "coding-task") -> TaskModel:
     )
 
 
-def _make_submission() -> dict[str, Any]:
+def _write(path: Path, content: str) -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return str(path)
+
+
+def _make_submission(tmp_path: Path | None = None) -> dict[str, Any]:
     contract = _example_contract()
+    output = copy.deepcopy(contract["output"])
+    if tmp_path is not None:
+        _write(
+            tmp_path / "artifacts" / "diffs" / "aq-52.patch",
+            "@@ /v1/tasks/{id}\n+ test\n",
+        )
+        _write(
+            tmp_path / "artifacts" / "tests" / "aq-52-pytest.txt",
+            "test_get_task_returns_200\n"
+            "test_missing_task_returns_404\n"
+            "4 passed in 0.15s\n",
+        )
+
     return {
-        "output": copy.deepcopy(contract["output"]),
+        "output": output,
         "dod_results": [
             {"item": contract["dod_checklist"][0], "checked": True},
             {"item": contract["dod_checklist"][1], "checked": False},
@@ -54,10 +79,10 @@ def _make_submission() -> dict[str, Any]:
     }
 
 
-def _validator() -> SubmissionValidator:
+def _validator(*, artifact_root: Path | None = None) -> SubmissionValidator:
     registry = TaskTypeRegistry(get_task_types_dir())
     registry.load()
-    return SubmissionValidator(registry)
+    return SubmissionValidator(registry, artifact_root=artifact_root)
 
 
 def test_validate_submission_accepts_valid_payload() -> None:
@@ -65,6 +90,24 @@ def test_validate_submission_accepts_valid_payload() -> None:
 
     assert result.is_valid is True
     assert result.errors == ()
+    assert result.dod_report is None
+
+
+def test_validate_submission_returns_declarative_dod_report(tmp_path: Path) -> None:
+    result = _validator(artifact_root=tmp_path).validate_submission(
+        _make_task(declarative_dod=True),
+        _make_submission(tmp_path),
+    )
+
+    assert result.is_valid is True
+    assert result.errors == ()
+    assert result.dod_report is not None
+    assert [item.state for item in result.dod_report.checklist] == [
+        "checked",
+        "checked",
+        "checked",
+    ]
+    assert result.dod_report.checked_count == 3
 
 
 def test_validate_submission_rejects_non_mapping_payload() -> None:
@@ -159,3 +202,37 @@ def test_validate_submission_rejects_missing_output_and_dod_results() -> None:
         "submission_output_type",
         "dod_results_type",
     ]
+
+
+def test_validate_submission_rejects_invalid_declarative_dod_contract(
+    tmp_path: Path,
+) -> None:
+    task = _make_task(declarative_dod=True)
+    task.contract["dod_checks"] = [
+        {
+            "item": task.definition_of_done[0],
+            "type": "shell",
+            "cmd": "pytest",
+        }
+    ]
+
+    result = _validator().validate_submission(task, _make_submission(tmp_path))
+
+    assert result.is_valid is False
+    assert result.errors[0].rule == "dod_checks_invalid"
+    assert result.errors[0].hint == "shell exec disabled; see ADR-AQ-012"
+
+
+def test_validate_submission_reports_unmet_declarative_dod_items(
+    tmp_path: Path,
+) -> None:
+    task = _make_task(declarative_dod=True)
+    task.contract["dod_checks"][0]["pattern"] = "missing-pattern"
+
+    result = _validator(artifact_root=tmp_path).validate_submission(
+        task, _make_submission(tmp_path)
+    )
+
+    assert result.is_valid is False
+    assert [error.rule for error in result.errors] == ["dod_unchecked_unmet"]
+    assert result.dod_report is not None

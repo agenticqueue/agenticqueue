@@ -274,3 +274,13 @@ def test_coding_task_rejects_learning_items_missing_required_fields(
         match="'action_rule' is a required property",
     ):
         registry.validate_contract("coding-task", invalid)
+
+
+def test_coding_task_rejects_malformed_dod_checks_payload(
+    registry: TaskTypeRegistry,
+) -> None:
+    invalid = _example_contract()
+    invalid["dod_checks"] = {"item": "Not an array"}
+
+    with pytest.raises(ValidationError, match="is not of type 'array'"):
+        registry.validate_contract("coding-task", invalid)
