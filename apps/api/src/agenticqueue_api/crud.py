@@ -170,6 +170,17 @@ def _serialize_record(config: CrudEntityConfig, record: Any) -> SchemaModel:
     return config.schema_type.model_validate(record)
 
 
+def _policy_is_attached(session: Session, policy_id: uuid.UUID) -> bool:
+    statements = (
+        sa.select(WorkspaceRecord.id)
+        .where(WorkspaceRecord.policy_id == policy_id)
+        .limit(1),
+        sa.select(ProjectRecord.id).where(ProjectRecord.policy_id == policy_id).limit(1),
+        sa.select(TaskRecord.id).where(TaskRecord.policy_id == policy_id).limit(1),
+    )
+    return any(session.scalar(statement) is not None for statement in statements)
+
+
 def _apply_schema_to_record(
     config: CrudEntityConfig,
     record: Any,
@@ -395,6 +406,16 @@ def _register_entity_routes(
     ) -> SchemaModel:
         _require_scope(request, config.write_scope)
         record = _get_record_or_404(session, config, entity_id)
+        if (
+            config.resource_name == "policies"
+            and payload
+            and _policy_is_attached(session, entity_id)
+        ):
+            raise_api_error(
+                status.HTTP_409_CONFLICT,
+                "Policy version is immutable once attached",
+                details={"policy_id": str(entity_id)},
+            )
         validated = _validate_patch(config, _serialize_record(config, record), payload)
         _validate_task_contract(request, config, validated)
         _maybe_validate_edge(config, session, validated)

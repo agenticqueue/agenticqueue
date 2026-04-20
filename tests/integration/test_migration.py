@@ -31,7 +31,7 @@ ENTITY_TABLES = {
 }
 PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
-PRE_CAPABILITY_GRANT_REVISION = "20260420_05"
+PRE_LATEST_REVISION = "20260420_06"
 
 
 def alembic_config() -> Config:
@@ -139,6 +139,34 @@ def assert_capability_grant_columns(expected_columns: set[str]) -> None:
             assert {row[0] for row in cursor.fetchall()} == expected_columns
 
 
+def assert_policy_columns(expected_columns: set[str]) -> None:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'agenticqueue' AND table_name = 'policy' "
+                "ORDER BY column_name"
+            )
+            assert {row[0] for row in cursor.fetchall()} == expected_columns
+
+
+def assert_policy_attachment_columns(
+    table_name: str,
+    *,
+    expected_present: bool,
+) -> None:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT count(*) FROM information_schema.columns "
+                "WHERE table_schema = 'agenticqueue' AND table_name = %s "
+                "AND column_name = 'policy_id'",
+                (table_name,),
+            )
+            expected_count = 1 if expected_present else 0
+            assert cursor.fetchone() == (expected_count,)
+
+
 def assert_seeded_capability_keys(expected_keys: set[str]) -> None:
     with psycopg.connect(get_sync_database_url()) as connection:
         with connection.cursor() as cursor:
@@ -188,6 +216,23 @@ def test_migration_reaches_head_with_extensions() -> None:
             "updated_at",
         }
     )
+    assert_policy_columns(
+        {
+            "autonomy_tier",
+            "body",
+            "capabilities",
+            "created_at",
+            "hitl_required",
+            "id",
+            "name",
+            "updated_at",
+            "version",
+            "workspace_id",
+        }
+    )
+    assert_policy_attachment_columns("workspace", expected_present=True)
+    assert_policy_attachment_columns("project", expected_present=True)
+    assert_policy_attachment_columns("task", expected_present=True)
     assert_seeded_capability_keys(
         {
             "admin",
@@ -223,17 +268,27 @@ def test_migration_reaches_head_with_extensions() -> None:
 def test_latest_migration_is_reversible() -> None:
     config = alembic_config()
     downgrade(config, "-1")
-    assert current_revision() == PRE_CAPABILITY_GRANT_REVISION
-    assert_foundation_state(PRE_CAPABILITY_GRANT_REVISION)
-    assert_entity_tables(PRE_CAPABILITY_GRANT_TABLES)
+    assert current_revision() == PRE_LATEST_REVISION
+    assert_foundation_state(PRE_LATEST_REVISION)
+    assert_entity_tables(ENTITY_TABLES)
     assert_capability_columns(
         {
-            "actor_id",
-            "capability_key",
             "created_at",
+            "description",
+            "id",
+            "key",
+            "updated_at",
+        }
+    )
+    assert_capability_grant_columns(
+        {
+            "actor_id",
+            "capability_id",
+            "created_at",
+            "expires_at",
             "granted_by_actor_id",
             "id",
-            "is_active",
+            "revoked_at",
             "scope",
             "updated_at",
         }
@@ -251,6 +306,22 @@ def test_latest_migration_is_reversible() -> None:
             "trace_id",
         }
     )
+    assert_policy_columns(
+        {
+            "autonomy_tier",
+            "body",
+            "created_at",
+            "hitl_required",
+            "id",
+            "name",
+            "updated_at",
+            "version",
+            "workspace_id",
+        }
+    )
+    assert_policy_attachment_columns("workspace", expected_present=False)
+    assert_policy_attachment_columns("project", expected_present=False)
+    assert_policy_attachment_columns("task", expected_present=False)
     assert_embedding_columns_and_indexes()
     upgrade(config, "head")
     expected_head = ScriptDirectory.from_config(config).get_current_head()
@@ -271,6 +342,23 @@ def test_latest_migration_is_reversible() -> None:
             "updated_at",
         }
     )
+    assert_policy_columns(
+        {
+            "autonomy_tier",
+            "body",
+            "capabilities",
+            "created_at",
+            "hitl_required",
+            "id",
+            "name",
+            "updated_at",
+            "version",
+            "workspace_id",
+        }
+    )
+    assert_policy_attachment_columns("workspace", expected_present=True)
+    assert_policy_attachment_columns("project", expected_present=True)
+    assert_policy_attachment_columns("task", expected_present=True)
     assert_audit_log_columns(
         {
             "action",
@@ -310,4 +398,21 @@ def test_full_migration_stack_is_reversible_to_base() -> None:
             "updated_at",
         }
     )
+    assert_policy_columns(
+        {
+            "autonomy_tier",
+            "body",
+            "capabilities",
+            "created_at",
+            "hitl_required",
+            "id",
+            "name",
+            "updated_at",
+            "version",
+            "workspace_id",
+        }
+    )
+    assert_policy_attachment_columns("workspace", expected_present=True)
+    assert_policy_attachment_columns("project", expected_present=True)
+    assert_policy_attachment_columns("task", expected_present=True)
     assert_embedding_columns_and_indexes()

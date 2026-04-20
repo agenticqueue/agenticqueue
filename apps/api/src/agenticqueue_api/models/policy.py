@@ -7,15 +7,18 @@ from typing import Any
 
 import sqlalchemy as sa
 from pydantic import Field
+from pydantic import field_validator
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from agenticqueue_api.capability_keys import CapabilityKey
 from agenticqueue_api.db import Base
 from agenticqueue_api.models.shared import (
     IdentifiedTable,
     TimestampedSchema,
     TimestampedTable,
     jsonb_dict_column,
+    jsonb_list_column,
 )
 
 
@@ -27,7 +30,46 @@ class PolicyModel(TimestampedSchema):
     version: str
     hitl_required: bool
     autonomy_tier: int
+    capabilities: list[CapabilityKey] = Field(default_factory=list)
     body: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("name", "version")
+    @classmethod
+    def validate_required_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("policy name and version must not be empty")
+        return normalized
+
+    @field_validator("autonomy_tier")
+    @classmethod
+    def validate_autonomy_tier(cls, value: int) -> int:
+        if value < 1 or value > 5:
+            raise ValueError("autonomy_tier must be between 1 and 5")
+        return value
+
+    @field_validator("capabilities")
+    @classmethod
+    def validate_capabilities(
+        cls, values: list[CapabilityKey]
+    ) -> list[CapabilityKey]:
+        deduped: list[CapabilityKey] = []
+        seen: set[CapabilityKey] = set()
+        for value in values:
+            if value in seen:
+                continue
+            seen.add(value)
+            deduped.append(value)
+        return deduped
+
+    @field_validator("body", mode="before")
+    @classmethod
+    def validate_body(cls, value: Any) -> dict[str, Any]:
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise ValueError("body must be an object")
+        return dict(value)
 
 
 class PolicyRecord(IdentifiedTable, TimestampedTable, Base):
@@ -57,4 +99,5 @@ class PolicyRecord(IdentifiedTable, TimestampedTable, Base):
         server_default=sa.false(),
     )
     autonomy_tier: Mapped[int] = mapped_column(sa.SmallInteger(), nullable=False)
+    capabilities: Mapped[list[str]] = jsonb_list_column()
     body: Mapped[dict[str, Any]] = jsonb_dict_column()

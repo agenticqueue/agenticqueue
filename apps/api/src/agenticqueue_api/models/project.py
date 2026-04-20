@@ -20,6 +20,7 @@ class ProjectModel(TimestampedSchema):
     """Pydantic schema for a project."""
 
     workspace_id: uuid.UUID
+    policy_id: uuid.UUID | None = None
     slug: str
     name: str
     description: str | None = None
@@ -41,6 +42,11 @@ class ProjectRecord(IdentifiedTable, TimestampedTable, Base):
         UUID(as_uuid=True),
         sa.ForeignKey("agenticqueue.workspace.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    policy_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("agenticqueue.policy.id", ondelete="SET NULL"),
+        nullable=True,
     )
     slug: Mapped[str] = mapped_column(sa.String(120), nullable=False)
     name: Mapped[str] = mapped_column(sa.String(255), nullable=False)

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from enum import StrEnum
 from typing import Any
 
 import sqlalchemy as sa
@@ -12,6 +11,10 @@ from pydantic import Field, field_validator
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from agenticqueue_api.capability_keys import (
+    CapabilityKey,
+    STANDARD_CAPABILITY_DESCRIPTIONS as _STANDARD_CAPABILITY_DESCRIPTIONS,
+)
 from agenticqueue_api.db import Base
 from agenticqueue_api.models.shared import (
     IdentifiedTable,
@@ -19,23 +22,6 @@ from agenticqueue_api.models.shared import (
     TimestampedTable,
     jsonb_dict_column,
 )
-
-
-class CapabilityKey(StrEnum):
-    """Standard Phase 1 capability keys."""
-
-    READ_REPO = "read_repo"
-    WRITE_BRANCH = "write_branch"
-    RUN_TESTS = "run_tests"
-    QUERY_GRAPH = "query_graph"
-    SEARCH_MEMORY = "search_memory"
-    CREATE_ARTIFACT = "create_artifact"
-    UPDATE_TASK = "update_task"
-    TRIGGER_HANDOFF = "trigger_handoff"
-    READ_LEARNINGS = "read_learnings"
-    WRITE_LEARNING = "write_learning"
-    PROMOTE_LEARNING = "promote_learning"
-    ADMIN = "admin"
 
 
 CAPABILITY_KEY_ENUM = sa.Enum(
@@ -46,21 +32,7 @@ CAPABILITY_KEY_ENUM = sa.Enum(
     values_callable=lambda members: [member.value for member in members],
 )
 
-
-STANDARD_CAPABILITY_DESCRIPTIONS: dict[CapabilityKey, str] = {
-    CapabilityKey.READ_REPO: "Read repository contents.",
-    CapabilityKey.WRITE_BRANCH: "Write code changes to the repository branch.",
-    CapabilityKey.RUN_TESTS: "Run verification and test commands.",
-    CapabilityKey.QUERY_GRAPH: "Query graph lineage and dependency data.",
-    CapabilityKey.SEARCH_MEMORY: "Search stored learnings and memory.",
-    CapabilityKey.CREATE_ARTIFACT: "Create artifacts linked to task runs.",
-    CapabilityKey.UPDATE_TASK: "Update task state and metadata.",
-    CapabilityKey.TRIGGER_HANDOFF: "Trigger downstream handoffs or dispatches.",
-    CapabilityKey.READ_LEARNINGS: "Read structured learnings.",
-    CapabilityKey.WRITE_LEARNING: "Write new task or project learnings.",
-    CapabilityKey.PROMOTE_LEARNING: "Promote a learning to broader scope.",
-    CapabilityKey.ADMIN: "Perform privileged administrative actions.",
-}
+STANDARD_CAPABILITY_DESCRIPTIONS = _STANDARD_CAPABILITY_DESCRIPTIONS
 
 
 def capability_grant_is_active(

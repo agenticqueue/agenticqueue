@@ -148,6 +148,94 @@ def test_policy_learning_and_edge_filters_cover_int_date_and_enum_paths(
     )
 
 
+def test_policy_attach_detach_and_post_attach_immutability(
+    client,
+    session_factory,
+    deps,
+) -> None:
+    actor = seed_actor(
+        session_factory,
+        handle="policy-admin",
+        actor_type="admin",
+        display_name="Policy Admin",
+    )
+    token = seed_token(
+        session_factory,
+        actor_id=actor.id,
+        scopes=[
+            "policy:read",
+            "policy:write",
+            "workspace:read",
+            "workspace:write",
+            "project:read",
+            "project:write",
+            "task:read",
+            "task:write",
+        ],
+    )
+    policy_payload = model_from(
+        PolicyModel,
+        {
+            "id": str(uuid.uuid4()),
+            "workspace_id": None,
+            "name": "default-coding",
+            "version": "1.0.0",
+            "hitl_required": True,
+            "autonomy_tier": 3,
+            "capabilities": ["read_repo", "run_tests"],
+            "body": {},
+            "created_at": "2026-04-20T00:00:00+00:00",
+            "updated_at": "2026-04-20T00:00:00+00:00",
+        },
+    ).model_dump(mode="json")
+    create_response = client.post(
+        "/v1/policies",
+        headers=auth_headers(token),
+        json=policy_payload,
+    )
+    assert create_response.status_code == 201
+    policy_id = create_response.json()["id"]
+
+    workspace_attach = client.patch(
+        f"/v1/workspaces/{deps.workspace_id}",
+        headers=auth_headers(token),
+        json={"policy_id": policy_id},
+    )
+    assert workspace_attach.status_code == 200
+    assert workspace_attach.json()["policy_id"] == policy_id
+
+    project_attach = client.patch(
+        f"/v1/projects/{deps.project_id}",
+        headers=auth_headers(token),
+        json={"policy_id": policy_id},
+    )
+    assert project_attach.status_code == 200
+    assert project_attach.json()["policy_id"] == policy_id
+
+    task_attach = client.patch(
+        f"/v1/tasks/{deps.task_id}",
+        headers=auth_headers(token),
+        json={"policy_id": policy_id},
+    )
+    assert task_attach.status_code == 200
+    assert task_attach.json()["policy_id"] == policy_id
+
+    immutable_update = client.patch(
+        f"/v1/policies/{policy_id}",
+        headers=auth_headers(token),
+        json={"hitl_required": False},
+    )
+    assert_error_shape(immutable_update, status_code=409, error_code="conflict")
+
+    task_detach = client.patch(
+        f"/v1/tasks/{deps.task_id}",
+        headers=auth_headers(token),
+        json={"policy_id": None},
+    )
+    assert task_detach.status_code == 200
+    assert task_detach.json()["policy_id"] is None
+
+
 def test_duplicate_create_invalid_filter_invalid_value_invalid_payload_and_immutable_patch_are_structured(
     client,
     session_factory,

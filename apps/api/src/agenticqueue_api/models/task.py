@@ -24,6 +24,7 @@ class TaskModel(TimestampedSchema):
     """Pydantic schema for a task."""
 
     project_id: uuid.UUID
+    policy_id: uuid.UUID | None = None
     task_type: str
     title: str
     state: str
@@ -41,6 +42,11 @@ class TaskRecord(IdentifiedTable, TimestampedTable, Base):
         UUID(as_uuid=True),
         sa.ForeignKey("agenticqueue.project.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    policy_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("agenticqueue.policy.id", ondelete="SET NULL"),
+        nullable=True,
     )
     task_type: Mapped[str] = mapped_column(sa.String(80), nullable=False)
     title: Mapped[str] = mapped_column(sa.String(255), nullable=False)
