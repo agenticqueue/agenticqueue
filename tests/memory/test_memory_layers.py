@@ -11,7 +11,10 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from agenticqueue_api.config import get_sqlalchemy_sync_database_url, get_sync_database_url
+from agenticqueue_api.config import (
+    get_sqlalchemy_sync_database_url,
+    get_sync_database_url,
+)
 from agenticqueue_api.memory import MemoryItemModel, MemoryItemRecord, MemoryLayer
 
 
@@ -39,7 +42,7 @@ def _memory_item(
         scope_id=_deterministic_uuid(f"{layer.value}-scope"),
         content_text=f"{layer.value} memory for {label}",
         content_hash=content_hash or f"{layer.value}-hash-{label}",
-        embedding=_embedding(),
+        embedding=None,
         source_ref=f"memory://{layer.value}/{label}",
         surface_area=[f"{layer.value}/surface", "memory/layers"],
         last_accessed_at=_utc("2026-04-20T18:00:00Z"),

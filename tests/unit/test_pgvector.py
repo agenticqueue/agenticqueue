@@ -397,7 +397,7 @@ def test_pgvector_migration_exposes_columns_and_indexes() -> None:
         tables = connection.execute(table_query).scalars().all()
         indexes = connection.execute(index_query).scalars().all()
 
-    assert tables == sorted(EMBEDDING_TABLES)
+    assert tables == sorted((*EMBEDDING_TABLES, "memory_item"))
     assert set(
         embedding_index_name(table_name) for table_name in EMBEDDING_TABLES
     ).issubset(set(indexes))
