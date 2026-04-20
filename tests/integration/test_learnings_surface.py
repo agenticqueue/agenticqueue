@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Generator
 import copy
 import json
 from pathlib import Path
@@ -112,7 +113,7 @@ def session_factory(engine: Engine) -> sessionmaker[Session]:
 
 
 @pytest.fixture
-def client(session_factory: sessionmaker[Session]) -> TestClient:
+def client(session_factory: sessionmaker[Session]) -> Generator[TestClient, None, None]:
     with TestClient(create_app(session_factory=session_factory)) as test_client:
         yield test_client
 
