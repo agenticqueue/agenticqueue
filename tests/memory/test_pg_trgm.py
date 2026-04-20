@@ -172,15 +172,13 @@ def _best_match_id(
     table_name: str,
     query: str,
 ) -> uuid.UUID:
-    statement = sa.text(
-        f"""
+    statement = sa.text(f"""
         SELECT id
         FROM agenticqueue.{table_name}
         WHERE {search_trigram_column_name(table_name)} % :query
         ORDER BY similarity({search_trigram_column_name(table_name)}, :query) DESC, id
         LIMIT 1
-        """
-    )
+        """)
     value = session.execute(statement, {"query": query}).scalar_one()
     return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
 
@@ -191,15 +189,13 @@ def _fts_match_id(
     table_name: str,
     query: str,
 ) -> uuid.UUID:
-    statement = sa.text(
-        f"""
+    statement = sa.text(f"""
         SELECT id
         FROM agenticqueue.{table_name}
         WHERE {SEARCH_DOCUMENT_COLUMN_NAME} @@ to_tsquery('english', :query)
         ORDER BY id
         LIMIT 1
-        """
-    )
+        """)
     value = session.execute(statement, {"query": query}).scalar_one()
     return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
 
@@ -227,18 +223,13 @@ def session(engine: Engine) -> Iterator[Session]:
 def test_search_indexes_exist_for_retrieval_entities() -> None:
     with psycopg.connect(get_sync_database_url()) as connection:
         with connection.cursor() as cursor:
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT tablename, indexname, indexdef
                 FROM pg_indexes
                 WHERE schemaname = 'agenticqueue'
                   AND tablename IN ('artifact', 'decision', 'learning')
-                """
-            )
-            indexes = {
-                (row[0], row[1]): row[2]
-                for row in cursor.fetchall()
-            }
+                """)
+            indexes = {(row[0], row[1]): row[2] for row in cursor.fetchall()}
 
     for table_name in ("artifact", "decision", "learning"):
         document_index = indexes[(table_name, search_document_index_name(table_name))]
@@ -252,43 +243,61 @@ def test_search_indexes_exist_for_retrieval_entities() -> None:
 def test_learning_search_supports_fts_and_trigram(session: Session) -> None:
     ids = _seed_search_rows(session)
 
-    assert _fts_match_id(
-        session,
-        table_name="learning",
-        query="validator & retry & payload",
-    ) == ids["learning"]
-    assert _best_match_id(
-        session,
-        table_name="learning",
-        query="Retry validator payload normalization",
-    ) == ids["learning"]
+    assert (
+        _fts_match_id(
+            session,
+            table_name="learning",
+            query="validator & retry & payload",
+        )
+        == ids["learning"]
+    )
+    assert (
+        _best_match_id(
+            session,
+            table_name="learning",
+            query="Retry validator payload normalization",
+        )
+        == ids["learning"]
+    )
 
 
 def test_artifact_search_supports_fts_and_trigram(session: Session) -> None:
     ids = _seed_search_rows(session)
 
-    assert _fts_match_id(
-        session,
-        table_name="artifact",
-        query="retrieval & patch",
-    ) == ids["artifact"]
-    assert _best_match_id(
-        session,
-        table_name="artifact",
-        query="retrieval-similarity patch",
-    ) == ids["artifact"]
+    assert (
+        _fts_match_id(
+            session,
+            table_name="artifact",
+            query="retrieval & patch",
+        )
+        == ids["artifact"]
+    )
+    assert (
+        _best_match_id(
+            session,
+            table_name="artifact",
+            query="retrieval-similarity patch",
+        )
+        == ids["artifact"]
+    )
 
 
 def test_decision_search_supports_fts_and_trigram(session: Session) -> None:
     ids = _seed_search_rows(session)
 
-    assert _fts_match_id(
-        session,
-        table_name="decision",
-        query="trigram & fallback & retrieval",
-    ) == ids["decision"]
-    assert _best_match_id(
-        session,
-        table_name="decision",
-        query="trigram fallbak retrieval search",
-    ) == ids["decision"]
+    assert (
+        _fts_match_id(
+            session,
+            table_name="decision",
+            query="trigram & fallback & retrieval",
+        )
+        == ids["decision"]
+    )
+    assert (
+        _best_match_id(
+            session,
+            table_name="decision",
+            query="trigram fallbak retrieval search",
+        )
+        == ids["decision"]
+    )

@@ -69,9 +69,7 @@ class LearningRecord(IdentifiedTable, TimestampedTable, Base):
             search_text_trgm_index_name(__tablename__),
             search_trigram_column_name(__tablename__),
             postgresql_using="gin",
-            postgresql_ops={
-                search_trigram_column_name(__tablename__): "gin_trgm_ops"
-            },
+            postgresql_ops={search_trigram_column_name(__tablename__): "gin_trgm_ops"},
         ),
     )
 

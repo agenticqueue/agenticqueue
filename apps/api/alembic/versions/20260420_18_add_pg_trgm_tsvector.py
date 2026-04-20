@@ -62,9 +62,7 @@ def upgrade() -> None:
             unique=False,
             schema="agenticqueue",
             postgresql_using="gin",
-            postgresql_ops={
-                search_trigram_column_name(table_name): "gin_trgm_ops"
-            },
+            postgresql_ops={search_trigram_column_name(table_name): "gin_trgm_ops"},
         )
 
 

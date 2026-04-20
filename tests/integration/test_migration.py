@@ -36,8 +36,31 @@ ENTITY_TABLES = {
 PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
 PRE_IDEMPOTENCY_TABLES = ENTITY_TABLES - {"idempotency_key"}
-PRE_LATEST_ENTITY_TABLES = ENTITY_TABLES - {"memory_item"}
-PRE_LATEST_REVISION = "20260420_16"
+PRE_LATEST_ENTITY_TABLES = ENTITY_TABLES
+PRE_LATEST_REVISION = "20260420_17"
+LEARNING_COLUMNS = {
+    "action_rule",
+    "applies_when",
+    "confidence",
+    "created_at",
+    "does_not_apply_when",
+    "embedding",
+    "evidence",
+    "id",
+    "learning_type",
+    "owner",
+    "owner_actor_id",
+    "promotion_eligible",
+    "review_date",
+    "scope",
+    "status",
+    "task_id",
+    "title",
+    "updated_at",
+    "what_happened",
+    "what_learned",
+}
+LEARNING_COLUMNS_WITH_SEARCH = LEARNING_COLUMNS | {"search_document", "search_text"}
 
 
 def alembic_config() -> Config:
@@ -254,30 +277,7 @@ def test_migration_reaches_head_with_extensions() -> None:
     assert current_revision() == expected_head
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
-    assert_learning_columns(
-        {
-            "action_rule",
-            "applies_when",
-            "confidence",
-            "created_at",
-            "does_not_apply_when",
-            "embedding",
-            "evidence",
-            "id",
-            "learning_type",
-            "owner",
-            "owner_actor_id",
-            "promotion_eligible",
-            "review_date",
-            "scope",
-            "status",
-            "task_id",
-            "title",
-            "updated_at",
-            "what_happened",
-            "what_learned",
-        }
-    )
+    assert_learning_columns(LEARNING_COLUMNS_WITH_SEARCH)
     assert_memory_item_columns(
         {
             "access_count",
@@ -371,31 +371,8 @@ def test_latest_migration_is_reversible() -> None:
     assert current_revision() == PRE_LATEST_REVISION
     assert_foundation_state(PRE_LATEST_REVISION)
     assert_entity_tables(PRE_LATEST_ENTITY_TABLES)
-    assert_memory_item_indexes(expected_present=False)
-    assert_learning_columns(
-        {
-            "action_rule",
-            "applies_when",
-            "confidence",
-            "created_at",
-            "does_not_apply_when",
-            "embedding",
-            "evidence",
-            "id",
-            "learning_type",
-            "owner",
-            "owner_actor_id",
-            "promotion_eligible",
-            "review_date",
-            "scope",
-            "status",
-            "task_id",
-            "title",
-            "updated_at",
-            "what_happened",
-            "what_learned",
-        }
-    )
+    assert_memory_item_indexes(expected_present=True)
+    assert_learning_columns(LEARNING_COLUMNS)
     assert_capability_columns(
         {
             "created_at",
@@ -453,7 +430,7 @@ def test_latest_migration_is_reversible() -> None:
     assert_policy_attachment_columns("project", expected_present=True)
     assert_policy_attachment_columns("task", expected_present=True)
     assert_embedding_columns_and_indexes(
-        expected_tables=set(EMBEDDING_TABLES),
+        expected_tables=set(EMBEDDING_TABLES) | {"memory_item"},
         expected_index_tables=set(EMBEDDING_TABLES),
     )
     assert role_timeout_is_persisted() is True
@@ -462,30 +439,7 @@ def test_latest_migration_is_reversible() -> None:
     assert expected_head is not None
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
-    assert_learning_columns(
-        {
-            "action_rule",
-            "applies_when",
-            "confidence",
-            "created_at",
-            "does_not_apply_when",
-            "embedding",
-            "evidence",
-            "id",
-            "learning_type",
-            "owner",
-            "owner_actor_id",
-            "promotion_eligible",
-            "review_date",
-            "scope",
-            "status",
-            "task_id",
-            "title",
-            "updated_at",
-            "what_happened",
-            "what_learned",
-        }
-    )
+    assert_learning_columns(LEARNING_COLUMNS_WITH_SEARCH)
     assert_capability_columns({"created_at", "description", "id", "key", "updated_at"})
     assert_capability_grant_columns(
         {
@@ -566,30 +520,7 @@ def test_full_migration_stack_is_reversible_to_base() -> None:
     assert expected_head is not None
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
-    assert_learning_columns(
-        {
-            "action_rule",
-            "applies_when",
-            "confidence",
-            "created_at",
-            "does_not_apply_when",
-            "embedding",
-            "evidence",
-            "id",
-            "learning_type",
-            "owner",
-            "owner_actor_id",
-            "promotion_eligible",
-            "review_date",
-            "scope",
-            "status",
-            "task_id",
-            "title",
-            "updated_at",
-            "what_happened",
-            "what_learned",
-        }
-    )
+    assert_learning_columns(LEARNING_COLUMNS_WITH_SEARCH)
     assert_capability_columns({"created_at", "description", "id", "key", "updated_at"})
     assert_capability_grant_columns(
         {
