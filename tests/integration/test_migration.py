@@ -35,8 +35,8 @@ ENTITY_TABLES = {
 PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
 PRE_IDEMPOTENCY_TABLES = ENTITY_TABLES - {"idempotency_key"}
-PRE_LATEST_ENTITY_TABLES = ENTITY_TABLES - {"learning_drafts"}
-PRE_LATEST_REVISION = "20260420_12"
+PRE_LATEST_ENTITY_TABLES = ENTITY_TABLES
+PRE_LATEST_REVISION = "20260420_13"
 
 
 def alembic_config() -> Config:
@@ -231,6 +231,7 @@ def test_migration_reaches_head_with_extensions() -> None:
             "learning_type",
             "owner",
             "owner_actor_id",
+            "promotion_eligible",
             "review_date",
             "scope",
             "status",
@@ -326,6 +327,7 @@ def test_latest_migration_is_reversible() -> None:
             "evidence",
             "id",
             "learning_type",
+            "owner",
             "owner_actor_id",
             "review_date",
             "scope",
@@ -413,6 +415,7 @@ def test_latest_migration_is_reversible() -> None:
             "learning_type",
             "owner",
             "owner_actor_id",
+            "promotion_eligible",
             "review_date",
             "scope",
             "status",
@@ -497,6 +500,7 @@ def test_full_migration_stack_is_reversible_to_base() -> None:
             "learning_type",
             "owner",
             "owner_actor_id",
+            "promotion_eligible",
             "review_date",
             "scope",
             "status",

@@ -395,13 +395,9 @@ def _validate_payload(
         managed_fields = SYSTEM_MANAGED_FIELDS_BY_RESOURCE.get(
             config.resource_name, frozenset()
         )
-        unexpected_fields = sorted(managed_fields.intersection(payload.keys()))
-        if unexpected_fields:
-            raise_api_error(
-                status.HTTP_400_BAD_REQUEST,
-                "System-managed fields cannot be set",
-                details={"fields": unexpected_fields},
-            )
+        payload = {
+            key: value for key, value in payload.items() if key not in managed_fields
+        }
     try:
         return config.schema_type.model_validate(payload)
     except pydantic.ValidationError as error:
@@ -453,23 +449,16 @@ def _validate_patch(
     existing: SchemaModel,
     patch: dict[str, Any],
 ) -> SchemaModel:
+    managed_fields = SYSTEM_MANAGED_FIELDS_BY_RESOURCE.get(
+        config.resource_name, frozenset()
+    )
+    patch = {key: value for key, value in patch.items() if key not in managed_fields}
     immutable_fields = sorted(IMMUTABLE_FIELDS.intersection(patch.keys()))
     if immutable_fields:
         raise_api_error(
             status.HTTP_400_BAD_REQUEST,
             "Immutable fields cannot be updated",
             details={"fields": immutable_fields},
-        )
-    managed_fields = sorted(
-        SYSTEM_MANAGED_FIELDS_BY_RESOURCE.get(
-            config.resource_name, frozenset()
-        ).intersection(patch.keys())
-    )
-    if managed_fields:
-        raise_api_error(
-            status.HTTP_400_BAD_REQUEST,
-            "System-managed fields cannot be updated",
-            details={"fields": managed_fields},
         )
 
     merged = existing.model_dump()

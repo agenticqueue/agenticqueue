@@ -744,7 +744,10 @@ def create_app(
                 raise_api_error(
                     status.HTTP_409_CONFLICT,
                     str(error),
-                    details={"learning_id": str(learning_id), "actor_id": str(actor.id)},
+                    details={
+                        "learning_id": str(learning_id),
+                        "actor_id": str(actor.id),
+                    },
                 )
 
     return app
