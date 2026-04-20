@@ -22,6 +22,7 @@ from agenticqueue_api.config import get_sqlalchemy_sync_database_url
 from agenticqueue_api.models import (
     ActorModel,
     AuditLogRecord,
+    CapabilityGrantModel,
     CapabilityKey,
     CapabilityRecord,
     ProjectModel,
@@ -217,15 +218,33 @@ def seed_capability_grant(
     actor_id: uuid.UUID,
     capability: CapabilityKey,
     scope: dict[str, object],
-) -> None:
+) -> CapabilityGrantModel:
     with session_factory() as session:
-        grant_capability(
+        grant = grant_capability(
             session,
             actor_id=actor_id,
             capability=capability,
             scope=scope,
         )
         session.commit()
+        return grant
+
+
+ALL_STANDARD_CAPABILITIES = tuple(CapabilityKey)
+REQUIRED_PROJECT_SCOPE = {"project_id": "matrix-project"}
+MISMATCHED_PROJECT_SCOPE = {"project_id": "other-project"}
+
+
+def make_capability_request(actor: ActorModel) -> SimpleNamespace:
+    return SimpleNamespace(state=SimpleNamespace(actor=actor))
+
+
+def make_project_scoped_dependency(capability: CapabilityKey):
+    return require_capability(
+        capability,
+        lambda request, session, payload, entity_id: REQUIRED_PROJECT_SCOPE,
+        entity_type="task",
+    )
 
 
 @pytest.fixture(scope="session")
@@ -394,6 +413,150 @@ def test_every_crud_mutation_route_has_capability_dependency(
         assert any(
             name.startswith("require_capability_") for name in dependency_names
         ), f"missing capability dependency on {sorted(route.methods)} {route.path}"
+
+
+@pytest.mark.parametrize(
+    "capability",
+    ALL_STANDARD_CAPABILITIES,
+    ids=lambda capability: capability.value,
+)
+def test_each_capability_allows_matching_project_scoped_grants(
+    session_factory: sessionmaker[Session],
+    capability: CapabilityKey,
+) -> None:
+    actor = seed_actor(session_factory, handle=f"cap-pass-{capability.value}")
+    dependency = make_project_scoped_dependency(capability)
+    seed_capability_grant(
+        session_factory,
+        actor_id=actor.id,
+        capability=capability,
+        scope=REQUIRED_PROJECT_SCOPE,
+    )
+
+    with session_factory() as session:
+        assert (
+            dependency(
+                request=make_capability_request(actor),
+                session=session,
+                payload=None,
+                entity_id=None,
+            )
+            is None
+        )
+
+
+@pytest.mark.parametrize(
+    "capability",
+    ALL_STANDARD_CAPABILITIES,
+    ids=lambda capability: capability.value,
+)
+def test_each_capability_denies_missing_grants(
+    session_factory: sessionmaker[Session],
+    capability: CapabilityKey,
+) -> None:
+    actor = seed_actor(session_factory, handle=f"cap-deny-{capability.value}")
+    dependency = make_project_scoped_dependency(capability)
+
+    with session_factory() as session:
+        with pytest.raises(HTTPException) as exc_info:
+            dependency(
+                request=make_capability_request(actor),
+                session=session,
+                payload=None,
+                entity_id=None,
+            )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == {
+        "error_code": "forbidden",
+        "message": "Capability grant required",
+        "details": {
+            "missing_capability": capability.value,
+            "required_scope": REQUIRED_PROJECT_SCOPE,
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "capability",
+    ALL_STANDARD_CAPABILITIES,
+    ids=lambda capability: capability.value,
+)
+def test_each_capability_rejects_scope_mismatches(
+    session_factory: sessionmaker[Session],
+    capability: CapabilityKey,
+) -> None:
+    actor = seed_actor(session_factory, handle=f"cap-scope-{capability.value}")
+    dependency = make_project_scoped_dependency(capability)
+    seed_capability_grant(
+        session_factory,
+        actor_id=actor.id,
+        capability=capability,
+        scope=MISMATCHED_PROJECT_SCOPE,
+    )
+
+    with session_factory() as session:
+        with pytest.raises(HTTPException) as exc_info:
+            dependency(
+                request=make_capability_request(actor),
+                session=session,
+                payload=None,
+                entity_id=None,
+            )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == {
+        "error_code": "forbidden",
+        "message": "Capability grant required",
+        "details": {
+            "missing_capability": capability.value,
+            "required_scope": REQUIRED_PROJECT_SCOPE,
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "capability",
+    ALL_STANDARD_CAPABILITIES,
+    ids=lambda capability: capability.value,
+)
+def test_each_capability_rejects_revoked_grants(
+    session_factory: sessionmaker[Session],
+    capability: CapabilityKey,
+) -> None:
+    from agenticqueue_api.capabilities import revoke_capability_grant
+
+    actor = seed_actor(session_factory, handle=f"cap-revoked-{capability.value}")
+    dependency = make_project_scoped_dependency(capability)
+    grant = seed_capability_grant(
+        session_factory,
+        actor_id=actor.id,
+        capability=capability,
+        scope=REQUIRED_PROJECT_SCOPE,
+    )
+
+    with session_factory() as session:
+        revoke_capability_grant(session, grant.id)
+        session.commit()
+
+    with session_factory() as session:
+        with pytest.raises(HTTPException) as exc_info:
+            dependency(
+                request=make_capability_request(actor),
+                session=session,
+                payload=None,
+                entity_id=None,
+            )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == {
+        "error_code": "forbidden",
+        "message": "Capability grant required",
+        "details": {
+            "missing_capability": capability.value,
+            "required_scope": REQUIRED_PROJECT_SCOPE,
+        },
+    }
 
 
 def test_capability_helpers_cover_lookup_revocation_and_unknown_capability(
