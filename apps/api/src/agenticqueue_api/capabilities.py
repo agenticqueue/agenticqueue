@@ -73,7 +73,9 @@ def get_capability_grant(
 
     row = session.execute(
         sa.select(CapabilityGrantRecord, CapabilityRecord)
-        .join(CapabilityRecord, CapabilityRecord.id == CapabilityGrantRecord.capability_id)
+        .join(
+            CapabilityRecord, CapabilityRecord.id == CapabilityGrantRecord.capability_id
+        )
         .where(CapabilityGrantRecord.id == grant_id)
     ).first()
     if row is None:
@@ -92,7 +94,9 @@ def revoke_capability_grant(
 
     row = session.execute(
         sa.select(CapabilityGrantRecord, CapabilityRecord)
-        .join(CapabilityRecord, CapabilityRecord.id == CapabilityGrantRecord.capability_id)
+        .join(
+            CapabilityRecord, CapabilityRecord.id == CapabilityGrantRecord.capability_id
+        )
         .where(CapabilityGrantRecord.id == grant_id)
     ).first()
     if row is None:
@@ -117,9 +121,13 @@ def list_capabilities_for_actor(
     current_time = now or dt.datetime.now(dt.UTC)
     statement = (
         sa.select(CapabilityGrantRecord, CapabilityRecord)
-        .join(CapabilityRecord, CapabilityRecord.id == CapabilityGrantRecord.capability_id)
+        .join(
+            CapabilityRecord, CapabilityRecord.id == CapabilityGrantRecord.capability_id
+        )
         .where(CapabilityGrantRecord.actor_id == actor_id)
-        .order_by(CapabilityGrantRecord.created_at.asc(), CapabilityGrantRecord.id.asc())
+        .order_by(
+            CapabilityGrantRecord.created_at.asc(), CapabilityGrantRecord.id.asc()
+        )
     )
     if not include_inactive:
         statement = statement.where(

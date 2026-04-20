@@ -138,7 +138,10 @@ def upgrade() -> None:
     )
     op.bulk_insert(
         capability_table,
-        [{"key": key, "description": description} for key, description in STANDARD_CAPABILITIES],
+        [
+            {"key": key, "description": description}
+            for key, description in STANDARD_CAPABILITIES
+        ],
     )
     op.execute("""
         INSERT INTO agenticqueue.capability (key, description)

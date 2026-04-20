@@ -174,9 +174,7 @@ def test_migration_reaches_head_with_extensions() -> None:
     assert current_revision() == expected_head
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
-    assert_capability_columns(
-        {"created_at", "description", "id", "key", "updated_at"}
-    )
+    assert_capability_columns({"created_at", "description", "id", "key", "updated_at"})
     assert_capability_grant_columns(
         {
             "actor_id",
@@ -259,9 +257,7 @@ def test_latest_migration_is_reversible() -> None:
     assert expected_head is not None
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
-    assert_capability_columns(
-        {"created_at", "description", "id", "key", "updated_at"}
-    )
+    assert_capability_columns({"created_at", "description", "id", "key", "updated_at"})
     assert_capability_grant_columns(
         {
             "actor_id",
@@ -300,9 +296,7 @@ def test_full_migration_stack_is_reversible_to_base() -> None:
     assert expected_head is not None
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
-    assert_capability_columns(
-        {"created_at", "description", "id", "key", "updated_at"}
-    )
+    assert_capability_columns({"created_at", "description", "id", "key", "updated_at"})
     assert_capability_grant_columns(
         {
             "actor_id",

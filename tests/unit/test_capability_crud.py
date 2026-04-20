@@ -411,9 +411,9 @@ def test_capability_helpers_cover_missing_and_include_inactive(
 
         assert get_capability_grant(session, missing_grant_id) is None
         assert revoke_capability_grant(session, missing_grant_id) is None
-        assert [grant.id for grant in list_capabilities_for_actor(session, actor.id)] == [
-            active.id
-        ]
+        assert [
+            grant.id for grant in list_capabilities_for_actor(session, actor.id)
+        ] == [active.id]
         assert {
             grant.id
             for grant in list_capabilities_for_actor(
