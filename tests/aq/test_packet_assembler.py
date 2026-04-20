@@ -29,6 +29,7 @@ from agenticqueue_api.models import (
     WorkspaceModel,
 )
 from agenticqueue_api.policy.loader import PolicyRegistry
+from agenticqueue_api.repo_scope import resolve_repo_scope
 from agenticqueue_api.repo import (
     create_actor,
     create_artifact,
@@ -484,6 +485,14 @@ def test_assemble_packet_returns_stable_golden_payload(
     db_session: Session,
 ) -> None:
     target_task_id = _seed_graph_fixture(db_session)
+    expected_scope = resolve_repo_scope(
+        _repo_root(),
+        [
+            "apps/api/src/agenticqueue_api/compiler.py",
+            "tests/aq/test_packet_assembler.py",
+        ],
+        max_files=200,
+    )
 
     first_packet = assemble_packet(db_session, target_task_id)
     second_packet = assemble_packet(db_session, target_task_id)
@@ -512,15 +521,14 @@ def test_assemble_packet_returns_stable_golden_payload(
         "run_tests",
         "update_task",
     ]
-    assert first_packet.repo_scope.model_dump(mode="json") == {
-        "repo": "github.com/agenticqueue/agenticqueue",
-        "branch": "main",
-        "file_scope": [
-            "apps/api/src/agenticqueue_api/compiler.py",
-            "tests/aq/test_packet_assembler.py",
-        ],
-        "surface_area": ["packet", "compiler", "graph"],
-    }
+    assert first_packet.repo_scope.repo == "github.com/agenticqueue/agenticqueue"
+    assert first_packet.repo_scope.branch == "main"
+    assert first_packet.repo_scope.file_scope == expected_scope.file_scope
+    assert first_packet.repo_scope.surface_area == ["packet", "compiler", "graph"]
+    assert (
+        first_packet.repo_scope.estimated_token_count
+        == expected_scope.estimated_token_count
+    )
     assert first_packet.expected_output_schema["required"] == [
         "diff_url",
         "test_report",
@@ -754,12 +762,13 @@ def test_packet_compiler_helper_branches_and_vector_candidates(
         task_type_registry=task_type_registry,
         policy_registry=policy_registry,
     )
-    assert packet["repo_scope"] == {
-        "repo": "",
-        "branch": "",
-        "file_scope": ["apps/api/src/agenticqueue_api/compiler.py"],
-        "surface_area": [],
-    }
+    assert packet["repo_scope"]["repo"] == ""
+    assert packet["repo_scope"]["branch"] == ""
+    assert packet["repo_scope"]["file_scope"] == [
+        "apps/api/src/agenticqueue_api/compiler.py"
+    ]
+    assert packet["repo_scope"]["surface_area"] == []
+    assert packet["repo_scope"]["estimated_token_count"] > 0
     assert packet["open_questions"] == ["keep bullet"]
 
     monkeypatch = pytest.MonkeyPatch()

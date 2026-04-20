@@ -17,6 +17,8 @@ DEFAULT_GRAPH_TRAVERSAL_TIMEOUT_MS = 2000
 DEFAULT_WRITE_STATEMENT_TIMEOUT_MS = 10000
 DEFAULT_TASK_TYPES_DIR = Path(__file__).resolve().parents[4] / "task_types"
 DEFAULT_POLICIES_DIR = Path(__file__).resolve().parents[4] / "policies"
+DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[4]
+DEFAULT_PACKET_SCOPE_MAX_FILES = 200
 ASYNC_PREFIX = "postgresql+asyncpg://"
 SQLALCHEMY_SYNC_PREFIX = "postgresql+psycopg://"
 PSYCOPG_PREFIX = "postgresql://"
@@ -155,6 +157,26 @@ def get_policies_dir() -> Path:
     if configured:
         return Path(configured)
     return DEFAULT_POLICIES_DIR
+
+
+def get_repo_root() -> Path:
+    """Return the local checkout root used for repo-relative scope resolution."""
+
+    configured = os.getenv("AGENTICQUEUE_REPO_ROOT") or os.getenv("REPO_ROOT")
+    if configured:
+        return Path(configured)
+    return DEFAULT_REPO_ROOT
+
+
+def get_packet_scope_max_files() -> int:
+    """Return the max number of files a resolved packet scope may include."""
+
+    return int(
+        os.getenv(
+            "AGENTICQUEUE_PACKET_SCOPE_MAX_FILES",
+            DEFAULT_PACKET_SCOPE_MAX_FILES,
+        )
+    )
 
 
 def get_reload_enabled() -> bool:

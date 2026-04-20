@@ -15,8 +15,10 @@ from pydantic import Field
 from sqlalchemy.orm import Session
 
 from agenticqueue_api.config import (
+    get_packet_scope_max_files,
     get_policies_dir,
     get_reload_enabled,
+    get_repo_root,
     get_task_types_dir,
 )
 from agenticqueue_api.learnings import LearningDedupeService, rank_learnings_for_task
@@ -37,6 +39,7 @@ from agenticqueue_api.models.shared import SchemaModel
 from agenticqueue_api.policy.loader import PolicyPack, PolicyRegistry, load_policy_pack
 from agenticqueue_api.policy.resolver import ResolvedPolicy, resolve_effective_policy
 from agenticqueue_api.repo import ancestors, neighbors
+from agenticqueue_api.repo_scope import resolve_repo_scope
 from agenticqueue_api.schemas.learning import LearningStatus
 from agenticqueue_api.task_type_registry import TaskTypeDefinition, TaskTypeRegistry
 
@@ -61,6 +64,7 @@ class PacketRepoScope(SchemaModel):
     branch: str
     file_scope: list[str] = Field(default_factory=list)
     surface_area: list[str] = Field(default_factory=list)
+    estimated_token_count: int = 0
 
 
 class PacketPermissions(SchemaModel):
@@ -134,11 +138,17 @@ def _normalize_string(value: object) -> str:
 
 def _task_repo_scope(task: TaskRecord) -> PacketRepoScope:
     contract = task.contract or {}
+    resolved_scope = resolve_repo_scope(
+        get_repo_root(),
+        _normalize_string_list(contract.get("file_scope")),
+        max_files=get_packet_scope_max_files(),
+    )
     return PacketRepoScope(
         repo=_normalize_string(contract.get("repo")),
         branch=_normalize_string(contract.get("branch")),
-        file_scope=_normalize_string_list(contract.get("file_scope")),
+        file_scope=resolved_scope.file_scope,
         surface_area=_normalize_string_list(contract.get("surface_area")),
+        estimated_token_count=resolved_scope.estimated_token_count,
     )
 
 
