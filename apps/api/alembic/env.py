@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from logging.config import fileConfig
+from uuid import uuid4
 
 from alembic import context
 from sqlalchemy import pool
@@ -49,6 +50,7 @@ async def run_migrations_online() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args={"prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__"},
     )
 
     async with connectable.connect() as connection:

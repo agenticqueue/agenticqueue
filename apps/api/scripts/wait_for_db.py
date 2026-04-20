@@ -7,7 +7,7 @@ import time
 
 import psycopg
 
-from agenticqueue_api.config import get_sync_database_url
+from agenticqueue_api.config import get_psycopg_connect_args, get_sync_database_url
 
 
 def parse_args() -> argparse.Namespace:
@@ -23,7 +23,12 @@ def main() -> int:
 
     for attempt in range(1, args.attempts + 1):
         try:
-            with psycopg.connect(sync_url, connect_timeout=2) as connection:
+            prepare_threshold = get_psycopg_connect_args()["prepare_threshold"]
+            with psycopg.connect(
+                sync_url,
+                connect_timeout=2,
+                prepare_threshold=prepare_threshold,
+            ) as connection:
                 with connection.cursor() as cursor:
                     cursor.execute("SELECT 1")
                     cursor.fetchone()

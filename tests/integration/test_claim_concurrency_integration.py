@@ -15,7 +15,10 @@ import sqlalchemy as sa
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from agenticqueue_api.config import get_sqlalchemy_sync_database_url
+from agenticqueue_api.config import (
+    get_psycopg_connect_args,
+    get_sqlalchemy_sync_database_url,
+)
 from agenticqueue_api.models import (
     ActorModel,
     CapabilityKey,
@@ -86,6 +89,7 @@ def engine() -> Engine:
         future=True,
         pool_size=50,
         max_overflow=0,
+        connect_args=get_psycopg_connect_args(),
     )
 
 

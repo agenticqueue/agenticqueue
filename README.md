@@ -11,12 +11,16 @@ git clone https://github.com/agenticqueue/agenticqueue.git
 cd agenticqueue
 cp .env.example .env
 uv sync
-docker compose up -d db
+docker compose up -d db pgbouncer
 uv run alembic -c apps/api/alembic.ini upgrade head
 ```
 
-Phase 1 starts with a minimal Postgres + Alembic foundation in `apps/api/`. The
-full API, worker, and UI land in later tickets.
+Phase 1 starts with a minimal Postgres + PgBouncer foundation in `apps/api/`.
+The pooler runs in transaction mode, so psycopg paths disable prepared
+statements via `prepare_threshold=None` and asyncpg paths use
+`prepared_statement_cache_size=0`. The full API, worker, and UI land in later
+tickets, but `docker-compose.yml` now defines an `api` service that is gated on
+PgBouncer health for future containerized smoke tests.
 
 ## Repo Map
 

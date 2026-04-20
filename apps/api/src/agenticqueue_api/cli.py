@@ -9,7 +9,10 @@ import typer
 from sqlalchemy.orm import Session, sessionmaker
 
 from agenticqueue_api.audit import set_session_audit_context
-from agenticqueue_api.config import get_sqlalchemy_sync_database_url
+from agenticqueue_api.config import (
+    get_psycopg_connect_args,
+    get_sqlalchemy_sync_database_url,
+)
 from agenticqueue_api.middleware.idempotency import (
     cleanup_expired_idempotency_keys,
     get_idempotency_stats,
@@ -23,7 +26,11 @@ app.add_typer(idempotency_app, name="idempotency")
 
 
 def _default_session_factory() -> sessionmaker[Session]:
-    engine = sa.create_engine(get_sqlalchemy_sync_database_url(), future=True)
+    engine = sa.create_engine(
+        get_sqlalchemy_sync_database_url(),
+        future=True,
+        connect_args=get_psycopg_connect_args(),
+    )
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 

@@ -1,7 +1,7 @@
 .PHONY: db-up db-migrate db-reset
 
 db-up:
-	docker compose up -d db
+	docker compose up -d db pgbouncer
 
 db-migrate:
 	uv run python apps/api/scripts/wait_for_db.py

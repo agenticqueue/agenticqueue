@@ -15,5 +15,49 @@ services:
     volumes:
       - agenticqueue_postgres_data:/var/lib/postgresql/data
 
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.1-p0
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://agenticqueue:agenticqueue@db:5432/agenticqueue
+      LISTEN_PORT: 6432
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      DEFAULT_POOL_SIZE: 25
+      MAX_CLIENT_CONN: 200
+      RESERVE_POOL_SIZE: 5
+      MAX_PREPARED_STATEMENTS: 0
+      ADMIN_USERS: agenticqueue
+      STATS_USERS: agenticqueue
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "PGPASSWORD=agenticqueue psql postgres://agenticqueue@127.0.0.1:6432/agenticqueue -c 'SELECT 1' > /dev/null",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "64329:6432"
+
+  api:
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    working_dir: /workspace
+    command: >-
+      sh -lc "uv sync --frozen && uv run python apps/api/scripts/wait_for_db.py --attempts 60 --delay-seconds 1 && uv run uvicorn agenticqueue_api.app:app --host 0.0.0.0 --port 8000"
+    environment:
+      AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://agenticqueue:agenticqueue@pgbouncer:6432/agenticqueue?prepared_statement_cache_size=0
+      UV_PROJECT_ENVIRONMENT: /tmp/agenticqueue-venv
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/workspace
+
 volumes:
   agenticqueue_postgres_data:

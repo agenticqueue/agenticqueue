@@ -32,6 +32,7 @@ from agenticqueue_api.capabilities import (
 )
 from agenticqueue_api.config import (
     get_policies_dir,
+    get_psycopg_connect_args,
     get_reload_enabled,
     get_sqlalchemy_sync_database_url,
     get_task_types_dir,
@@ -166,7 +167,11 @@ class RegisterTaskTypeRequest(SchemaModel):
 
 
 def _default_session_factory() -> sessionmaker[Session]:
-    engine = sa.create_engine(get_sqlalchemy_sync_database_url(), future=True)
+    engine = sa.create_engine(
+        get_sqlalchemy_sync_database_url(),
+        future=True,
+        connect_args=get_psycopg_connect_args(),
+    )
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 

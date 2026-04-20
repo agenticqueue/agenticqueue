@@ -49,9 +49,9 @@ jobs:
         shell: bash
         run: python -m pip install --upgrade pip .
 
-      - name: Start Postgres
+      - name: Start Postgres + PgBouncer
         shell: bash
-        run: docker compose up -d db
+        run: docker compose up -d db pgbouncer
 
       - name: Wait for Postgres
         shell: bash
