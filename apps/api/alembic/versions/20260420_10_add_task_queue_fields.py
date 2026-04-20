@@ -87,7 +87,9 @@ def upgrade() -> None:
         "CREATE INDEX ix_task_queue_lookup "
         "ON agenticqueue.task (state, priority DESC, sequence ASC)"
     )
-    op.execute("CREATE INDEX ix_task_labels_gin ON agenticqueue.task USING gin (labels)")
+    op.execute(
+        "CREATE INDEX ix_task_labels_gin ON agenticqueue.task USING gin (labels)"
+    )
 
 
 def downgrade() -> None:
