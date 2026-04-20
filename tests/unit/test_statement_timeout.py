@@ -90,6 +90,6 @@ def test_recursive_cte_timeout_returns_504_and_logs_fingerprint(
     assert health_response.json() == {"ok": 1}
     assert after_connections <= before_connections + 1
     assert any(
-        "statement-timeout endpoint=v1.tests.graph-timeout" in record.message
+        "statement-timeout endpoint=v1.tests.graph-timeout" in record.getMessage()
         for record in caplog.records
     )

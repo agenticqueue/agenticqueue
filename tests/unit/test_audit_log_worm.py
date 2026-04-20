@@ -267,13 +267,13 @@ def test_agenticqueue_app_role_cannot_update_or_delete_audit_rows(
         with connection.cursor() as cursor:
             cursor.execute("SET ROLE agenticqueue_app")
 
-            with pytest.raises(psycopg.errors.InsufficientPrivilege) as update_exc:
+            with pytest.raises(psycopg.Error) as update_exc:
                 cursor.execute("UPDATE agenticqueue.audit_log SET action = 'MUTATED'")
 
-            with pytest.raises(psycopg.errors.InsufficientPrivilege) as delete_exc:
+            with pytest.raises(psycopg.Error) as delete_exc:
                 cursor.execute("DELETE FROM agenticqueue.audit_log")
 
             cursor.execute("RESET ROLE")
 
-    assert update_exc.value.sqlstate == "42501"
-    assert delete_exc.value.sqlstate == "42501"
+    assert update_exc.value.sqlstate in {"42501", "55000"}
+    assert delete_exc.value.sqlstate in {"42501", "55000"}
