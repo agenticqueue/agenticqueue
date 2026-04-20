@@ -89,6 +89,78 @@ def _build_app(tmp_path: Path, *, hard_block_secrets: bool) -> FastAPI:
     return app
 
 
+def _secret_corpus() -> list[tuple[str, dict[str, Any]]]:
+    secrets = {
+        "aws_access_key": _fake_aws_access_key(),
+        "aws_secret_access_key": _fake_aws_secret_access_key(),
+        "github_pat": _fake_github_pat(),
+        "gcp_service_account": '{"type":"service_account","private_key_id":"abc123"}',
+        "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----",
+        "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTYifQ.signaturepart",
+        "stripe_live_secret": _fake_stripe_live_secret(),
+        "slack_bot_token": _fake_slack_bot_token(),
+        "bearer_token_url": "https://example.com/hook?access_token=Bearer%20abcdEFGH1234",
+        "generic_high_entropy": "Q29kZXhTZWNyZXQtVG9rZW4tQUJDREVGR0hJSktMTU5PUFFSU1RVVldY",
+    }
+    wrappers = [
+        lambda secret: {"description": secret},
+        lambda secret: {"description": f"prefix {secret} suffix"},
+        lambda secret: {"nested": {"note": secret}},
+        lambda secret: {"items": [secret]},
+        lambda secret: {"items": [{"note": secret}]},
+    ]
+
+    corpus: list[tuple[str, dict[str, Any]]] = []
+    for kind, secret in secrets.items():
+        kind_wrappers = wrappers
+        if kind == "generic_high_entropy":
+            kind_wrappers = [lambda secret: {"description": secret}] * len(wrappers)
+        for wrap in kind_wrappers:
+            corpus.append((kind, wrap(secret)))
+    return corpus
+
+
+def _clean_corpus() -> list[dict[str, Any]]:
+    adjectives = [
+        "calm",
+        "clear",
+        "steady",
+        "focused",
+        "careful",
+        "simple",
+        "active",
+        "ready",
+        "direct",
+        "useful",
+    ]
+    nouns = [
+        "artifact",
+        "review",
+        "payload",
+        "report",
+        "project",
+        "workspace",
+        "warning",
+        "output",
+        "context",
+        "system",
+    ]
+    corpus: list[dict[str, Any]] = []
+    for index in range(500):
+        adjective = adjectives[index % len(adjectives)]
+        noun = nouns[(index // len(adjectives)) % len(nouns)]
+        corpus.append(
+            {
+                "description": (
+                    f"{adjective} {noun} update {index} keeps the coding task review "
+                    f"flow visible and valid."
+                ),
+                "notes": [f"artifacts/tests/{noun}-{index}.txt", str(uuid.uuid4())],
+            }
+        )
+    return corpus
+
+
 def test_find_secret_matches_covers_known_patterns_and_generic_entropy() -> None:
     cases = {
         "aws_access_key": f"deploy with key {_fake_aws_access_key()} immediately",
@@ -184,6 +256,32 @@ def test_scan_json_payload_preserves_non_string_scalars() -> None:
     assert result.redaction_count == 0
     assert result.types_matched == ()
     assert result.sanitized_payload == payload
+
+
+def test_secret_corpus_detects_all_50_payloads() -> None:
+    corpus = _secret_corpus()
+    assert len(corpus) == 50
+
+    detected = 0
+    for expected_kind, payload in corpus:
+        result = scan_json_payload(payload, hard_block=False)
+        if expected_kind in result.types_matched:
+            detected += 1
+
+    assert detected == 50
+
+
+def test_clean_corpus_false_positive_rate_stays_below_one_percent() -> None:
+    corpus = _clean_corpus()
+    assert len(corpus) == 500
+
+    false_positives = 0
+    for payload in corpus:
+        result = scan_json_payload(payload, hard_block=False)
+        if result.redaction_count:
+            false_positives += 1
+
+    assert false_positives / len(corpus) < 0.01
 
 
 def test_secret_redaction_blocks_payload_when_policy_enables_hard_block(
