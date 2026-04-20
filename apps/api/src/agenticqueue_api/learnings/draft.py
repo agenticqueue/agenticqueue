@@ -283,7 +283,9 @@ def _reviewer_correction_notes(details: Mapping[str, Any]) -> list[str]:
     return _dedupe(notes)
 
 
-def _validator_rejection_attempts(details: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+def _validator_rejection_attempts(
+    details: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
     matches: list[Mapping[str, Any]] = []
     for attempt in _attempts(details):
         tokens = _token_blob(attempt)
@@ -348,7 +350,10 @@ def _failed_test_names(details: Mapping[str, Any]) -> list[str]:
             raw_tests, (str, bytes, bytearray)
         ):
             failed.extend(_string_or_none(item) for item in raw_tests)
-        if any(marker in tokens for marker in ("test_failed", "pytest_failed", "failing test")):
+        if any(
+            marker in tokens
+            for marker in ("test_failed", "pytest_failed", "failing test")
+        ):
             label = _string_or_none(
                 attempt.get("summary") or attempt.get("reason") or attempt.get("status")
             )

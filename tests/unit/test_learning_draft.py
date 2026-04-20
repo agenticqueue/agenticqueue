@@ -124,7 +124,9 @@ def test_draft_learnings_returns_pitfall_after_two_validator_rejections() -> Non
                 "attempts": [
                     {
                         "status": "test_failed",
-                        "failed_tests": ["tests/unit/test_validator.py::test_validate_submission_accepts_valid_payload"],
+                        "failed_tests": [
+                            "tests/unit/test_validator.py::test_validate_submission_accepts_valid_payload"
+                        ],
                     }
                 ]
             },
