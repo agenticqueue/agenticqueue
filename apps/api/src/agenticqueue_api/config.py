@@ -8,6 +8,8 @@ DEFAULT_DATABASE_URL = (
     "postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:54329/agenticqueue"
 )
 DEFAULT_TOKEN_SIGNING_SECRET = "agenticqueue-dev-token-signing-secret"
+DEFAULT_EMBEDDING_DIMENSION = 768
+DEFAULT_VECTOR_IVFFLAT_LISTS = 100
 ASYNC_PREFIX = "postgresql+asyncpg://"
 SQLALCHEMY_SYNC_PREFIX = "postgresql+psycopg://"
 PSYCOPG_PREFIX = "postgresql://"
@@ -52,4 +54,18 @@ def get_token_signing_secret() -> str:
         os.getenv("AGENTICQUEUE_TOKEN_SIGNING_SECRET")
         or os.getenv("TOKEN_SIGNING_SECRET")
         or DEFAULT_TOKEN_SIGNING_SECRET
+    )
+
+
+def get_embedding_dimension() -> int:
+    """Return the configured pgvector embedding dimension."""
+    return int(
+        os.getenv("AGENTICQUEUE_EMBEDDING_DIMENSION", DEFAULT_EMBEDDING_DIMENSION)
+    )
+
+
+def get_vector_ivfflat_lists() -> int:
+    """Return the ivfflat list count used for embedding indexes."""
+    return int(
+        os.getenv("AGENTICQUEUE_VECTOR_IVFFLAT_LISTS", DEFAULT_VECTOR_IVFFLAT_LISTS)
     )

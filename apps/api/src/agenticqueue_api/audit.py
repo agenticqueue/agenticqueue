@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, object_session
 
 from agenticqueue_api.db import Base
 from agenticqueue_api.models.audit_log import AuditLogRecord
+from agenticqueue_api.pgvector import normalize_embedding
 
 AUDIT_ACTOR_ID_KEY = "agenticqueue_audit_actor_id"
 AUDIT_TRACE_ID_KEY = "agenticqueue_audit_trace_id"
@@ -37,7 +38,9 @@ def _is_auditable_instance(target: object) -> bool:
 def _serialize_snapshot(row: Mapping[str, Any] | None) -> dict[str, Any] | None:
     if row is None:
         return None
-    return {key: jsonable_encoder(value) for key, value in row.items()}
+    return {
+        key: jsonable_encoder(normalize_embedding(value)) for key, value in row.items()
+    }
 
 
 def _load_row_snapshot(

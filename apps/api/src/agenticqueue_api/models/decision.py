@@ -6,11 +6,13 @@ import datetime as dt
 import uuid
 
 import sqlalchemy as sa
+from pydantic import field_validator
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from agenticqueue_api.db import Base
 from agenticqueue_api.models.shared import CreatedSchema, CreatedTable, IdentifiedTable
+from agenticqueue_api.pgvector import embedding_column, normalize_embedding
 
 
 class DecisionModel(CreatedSchema):
@@ -22,6 +24,12 @@ class DecisionModel(CreatedSchema):
     summary: str
     rationale: str | None = None
     decided_at: dt.datetime
+    embedding: list[float] | None = None
+
+    @field_validator("embedding", mode="before")
+    @classmethod
+    def _normalize_embedding(cls, value: object) -> list[float] | None:
+        return normalize_embedding(value)
 
 
 class DecisionRecord(IdentifiedTable, CreatedTable, Base):
@@ -50,3 +58,4 @@ class DecisionRecord(IdentifiedTable, CreatedTable, Base):
         sa.DateTime(timezone=True),
         nullable=False,
     )
+    embedding: Mapped[list[float] | None] = embedding_column()

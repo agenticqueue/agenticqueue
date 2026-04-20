@@ -6,7 +6,7 @@ import datetime as dt
 import uuid
 
 import sqlalchemy as sa
-from pydantic import Field
+from pydantic import Field, field_validator
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,6 +17,7 @@ from agenticqueue_api.models.shared import (
     TimestampedTable,
     jsonb_list_column,
 )
+from agenticqueue_api.pgvector import embedding_column, normalize_embedding
 
 
 class LearningModel(TimestampedSchema):
@@ -36,6 +37,12 @@ class LearningModel(TimestampedSchema):
     confidence: str
     status: str
     review_date: dt.date | None = None
+    embedding: list[float] | None = None
+
+    @field_validator("embedding", mode="before")
+    @classmethod
+    def _normalize_embedding(cls, value: object) -> list[float] | None:
+        return normalize_embedding(value)
 
 
 class LearningRecord(IdentifiedTable, TimestampedTable, Base):
@@ -65,3 +72,4 @@ class LearningRecord(IdentifiedTable, TimestampedTable, Base):
     confidence: Mapped[str] = mapped_column(sa.String(32), nullable=False)
     status: Mapped[str] = mapped_column(sa.String(32), nullable=False)
     review_date: Mapped[dt.date | None] = mapped_column(sa.Date(), nullable=True)
+    embedding: Mapped[list[float] | None] = embedding_column()
