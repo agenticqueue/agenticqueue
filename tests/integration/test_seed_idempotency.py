@@ -25,6 +25,7 @@ from agenticqueue_api.seed import load_seed_fixture
 TRUNCATE_TABLES = [
     "api_token",
     "capability_grant",
+    "idempotency_key",
     "edge",
     "artifact",
     "decision",

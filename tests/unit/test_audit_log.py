@@ -27,6 +27,7 @@ from agenticqueue_api.repo import create_actor
 TRUNCATE_TABLES = [
     "api_token",
     "capability_grant",
+    "idempotency_key",
     "edge",
     "artifact",
     "decision",
@@ -348,6 +349,7 @@ def test_trace_id_propagates_from_request_context(
         "/v1/auth/tokens",
         headers={
             "Authorization": f"Bearer {raw_token}",
+            "Idempotency-Key": str(uuid.uuid4()),
             "X-Trace-Id": "trace-request-123",
         },
         json={

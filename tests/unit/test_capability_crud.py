@@ -26,6 +26,7 @@ from agenticqueue_api.repo import create_actor
 TRUNCATE_TABLES = [
     "api_token",
     "capability_grant",
+    "idempotency_key",
     "edge",
     "artifact",
     "decision",
@@ -161,7 +162,10 @@ def test_grant_happy_path_creates_capability_grant(
 
     response = client.post(
         "/v1/capabilities/grant",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        headers={
+            "Authorization": f"Bearer {admin_token}",
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
         json={
             "actor_id": str(target.id),
             "capability": "read_repo",
@@ -221,7 +225,10 @@ def test_revoke_soft_deletes_but_preserves_grant_row(
 
     response = client.post(
         "/v1/capabilities/revoke",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        headers={
+            "Authorization": f"Bearer {admin_token}",
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
         json={"grant_id": str(grant.id)},
     )
 

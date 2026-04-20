@@ -29,6 +29,7 @@ from agenticqueue_api.repo import create_actor
 TRUNCATE_TABLES = [
     "api_token",
     "capability_grant",
+    "idempotency_key",
     "edge",
     "artifact",
     "decision",
@@ -304,7 +305,10 @@ def test_provision_endpoint_creates_token_and_returns_raw_value_once(
 
     response = client.post(
         "/v1/auth/tokens",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        headers={
+            "Authorization": f"Bearer {admin_token}",
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
         json={
             "actor_id": str(user_id),
             "scopes": ["task:read", "task:read", "task:write"],
@@ -338,7 +342,10 @@ def test_revoke_endpoint_marks_token_and_blocks_future_use(
 
     revoke_response = client.post(
         f"/v1/auth/tokens/{token_id}/revoke",
-        headers={"Authorization": f"Bearer {raw_token}"},
+        headers={
+            "Authorization": f"Bearer {raw_token}",
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
     )
 
     assert revoke_response.status_code == 200

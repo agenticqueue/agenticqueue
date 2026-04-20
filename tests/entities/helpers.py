@@ -48,6 +48,7 @@ from agenticqueue_api.repo import (
 TRUNCATE_TABLES = [
     "api_token",
     "capability_grant",
+    "idempotency_key",
     "edge",
     "artifact",
     "decision",
@@ -538,7 +539,10 @@ def make_coding_task_contract(*, surface_area: list[str]) -> dict[str, Any]:
 
 
 def auth_headers(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    return {
+        "Authorization": f"Bearer {token}",
+        "Idempotency-Key": str(uuid.uuid4()),
+    }
 
 
 def assert_error_shape(

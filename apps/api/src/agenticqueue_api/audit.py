@@ -32,7 +32,11 @@ def set_session_audit_context(
 
 
 def _is_auditable_instance(target: object) -> bool:
-    return isinstance(target, Base) and not isinstance(target, AuditLogRecord)
+    return (
+        isinstance(target, Base)
+        and not isinstance(target, AuditLogRecord)
+        and getattr(target, "__tablename__", None) != "idempotency_key"
+    )
 
 
 def _serialize_snapshot(row: Mapping[str, Any] | None) -> dict[str, Any] | None:
@@ -150,6 +154,8 @@ def _audit_after_insert(
     connection: sa.Connection,
     target: object,
 ) -> None:
+    if not _is_auditable_instance(target):
+        return
     entity_id = getattr(target, cast(str, mapper.primary_key[0].key), None)
     _write_audit_row(
         mapper,
@@ -167,6 +173,8 @@ def _audit_after_update(
     connection: sa.Connection,
     target: object,
 ) -> None:
+    if not _is_auditable_instance(target):
+        return
     entity_id = getattr(target, cast(str, mapper.primary_key[0].key), None)
     _write_audit_row(
         mapper,
@@ -184,6 +192,8 @@ def _audit_after_delete(
     connection: sa.Connection,
     target: object,
 ) -> None:
+    if not _is_auditable_instance(target):
+        return
     _write_audit_row(
         mapper,
         connection,

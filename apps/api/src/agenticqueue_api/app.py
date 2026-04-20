@@ -33,6 +33,7 @@ from agenticqueue_api.config import (
 )
 from agenticqueue_api.crud import build_crud_router
 from agenticqueue_api.errors import install_exception_handlers, raise_api_error
+from agenticqueue_api.middleware import IdempotencyKeyMiddleware
 from agenticqueue_api.models import (
     ActorModel,
     ActorRecord,
@@ -260,6 +261,7 @@ def create_app(
     )
     app.state.session_factory = session_factory or _default_session_factory()
     app.state.task_type_registry = task_type_registry or _default_task_type_registry()
+    app.add_middleware(IdempotencyKeyMiddleware)
     app.add_middleware(AgenticQueueAuthMiddleware)
     install_exception_handlers(app)
     app.include_router(build_crud_router(get_db_session))

@@ -38,6 +38,7 @@ from agenticqueue_api.repo import (
 TRUNCATE_TABLES = [
     "api_token",
     "capability_grant",
+    "idempotency_key",
     "edge",
     "artifact",
     "decision",
@@ -110,7 +111,10 @@ def example_contract() -> dict[str, object]:
 
 
 def auth_headers(token: str, trace_id: str | None = None) -> dict[str, str]:
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Idempotency-Key": str(uuid.uuid4()),
+    }
     if trace_id is not None:
         headers["X-Trace-Id"] = trace_id
     return headers

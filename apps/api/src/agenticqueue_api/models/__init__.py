@@ -13,6 +13,7 @@ from agenticqueue_api.models.capability import (
 )
 from agenticqueue_api.models.decision import DecisionModel, DecisionRecord
 from agenticqueue_api.models.edge import EdgeModel, EdgeRecord, EdgeRelation
+from agenticqueue_api.models.idempotency_key import IdempotencyKeyRecord
 from agenticqueue_api.models.learning import LearningModel, LearningRecord
 from agenticqueue_api.models.packet_version import (
     PacketVersionModel,
@@ -43,6 +44,7 @@ __all__ = [
     "EdgeModel",
     "EdgeRecord",
     "EdgeRelation",
+    "IdempotencyKeyRecord",
     "LearningModel",
     "LearningRecord",
     "PacketVersionModel",

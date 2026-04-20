@@ -25,6 +25,7 @@ from agenticqueue_api.task_type_registry import SchemaLoadError, TaskTypeRegistr
 TRUNCATE_TABLES = [
     "api_token",
     "capability_grant",
+    "idempotency_key",
     "edge",
     "artifact",
     "decision",
@@ -162,7 +163,10 @@ def _task_payload(project_id: uuid.UUID, contract: dict[str, Any]) -> dict[str, 
 
 
 def _auth_headers(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    return {
+        "Authorization": f"Bearer {token}",
+        "Idempotency-Key": str(uuid.uuid4()),
+    }
 
 
 @pytest.fixture(scope="session")

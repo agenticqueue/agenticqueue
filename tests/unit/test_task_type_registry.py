@@ -38,6 +38,7 @@ VALID_POLICY = {"hitl_required": False, "autonomy_tier": 3}
 TRUNCATE_TABLES = [
     "api_token",
     "capability_grant",
+    "idempotency_key",
     "edge",
     "artifact",
     "decision",
@@ -149,7 +150,10 @@ def seed_token(
 
 
 def auth_headers(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    return {
+        "Authorization": f"Bearer {token}",
+        "Idempotency-Key": str(uuid.uuid4()),
+    }
 
 
 @pytest.fixture(scope="session")
