@@ -51,6 +51,7 @@ def truncate_all_tables(engine: Engine) -> None:
             sa.text(f"TRUNCATE TABLE {qualified_tables} RESTART IDENTITY CASCADE")
         )
 
+
 @pytest.fixture(scope="session")
 def engine() -> Engine:
     return sa.create_engine(get_sqlalchemy_sync_database_url(), future=True)
