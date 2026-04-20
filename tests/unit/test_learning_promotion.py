@@ -10,10 +10,12 @@ import sqlalchemy as sa
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
+from typer.testing import CliRunner
 
 from agenticqueue_api.app import create_app
 from agenticqueue_api.auth import issue_api_token
 from agenticqueue_api.capabilities import grant_capability
+from agenticqueue_api.cli import app as cli_app
 from agenticqueue_api.config import get_sqlalchemy_sync_database_url
 from agenticqueue_api.learnings import DraftLearningRecord, LearningPromotionService
 from agenticqueue_api.models import (
@@ -58,6 +60,8 @@ TRUNCATE_TABLES = [
     "workspace",
     "actor",
 ]
+
+runner = CliRunner()
 
 
 def _repo_root() -> Path:
@@ -522,6 +526,45 @@ def test_promote_learning_updates_scope_and_writes_audit_entry(
     assert audit_row.after is not None
     assert audit_row.after["scope"] == LearningScope.GLOBAL.value
     assert audit_row.after["promotion_eligible"] is False
+
+
+def test_learning_promote_cli_updates_scope(
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as session:
+        _, task_id, _, _ = seed_workspace_project_task_run(
+            session,
+            suffix="cli-promote",
+            created_at="2026-04-20T00:00:00+00:00",
+        )
+        learning = create_learning(
+            session,
+            make_learning_payload(
+                924,
+                task_id=task_id,
+                title="CLI promotion candidate",
+                action_rule="Promote reusable learnings through the shared CLI.",
+                scope=LearningScope.TASK.value,
+                created_at="2026-04-20T00:00:00+00:00",
+            ),
+        )
+        session.commit()
+        learning_id = learning.id
+
+    result = runner.invoke(
+        cli_app,
+        ["learning", "promote", str(learning_id), LearningScope.PROJECT.value],
+    )
+
+    assert result.exit_code == 0
+    promoted = LearningModel.model_validate(json.loads(result.stdout))
+    assert promoted.id == learning_id
+    assert promoted.scope == LearningScope.PROJECT
+
+    with session_factory() as session:
+        db_record = session.get(LearningRecord, learning_id)
+        assert db_record is not None
+        assert db_record.scope == LearningScope.PROJECT.value
 
 
 def test_promote_endpoint_requires_capability_and_updates_learning(

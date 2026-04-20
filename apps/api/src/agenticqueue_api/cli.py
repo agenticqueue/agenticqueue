@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 
 import sqlalchemy as sa
 import typer
@@ -13,16 +14,20 @@ from agenticqueue_api.config import (
     get_psycopg_connect_args,
     get_sqlalchemy_sync_database_url,
 )
+from agenticqueue_api.learnings import LearningPromotionService
 from agenticqueue_api.middleware.idempotency import (
     cleanup_expired_idempotency_keys,
     get_idempotency_stats,
     stats_as_json,
 )
+from agenticqueue_api.schemas.learning import LearningScope
 from agenticqueue_api.seed import load_seed_fixture, seed_example_data
 
 app = typer.Typer(help="AgenticQueue local developer commands.")
 idempotency_app = typer.Typer(help="Inspect and maintain idempotency cache rows.")
+learning_app = typer.Typer(help="Inspect and promote learnings.")
 app.add_typer(idempotency_app, name="idempotency")
+app.add_typer(learning_app, name="learning")
 
 
 def _default_session_factory() -> sessionmaker[Session]:
@@ -75,6 +80,34 @@ def idempotency_cleanup_command() -> None:
         deleted = cleanup_expired_idempotency_keys(session)
         session.commit()
     typer.echo(json.dumps({"deleted": deleted}, sort_keys=True))
+
+
+@learning_app.command("promote")
+def learning_promote_command(
+    learning_id: uuid.UUID,
+    target_scope: LearningScope,
+) -> None:
+    """Promote one learning to project or global scope."""
+
+    session_factory = _default_session_factory()
+    with session_factory() as session:
+        set_session_audit_context(
+            session,
+            actor_id=None,
+            trace_id="aq-learning-promote-cli",
+        )
+        service = LearningPromotionService(session)
+        try:
+            promoted = service.promote(
+                learning_id=learning_id,
+                target_scope=target_scope,
+            )
+        except (KeyError, ValueError) as error:
+            typer.echo(str(error), err=True)
+            raise typer.Exit(code=1) from error
+        session.commit()
+
+    typer.echo(json.dumps(promoted.model_dump(mode="json"), sort_keys=True))
 
 
 if __name__ == "__main__":
