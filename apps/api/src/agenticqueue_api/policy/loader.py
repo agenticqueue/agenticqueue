@@ -39,9 +39,7 @@ class _PolicyPayload(BaseModel):
 
     @field_validator("capabilities")
     @classmethod
-    def validate_capabilities(
-        cls, values: list[CapabilityKey]
-    ) -> list[CapabilityKey]:
+    def validate_capabilities(cls, values: list[CapabilityKey]) -> list[CapabilityKey]:
         deduped: list[CapabilityKey] = []
         seen: set[CapabilityKey] = set()
         for value in values:

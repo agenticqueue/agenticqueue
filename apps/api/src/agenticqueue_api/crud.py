@@ -175,7 +175,9 @@ def _policy_is_attached(session: Session, policy_id: uuid.UUID) -> bool:
         sa.select(WorkspaceRecord.id)
         .where(WorkspaceRecord.policy_id == policy_id)
         .limit(1),
-        sa.select(ProjectRecord.id).where(ProjectRecord.policy_id == policy_id).limit(1),
+        sa.select(ProjectRecord.id)
+        .where(ProjectRecord.policy_id == policy_id)
+        .limit(1),
         sa.select(TaskRecord.id).where(TaskRecord.policy_id == policy_id).limit(1),
     )
     return any(session.scalar(statement) is not None for statement in statements)

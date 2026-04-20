@@ -214,11 +214,7 @@ def test_policy_registry_rejects_out_of_range_tiers_and_bad_files(
     _write_policy(
         bad_tier_dir,
         name="default-coding",
-        body=(
-            'version: "1.0.0"\n'
-            "hitl_required: true\n"
-            "autonomy_tier: 7\n"
-        ),
+        body=('version: "1.0.0"\nhitl_required: true\nautonomy_tier: 7\n'),
     )
     with pytest.raises(ValidationError):
         PolicyRegistry(bad_tier_dir).load()
@@ -231,11 +227,7 @@ def test_policy_loader_covers_blank_version_invalid_name_and_body_shapes(
     _write_policy(
         blank_version_dir,
         name="default-coding",
-        body=(
-            'version: "   "\n'
-            "hitl_required: true\n"
-            "autonomy_tier: 3\n"
-        ),
+        body=('version: "   "\nhitl_required: true\nautonomy_tier: 3\n'),
     )
     with pytest.raises(ValidationError):
         PolicyRegistry(blank_version_dir).load()
@@ -249,12 +241,7 @@ def test_policy_loader_covers_blank_version_invalid_name_and_body_shapes(
     _write_policy(
         body_none_dir,
         name="default-coding",
-        body=(
-            'version: "1.0.0"\n'
-            "hitl_required: true\n"
-            "autonomy_tier: 3\n"
-            "body:\n"
-        ),
+        body=('version: "1.0.0"\nhitl_required: true\nautonomy_tier: 3\nbody:\n'),
     )
     body_none_registry = PolicyRegistry(body_none_dir)
     body_none_registry.load()
@@ -294,11 +281,7 @@ def test_policy_loader_covers_blank_version_invalid_name_and_body_shapes(
     invalid_name_path = _write_policy(
         tmp_path / "invalid-name",
         name="Default_Coding",
-        body=(
-            'version: "1.0.0"\n'
-            "hitl_required: true\n"
-            "autonomy_tier: 3\n"
-        ),
+        body=('version: "1.0.0"\nhitl_required: true\nautonomy_tier: 3\n'),
     )
     with pytest.raises(PolicyLoadError, match="Invalid policy file name"):
         load_policy_pack(invalid_name_path)

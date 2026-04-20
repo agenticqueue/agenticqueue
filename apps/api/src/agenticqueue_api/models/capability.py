@@ -23,7 +23,6 @@ from agenticqueue_api.models.shared import (
     jsonb_dict_column,
 )
 
-
 CAPABILITY_KEY_ENUM = sa.Enum(
     CapabilityKey,
     name="capability_key",
