@@ -102,7 +102,9 @@ def _render_markdown(packet: dict[str, Any]) -> str:
         *_render_list(permissions["capabilities"]),
         "",
     ]
-    _append_json_section(lines, heading="Task Contract", payload=packet["task_contract"])
+    _append_json_section(
+        lines, heading="Task Contract", payload=packet["task_contract"]
+    )
     _append_json_section(
         lines,
         heading="Relevant Decisions",
