@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -202,7 +203,7 @@ def admin_token(session_factory: sessionmaker[Session]) -> str:
 
 
 @pytest.fixture
-def client(session_factory: sessionmaker[Session]) -> TestClient:
+def client(session_factory: sessionmaker[Session]) -> Iterator[TestClient]:
     app = create_app(session_factory=session_factory)
     with TestClient(app) as test_client:
         yield test_client
