@@ -6,8 +6,7 @@ import uuid
 from typing import Any
 
 import sqlalchemy as sa
-from pydantic import Field
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from agenticqueue_api.db import Base
@@ -15,7 +14,6 @@ from agenticqueue_api.models.shared import (
     CreatedSchema,
     CreatedTable,
     IdentifiedTable,
-    jsonb_dict_column,
 )
 
 
@@ -26,7 +24,9 @@ class AuditLogModel(CreatedSchema):
     entity_type: str
     entity_id: uuid.UUID | None = None
     action: str
-    payload: dict[str, Any] = Field(default_factory=dict)
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+    trace_id: str | None = None
 
 
 class AuditLogRecord(IdentifiedTable, CreatedTable, Base):
@@ -44,4 +44,6 @@ class AuditLogRecord(IdentifiedTable, CreatedTable, Base):
         UUID(as_uuid=True), nullable=True
     )
     action: Mapped[str] = mapped_column(sa.String(64), nullable=False)
-    payload: Mapped[dict[str, Any]] = jsonb_dict_column()
+    before: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    after: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)

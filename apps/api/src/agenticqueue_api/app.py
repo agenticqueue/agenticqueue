@@ -12,6 +12,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status
 from pydantic import Field
 from sqlalchemy.orm import Session, sessionmaker
 
+from agenticqueue_api.audit import set_session_audit_context
 from agenticqueue_api.auth import (
     AgenticQueueAuthMiddleware,
     get_api_token,
@@ -117,6 +118,14 @@ def _require_admin_actor(request: Request) -> ActorModel:
 
 def get_db_session(request: Request) -> Iterator[Session]:
     session = request.app.state.session_factory()
+    actor = getattr(request.state, "actor", None)
+    trace_id = request.headers.get("X-Trace-Id") or str(uuid.uuid4())
+    request.state.trace_id = trace_id
+    set_session_audit_context(
+        session,
+        actor_id=None if actor is None else actor.id,
+        trace_id=trace_id,
+    )
     try:
         yield session
         session.commit()

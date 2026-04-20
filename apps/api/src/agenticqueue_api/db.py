@@ -24,3 +24,4 @@ class Base(DeclarativeBase):
 
 # Import ORM models so metadata is populated before Alembic autogenerate runs.
 from agenticqueue_api import models as _models  # noqa: E402,F401
+from agenticqueue_api import audit as _audit  # noqa: E402,F401

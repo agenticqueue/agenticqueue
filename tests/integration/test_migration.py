@@ -29,6 +29,7 @@ ENTITY_TABLES = {
 }
 PRE_AUTH_TABLES = ENTITY_TABLES - {"api_token"}
 EDGE_REVISION = "20260419_02"
+PRE_AUDIT_HOOK_REVISION = "20260420_03"
 
 
 def alembic_config() -> Config:
@@ -73,6 +74,17 @@ def assert_entity_tables(expected_tables: set[str]) -> None:
             assert {row[0] for row in cursor.fetchall()} == expected_tables
 
 
+def assert_audit_log_columns(expected_columns: set[str]) -> None:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'agenticqueue' AND table_name = 'audit_log' "
+                "ORDER BY column_name"
+            )
+            assert {row[0] for row in cursor.fetchall()} == expected_columns
+
+
 def assert_base_state() -> None:
     with psycopg.connect(get_sync_database_url()) as connection:
         with connection.cursor() as cursor:
@@ -101,19 +113,28 @@ def test_migration_reaches_head_with_extensions() -> None:
     assert current_revision() == expected_head
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
+    assert_audit_log_columns(
+        {"action", "actor_id", "after", "before", "created_at", "entity_id", "entity_type", "id", "trace_id"}
+    )
 
 
 def test_latest_migration_is_reversible() -> None:
     config = alembic_config()
     downgrade(config, "-1")
-    assert current_revision() == EDGE_REVISION
-    assert_foundation_state(EDGE_REVISION)
-    assert_entity_tables(PRE_AUTH_TABLES)
+    assert current_revision() == PRE_AUDIT_HOOK_REVISION
+    assert_foundation_state(PRE_AUDIT_HOOK_REVISION)
+    assert_entity_tables(ENTITY_TABLES)
+    assert_audit_log_columns(
+        {"action", "actor_id", "created_at", "entity_id", "entity_type", "id", "payload"}
+    )
     upgrade(config, "head")
     expected_head = ScriptDirectory.from_config(config).get_current_head()
     assert expected_head is not None
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
+    assert_audit_log_columns(
+        {"action", "actor_id", "after", "before", "created_at", "entity_id", "entity_type", "id", "trace_id"}
+    )
 
 
 def test_full_migration_stack_is_reversible_to_base() -> None:
