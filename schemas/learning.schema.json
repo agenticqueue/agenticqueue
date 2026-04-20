@@ -1,0 +1,142 @@
+{
+  "$defs": {
+    "LearningConfidence": {
+      "description": "Confidence levels for one learning.",
+      "enum": [
+        "tentative",
+        "confirmed",
+        "validated"
+      ],
+      "title": "LearningConfidence",
+      "type": "string"
+    },
+    "LearningScope": {
+      "description": "Promotion scope for one learning.",
+      "enum": [
+        "task",
+        "project",
+        "global"
+      ],
+      "title": "LearningScope",
+      "type": "string"
+    },
+    "LearningStatus": {
+      "description": "Lifecycle states for one learning.",
+      "enum": [
+        "active",
+        "superseded",
+        "expired"
+      ],
+      "title": "LearningStatus",
+      "type": "string"
+    },
+    "LearningType": {
+      "description": "Canonical learning kinds from ADR-AQ-010.",
+      "enum": [
+        "pitfall",
+        "pattern",
+        "decision-followup",
+        "tooling",
+        "repo-behavior",
+        "user-preference",
+        "process-rule"
+      ],
+      "title": "LearningType",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Standalone 13-field learning schema from ADR-AQ-010.",
+  "properties": {
+    "action_rule": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "Action Rule",
+      "type": "string"
+    },
+    "applies_when": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "title": "Applies When",
+      "type": "string"
+    },
+    "confidence": {
+      "$ref": "#/$defs/LearningConfidence"
+    },
+    "does_not_apply_when": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "title": "Does Not Apply When",
+      "type": "string"
+    },
+    "evidence": {
+      "items": {
+        "maxLength": 2048,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "title": "Evidence",
+      "type": "array"
+    },
+    "owner": {
+      "maxLength": 255,
+      "minLength": 1,
+      "title": "Owner",
+      "type": "string"
+    },
+    "review_date": {
+      "maxLength": 10,
+      "minLength": 10,
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "title": "Review Date",
+      "type": "string"
+    },
+    "scope": {
+      "$ref": "#/$defs/LearningScope"
+    },
+    "status": {
+      "$ref": "#/$defs/LearningStatus"
+    },
+    "title": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "type": {
+      "$ref": "#/$defs/LearningType"
+    },
+    "what_happened": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "What Happened",
+      "type": "string"
+    },
+    "what_learned": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "title": "What Learned",
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "type",
+    "what_happened",
+    "what_learned",
+    "action_rule",
+    "applies_when",
+    "does_not_apply_when",
+    "evidence",
+    "scope",
+    "confidence",
+    "status",
+    "owner",
+    "review_date"
+  ],
+  "title": "learning",
+  "type": "object"
+}

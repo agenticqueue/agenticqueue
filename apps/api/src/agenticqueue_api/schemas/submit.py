@@ -4,38 +4,18 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, Final, Literal, TypeAlias
+from typing import Annotated, Any, Final, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from pydantic import model_validator
 
+from agenticqueue_api.schemas.learning import LearningSchemaModel
+
 MAX_SUBMISSION_DEPTH: Final = 10
 
-ShortText = Annotated[str, StringConstraints(min_length=1, max_length=255)]
 MediumText = Annotated[str, StringConstraints(min_length=1, max_length=1024)]
-LongText = Annotated[str, StringConstraints(min_length=1, max_length=4096)]
 PathText = Annotated[str, StringConstraints(min_length=1, max_length=2048)]
-DateText = Annotated[
-    str,
-    StringConstraints(
-        min_length=10,
-        max_length=10,
-        pattern=r"^\d{4}-\d{2}-\d{2}$",
-    ),
-]
 ArtifactKind = Annotated[str, StringConstraints(min_length=1, max_length=64)]
-LearningType = Literal[
-    "pitfall",
-    "pattern",
-    "decision-followup",
-    "tooling",
-    "repo-behavior",
-    "user-preference",
-    "process-rule",
-]
-LearningScope = Literal["task", "project", "global"]
-LearningConfidence = Literal["tentative", "confirmed", "validated"]
-LearningStatus = Literal["active", "superseded", "expired"]
 DetailKey = Annotated[str, StringConstraints(min_length=1, max_length=64)]
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonDetails: TypeAlias = dict[
@@ -72,22 +52,8 @@ class SubmitArtifactModel(StrictSchemaModel):
     details: JsonDetails = Field(default_factory=dict, max_length=16)
 
 
-class SubmitLearningModel(StrictSchemaModel):
+class SubmitLearningModel(LearningSchemaModel):
     """One structured learning embedded in a task completion."""
-
-    title: MediumText
-    type: LearningType
-    what_happened: LongText
-    what_learned: LongText
-    action_rule: LongText
-    applies_when: MediumText
-    does_not_apply_when: MediumText
-    evidence: list[PathText] = Field(min_length=1, max_length=16)
-    scope: LearningScope
-    confidence: LearningConfidence
-    status: LearningStatus
-    owner: ShortText
-    review_date: DateText
 
 
 class SubmitOutputModel(StrictSchemaModel):
