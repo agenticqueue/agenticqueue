@@ -14,6 +14,7 @@ from agenticqueue_api.models import (
     ActorModel,
     ArtifactModel,
     AuditLogModel,
+    CapabilityRecord,
     CapabilityModel,
     DecisionModel,
     LearningModel,
@@ -139,11 +140,8 @@ ENTITY_FIXTURES = {
     },
     "capability": {
         "id": CAPABILITY_ID,
-        "actor_id": ACTOR_ID,
-        "capability_key": "write_repo",
-        "scope": "project:agenticqueue-core",
-        "granted_by_actor_id": ACTOR_ID,
-        "is_active": True,
+        "key": "read_repo",
+        "description": "Read repository contents.",
         "created_at": "2026-04-19T12:11:00+00:00",
         "updated_at": "2026-04-19T12:11:00+00:00",
     },
@@ -294,6 +292,10 @@ def test_entity_model_round_trip_and_repo_crud(
         ensure_seeded(db_session, dependency)
 
     assert case.schema_cls.model_validate_json(payload.model_dump_json()) == payload
+    if entity_name == "capability":
+        db_session.execute(
+            sa.delete(CapabilityRecord).where(CapabilityRecord.key == payload.key)
+        )
 
     created = case.create_fn(db_session, payload)
     loaded = case.get_fn(db_session, payload.id)

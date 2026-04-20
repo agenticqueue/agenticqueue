@@ -23,11 +23,12 @@ from agenticqueue_api.auth import (
     revoke_api_token,
 )
 from agenticqueue_api.config import get_sqlalchemy_sync_database_url
-from agenticqueue_api.models import ActorModel
+from agenticqueue_api.models import ActorModel, CapabilityKey, CapabilityRecord
 from agenticqueue_api.repo import create_actor
 
 TRUNCATE_TABLES = [
     "api_token",
+    "capability_grant",
     "edge",
     "artifact",
     "decision",
@@ -75,6 +76,16 @@ def truncate_all_tables(engine: Engine) -> None:
         )
         connection.execute(
             sa.text(f"TRUNCATE TABLE {qualified_tables} RESTART IDENTITY CASCADE")
+        )
+        connection.execute(
+            sa.insert(CapabilityRecord),
+            [
+                {
+                    "key": capability,
+                    "description": f"Seeded capability: {capability.value}",
+                }
+                for capability in CapabilityKey
+            ],
         )
 
 

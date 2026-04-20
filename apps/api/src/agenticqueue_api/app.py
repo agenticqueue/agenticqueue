@@ -1,11 +1,11 @@
-"""FastAPI app for the AgenticQueue API token surface."""
+"""FastAPI app for the AgenticQueue auth and capability surface."""
 
 from __future__ import annotations
 
 import datetime as dt
 import uuid
 from collections.abc import Iterator
-from typing import cast
+from typing import Any, cast
 
 import sqlalchemy as sa
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -21,8 +21,19 @@ from agenticqueue_api.auth import (
     revoke_api_token,
     token_display_prefix,
 )
+from agenticqueue_api.capabilities import (
+    grant_capability,
+    list_capabilities_for_actor,
+    revoke_capability_grant,
+)
 from agenticqueue_api.config import get_sqlalchemy_sync_database_url
-from agenticqueue_api.models import ActorModel, ActorRecord, ApiTokenModel
+from agenticqueue_api.models import (
+    ActorModel,
+    ActorRecord,
+    ApiTokenModel,
+    CapabilityGrantModel,
+    CapabilityKey,
+)
 from agenticqueue_api.models.shared import SchemaModel
 
 
@@ -70,6 +81,43 @@ class ProvisionApiTokenResponse(SchemaModel):
     api_token: ApiTokenView
 
 
+class CapabilityGrantView(SchemaModel):
+    """Capability grant returned from the API."""
+
+    id: uuid.UUID
+    actor_id: uuid.UUID
+    capability_id: uuid.UUID
+    capability: CapabilityKey
+    scope: dict[str, Any] = Field(default_factory=dict)
+    granted_by_actor_id: uuid.UUID | None = None
+    expires_at: dt.datetime | None = None
+    revoked_at: dt.datetime | None = None
+    created_at: dt.datetime
+    updated_at: dt.datetime
+
+
+class ActorCapabilityListResponse(SchemaModel):
+    """Active capabilities for one actor."""
+
+    actor: ActorSummary
+    capabilities: list[CapabilityGrantView]
+
+
+class GrantCapabilityRequest(SchemaModel):
+    """Payload for granting a capability."""
+
+    actor_id: uuid.UUID
+    capability: CapabilityKey
+    scope: dict[str, Any] = Field(default_factory=dict)
+    expires_at: dt.datetime | None = None
+
+
+class RevokeCapabilityRequest(SchemaModel):
+    """Payload for revoking a capability grant."""
+
+    grant_id: uuid.UUID
+
+
 def _default_session_factory() -> sessionmaker[Session]:
     engine = sa.create_engine(get_sqlalchemy_sync_database_url(), future=True)
     return sessionmaker(bind=engine, expire_on_commit=False)
@@ -94,6 +142,21 @@ def _token_view(token: ApiTokenModel) -> ApiTokenView:
         revoked_at=token.revoked_at,
         created_at=token.created_at,
         updated_at=token.updated_at,
+    )
+
+
+def _capability_grant_view(grant: CapabilityGrantModel) -> CapabilityGrantView:
+    return CapabilityGrantView(
+        id=grant.id,
+        actor_id=grant.actor_id,
+        capability_id=grant.capability_id,
+        capability=grant.capability,
+        scope=grant.scope,
+        granted_by_actor_id=grant.granted_by_actor_id,
+        expires_at=grant.expires_at,
+        revoked_at=grant.revoked_at,
+        created_at=grant.created_at,
+        updated_at=grant.updated_at,
     )
 
 
@@ -215,6 +278,84 @@ def create_app(
                 detail="Token not found",
             )
         return _token_view(revoked)
+
+    @app.post(
+        "/v1/capabilities/grant",
+        response_model=CapabilityGrantView,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def grant_capability_endpoint(
+        payload: GrantCapabilityRequest,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> CapabilityGrantView:
+        admin_actor = _require_admin_actor(request)
+        actor_exists = session.get(ActorRecord, payload.actor_id)
+        if actor_exists is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Actor not found",
+            )
+
+        try:
+            grant = grant_capability(
+                session,
+                actor_id=payload.actor_id,
+                capability=payload.capability,
+                scope=payload.scope,
+                granted_by_actor_id=admin_actor.id,
+                expires_at=payload.expires_at,
+            )
+        except ValueError as error:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(error),
+            ) from error
+        return _capability_grant_view(grant)
+
+    @app.post("/v1/capabilities/revoke", response_model=CapabilityGrantView)
+    def revoke_capability_endpoint(
+        payload: RevokeCapabilityRequest,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> CapabilityGrantView:
+        _require_admin_actor(request)
+        revoked_grant = revoke_capability_grant(session, payload.grant_id)
+        if revoked_grant is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Capability grant not found",
+            )
+        return _capability_grant_view(revoked_grant)
+
+    @app.get(
+        "/v1/actors/{actor_id}/capabilities",
+        response_model=ActorCapabilityListResponse,
+    )
+    def list_capability_grants(
+        actor_id: uuid.UUID,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> ActorCapabilityListResponse:
+        requesting_actor = _require_actor(request)
+        if requesting_actor.actor_type != "admin" and requesting_actor.id != actor_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin actor required",
+            )
+
+        target_actor = session.get(ActorRecord, actor_id)
+        if target_actor is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Actor not found",
+            )
+
+        grants = list_capabilities_for_actor(session, actor_id)
+        return ActorCapabilityListResponse(
+            actor=_actor_summary(ActorModel.model_validate(target_actor)),
+            capabilities=[_capability_grant_view(grant) for grant in grants],
+        )
 
     return app
 

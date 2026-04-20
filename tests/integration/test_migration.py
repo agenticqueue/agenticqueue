@@ -18,6 +18,7 @@ ENTITY_TABLES = {
     "artifact",
     "audit_log",
     "capability",
+    "capability_grant",
     "decision",
     "edge",
     "learning",
@@ -28,9 +29,9 @@ ENTITY_TABLES = {
     "task",
     "workspace",
 }
-PRE_AUTH_TABLES = ENTITY_TABLES - {"api_token"}
+PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
-PRE_PGVECTOR_REVISION = "20260420_04"
+PRE_CAPABILITY_GRANT_REVISION = "20260420_05"
 
 
 def alembic_config() -> Config:
@@ -116,6 +117,35 @@ def assert_embedding_columns_are_absent() -> None:
             assert cursor.fetchone() == (0,)
 
 
+def assert_capability_columns(expected_columns: set[str]) -> None:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'agenticqueue' AND table_name = 'capability' "
+                "ORDER BY column_name"
+            )
+            assert {row[0] for row in cursor.fetchall()} == expected_columns
+
+
+def assert_capability_grant_columns(expected_columns: set[str]) -> None:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'agenticqueue' AND table_name = 'capability_grant' "
+                "ORDER BY column_name"
+            )
+            assert {row[0] for row in cursor.fetchall()} == expected_columns
+
+
+def assert_seeded_capability_keys(expected_keys: set[str]) -> None:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT key FROM agenticqueue.capability ORDER BY key")
+            assert {row[0] for row in cursor.fetchall()} == expected_keys
+
+
 def assert_base_state() -> None:
     with psycopg.connect(get_sync_database_url()) as connection:
         with connection.cursor() as cursor:
@@ -144,6 +174,38 @@ def test_migration_reaches_head_with_extensions() -> None:
     assert current_revision() == expected_head
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
+    assert_capability_columns(
+        {"created_at", "description", "id", "key", "updated_at"}
+    )
+    assert_capability_grant_columns(
+        {
+            "actor_id",
+            "capability_id",
+            "created_at",
+            "expires_at",
+            "granted_by_actor_id",
+            "id",
+            "revoked_at",
+            "scope",
+            "updated_at",
+        }
+    )
+    assert_seeded_capability_keys(
+        {
+            "admin",
+            "create_artifact",
+            "promote_learning",
+            "query_graph",
+            "read_learnings",
+            "read_repo",
+            "run_tests",
+            "search_memory",
+            "trigger_handoff",
+            "update_task",
+            "write_branch",
+            "write_learning",
+        }
+    )
     assert_audit_log_columns(
         {
             "action",
@@ -163,9 +225,21 @@ def test_migration_reaches_head_with_extensions() -> None:
 def test_latest_migration_is_reversible() -> None:
     config = alembic_config()
     downgrade(config, "-1")
-    assert current_revision() == PRE_PGVECTOR_REVISION
-    assert_foundation_state(PRE_PGVECTOR_REVISION)
-    assert_entity_tables(ENTITY_TABLES)
+    assert current_revision() == PRE_CAPABILITY_GRANT_REVISION
+    assert_foundation_state(PRE_CAPABILITY_GRANT_REVISION)
+    assert_entity_tables(PRE_CAPABILITY_GRANT_TABLES)
+    assert_capability_columns(
+        {
+            "actor_id",
+            "capability_key",
+            "created_at",
+            "granted_by_actor_id",
+            "id",
+            "is_active",
+            "scope",
+            "updated_at",
+        }
+    )
     assert_audit_log_columns(
         {
             "action",
@@ -179,12 +253,28 @@ def test_latest_migration_is_reversible() -> None:
             "trace_id",
         }
     )
-    assert_embedding_columns_are_absent()
+    assert_embedding_columns_and_indexes()
     upgrade(config, "head")
     expected_head = ScriptDirectory.from_config(config).get_current_head()
     assert expected_head is not None
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
+    assert_capability_columns(
+        {"created_at", "description", "id", "key", "updated_at"}
+    )
+    assert_capability_grant_columns(
+        {
+            "actor_id",
+            "capability_id",
+            "created_at",
+            "expires_at",
+            "granted_by_actor_id",
+            "id",
+            "revoked_at",
+            "scope",
+            "updated_at",
+        }
+    )
     assert_audit_log_columns(
         {
             "action",
@@ -210,4 +300,20 @@ def test_full_migration_stack_is_reversible_to_base() -> None:
     assert expected_head is not None
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
+    assert_capability_columns(
+        {"created_at", "description", "id", "key", "updated_at"}
+    )
+    assert_capability_grant_columns(
+        {
+            "actor_id",
+            "capability_id",
+            "created_at",
+            "expires_at",
+            "granted_by_actor_id",
+            "id",
+            "revoked_at",
+            "scope",
+            "updated_at",
+        }
+    )
     assert_embedding_columns_and_indexes()
