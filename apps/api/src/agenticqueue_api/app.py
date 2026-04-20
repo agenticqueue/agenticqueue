@@ -9,7 +9,7 @@ from typing import Any, cast
 from pathlib import Path
 
 import sqlalchemy as sa
-from fastapi import Depends, FastAPI, Request, status
+from fastapi import Body, Depends, FastAPI, Request, status
 from pydantic import ConfigDict, Field, ValidationError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -46,8 +46,10 @@ from agenticqueue_api.middleware import (
     IdempotencyKeyMiddleware,
     SecretRedactionMiddleware,
 )
-from agenticqueue_api.learnings.draft import (
+from agenticqueue_api.learnings import (
+    ConfirmLearningDraftRequest,
     ConfirmedDraftLearningView,
+    DedupeSuggestion,
     DraftLearningPatch,
     DraftLearningRecord,
     DraftLearningView,
@@ -631,17 +633,18 @@ def create_app(
     @app.post(
         "/learnings/drafts/{draft_id}/confirm",
         include_in_schema=False,
-        response_model=ConfirmedDraftLearningView,
+        response_model=ConfirmedDraftLearningView | DedupeSuggestion,
     )
     @app.post(
         "/v1/learnings/drafts/{draft_id}/confirm",
-        response_model=ConfirmedDraftLearningView,
+        response_model=ConfirmedDraftLearningView | DedupeSuggestion,
     )
     def confirm_learning_draft(
         draft_id: uuid.UUID,
         request: Request,
         session: Session = Depends(get_db_session),
-    ) -> ConfirmedDraftLearningView:
+        payload: ConfirmLearningDraftRequest | None = Body(default=None),
+    ) -> ConfirmedDraftLearningView | DedupeSuggestion:
         actor = _require_actor(request)
         _require_token_scope(request, "learning:write")
         store = _draft_store_or_error(session, draft_id)
@@ -652,7 +655,11 @@ def create_app(
                 entity_id=draft_id,
             )
             try:
-                return store.confirm(draft_id, owner_actor_id=actor.id)
+                return store.confirm(
+                    draft_id,
+                    owner_actor_id=actor.id,
+                    request=payload,
+                )
             except ValidationError as error:
                 raise_api_error(
                     status.HTTP_422_UNPROCESSABLE_CONTENT,

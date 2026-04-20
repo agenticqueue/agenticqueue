@@ -17,18 +17,23 @@ from agenticqueue_api.app import create_app
 from agenticqueue_api.auth import issue_api_token
 from agenticqueue_api.capabilities import grant_capability
 from agenticqueue_api.config import get_sqlalchemy_sync_database_url
+from agenticqueue_api.learnings import DraftLearningPatch
 from agenticqueue_api.learnings.draft import DraftLearningRecord, DraftStore
 from agenticqueue_api.models import ActorModel, CapabilityKey, CapabilityRecord
+from agenticqueue_api.models.edge import EdgeRelation
+from agenticqueue_api.models.learning import LearningModel
 from agenticqueue_api.models.project import ProjectModel
 from agenticqueue_api.models.run import RunModel
 from agenticqueue_api.models.task import TaskModel
 from agenticqueue_api.models.workspace import WorkspaceModel
 from agenticqueue_api.repo import (
     create_actor,
+    create_learning,
     create_project,
     create_run,
     create_task,
     create_workspace,
+    neighbors,
 )
 
 TRUNCATE_TABLES = [
@@ -278,6 +283,83 @@ def _post_headers(token: str) -> dict[str, str]:
     }
 
 
+def _create_existing_learning(
+    session_factory: sessionmaker[Session],
+    *,
+    task_id: uuid.UUID,
+    title: str,
+    action_rule: str,
+    evidence: list[str],
+) -> uuid.UUID:
+    with session_factory() as session:
+        learning = create_learning(
+            session,
+            LearningModel.model_validate(
+                {
+                    "id": str(uuid.uuid4()),
+                    "task_id": str(task_id),
+                    "owner_actor_id": None,
+                    "owner": "agenticqueue-auto-draft",
+                    "title": title,
+                    "learning_type": "pattern",
+                    "what_happened": "Existing learning",
+                    "what_learned": "Keep the workaround documented.",
+                    "action_rule": action_rule,
+                    "applies_when": "The validator path repeats.",
+                    "does_not_apply_when": "The contract shape changed.",
+                    "evidence": evidence,
+                    "scope": "task",
+                    "confidence": "tentative",
+                    "status": "active",
+                    "review_date": "2026-05-04",
+                    "embedding": None,
+                    "created_at": "2026-04-20T00:00:00+00:00",
+                    "updated_at": "2026-04-20T00:00:00+00:00",
+                }
+            ),
+        )
+        session.commit()
+        return learning.id
+
+
+def _seed_pending_duplicate_draft(
+    session_factory: sessionmaker[Session],
+    *,
+    handle: str,
+    title: str,
+    action_rule: str,
+    evidence: list[str],
+) -> tuple[uuid.UUID, str, uuid.UUID, uuid.UUID]:
+    actor_id, token, task, run = _seed_task_run_and_token(
+        session_factory,
+        handle=handle,
+    )
+    existing_learning_id = _create_existing_learning(
+        session_factory,
+        task_id=task.id,
+        title=title,
+        action_rule=action_rule,
+        evidence=["artifact://existing"],
+    )
+    with session_factory() as session:
+        store = DraftStore(session)
+        draft = store.create_drafts(
+            task=task,
+            run=run,
+            submission=_submission(),
+        )[0]
+        store.edit(
+            draft.id,
+            DraftLearningPatch(
+                title=title,
+                action_rule=action_rule,
+                evidence=evidence,
+            ),
+        )
+        session.commit()
+        return actor_id, token, draft.id, existing_learning_id
+
+
 def test_learning_draft_edit_confirm_flow_promotes_active_learning(
     client: TestClient,
     session_factory: sessionmaker[Session],
@@ -370,3 +452,76 @@ def test_reject_requires_reason_and_confirm_rejects_invalid_payload(
         headers=_post_headers(invalid_token),
     )
     assert confirm_response.status_code == 422
+
+
+def test_confirm_returns_dedupe_suggestion_then_accepts_merge(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, token, draft_id, existing_learning_id = _seed_pending_duplicate_draft(
+        session_factory,
+        handle="learning-draft-dedupe",
+        title="Capture validator retry pattern",
+        action_rule="Fix the validator payload before retrying the run.",
+        evidence=["artifact://draft"],
+    )
+
+    suggestion_response = client.post(
+        f"/v1/learnings/drafts/{draft_id}/confirm",
+        headers=_post_headers(token),
+    )
+    assert suggestion_response.status_code == 200
+    suggestion = suggestion_response.json()
+    assert suggestion["matched_learning"]["id"] == str(existing_learning_id)
+    assert suggestion["threshold"] == pytest.approx(0.92)
+
+    merge_response = client.post(
+        f"/v1/learnings/drafts/{draft_id}/confirm",
+        headers=_post_headers(token),
+        json={
+            "merge_decision": "accept",
+            "matched_learning_id": str(existing_learning_id),
+        },
+    )
+    assert merge_response.status_code == 200
+    confirmed = merge_response.json()
+    assert confirmed["learning"]["id"] == str(existing_learning_id)
+    assert confirmed["learning"]["evidence"] == [
+        "artifact://existing",
+        "artifact://draft",
+    ]
+    assert confirmed["learning"]["confidence"] == "confirmed"
+
+
+def test_confirm_reject_merge_creates_related_edge(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, token, draft_id, existing_learning_id = _seed_pending_duplicate_draft(
+        session_factory,
+        handle="learning-draft-related",
+        title="Capture validator retry pattern",
+        action_rule="Fix the validator payload before retrying the run.",
+        evidence=["artifact://draft-related"],
+    )
+
+    response = client.post(
+        f"/v1/learnings/drafts/{draft_id}/confirm",
+        headers=_post_headers(token),
+        json={
+            "merge_decision": "reject",
+            "matched_learning_id": str(existing_learning_id),
+        },
+    )
+    assert response.status_code == 200
+    confirmed = response.json()
+    learning_id = uuid.UUID(confirmed["learning"]["id"])
+
+    with session_factory() as session:
+        related = neighbors(
+            session,
+            "learning",
+            learning_id,
+            edge_types=(EdgeRelation.RELATED_TO,),
+        )
+    assert [hit.entity_id for hit in related] == [existing_learning_id]

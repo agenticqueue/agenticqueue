@@ -1,5 +1,12 @@
 """Learning draft helpers."""
 
+from agenticqueue_api.learnings.dedupe import (
+    ConfirmLearningDraftRequest,
+    DedupeSuggestion,
+    LearningDedupeService,
+    MergeDecision,
+    build_dedupe_text,
+)
 from agenticqueue_api.learnings.draft import (
     ConfirmedDraftLearningView,
     DraftLearning,
@@ -19,7 +26,9 @@ from agenticqueue_api.schemas.learning import (
 )
 
 __all__ = [
+    "ConfirmLearningDraftRequest",
     "ConfirmedDraftLearningView",
+    "DedupeSuggestion",
     "DraftLearning",
     "DraftLearningPatch",
     "DraftLearningRecord",
@@ -27,9 +36,12 @@ __all__ = [
     "DraftLearningView",
     "DraftRejectRequest",
     "DraftStore",
+    "LearningDedupeService",
     "LearningConfidence",
     "LearningScope",
     "LearningStatus",
     "LearningType",
+    "MergeDecision",
+    "build_dedupe_text",
     "draft_learnings",
 ]

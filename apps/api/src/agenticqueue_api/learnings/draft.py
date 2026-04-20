@@ -14,6 +14,11 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from agenticqueue_api.db import Base
+from agenticqueue_api.learnings.dedupe import (
+    ConfirmLearningDraftRequest,
+    DedupeSuggestion,
+    LearningDedupeService,
+)
 from agenticqueue_api.models.learning import LearningModel, LearningRecord
 from agenticqueue_api.models.run import RunModel
 from agenticqueue_api.models.shared import (
@@ -207,9 +212,61 @@ class DraftStore:
         draft_id: uuid.UUID,
         *,
         owner_actor_id: uuid.UUID | None,
-    ) -> ConfirmedDraftLearningView:
+        request: ConfirmLearningDraftRequest | None = None,
+        embed_text: Any = None,
+    ) -> ConfirmedDraftLearningView | DedupeSuggestion:
         record = self._require_pending(draft_id)
         draft = LearningSchemaModel.model_validate(record.payload)
+        dedupe = LearningDedupeService(self._session, embed_text=embed_text)
+        suggestion = dedupe.suggest(draft_id=draft_id, draft_learning=draft)
+        if suggestion is not None:
+            if request is None or request.merge_decision is None:
+                return suggestion
+            if request.matched_learning_id != suggestion.matched_learning.id:
+                raise ValueError(
+                    "Dedupe suggestion is stale; retry confirmation to refresh it.",
+                )
+            if request.merge_decision.value == "accept":
+                learning = dedupe.merge_into_existing(
+                    existing_learning_id=suggestion.matched_learning.id,
+                    draft_learning=draft,
+                )
+                self._mark_confirmed(record, learning_id=learning.id)
+                return ConfirmedDraftLearningView(
+                    draft=self._view(record),
+                    learning=learning,
+                )
+        elif request is not None and request.merge_decision is not None:
+            raise ValueError("No dedupe suggestion is available for this draft.")
+
+        learning_record = self._create_learning_record(
+            record=record,
+            draft=draft,
+            owner_actor_id=owner_actor_id,
+            embed_text=embed_text,
+        )
+        if suggestion is not None:
+            dedupe.create_related_edge(
+                learning_id=learning_record.id,
+                related_learning_id=suggestion.matched_learning.id,
+                created_by=owner_actor_id,
+            )
+
+        self._mark_confirmed(record, learning_id=learning_record.id)
+        return ConfirmedDraftLearningView(
+            draft=self._view(record),
+            learning=LearningModel.model_validate(learning_record),
+        )
+
+    def _create_learning_record(
+        self,
+        *,
+        record: DraftLearningRecord,
+        draft: LearningSchemaModel,
+        owner_actor_id: uuid.UUID | None,
+        embed_text: Any,
+    ) -> LearningRecord:
+        dedupe = LearningDedupeService(self._session, embed_text=embed_text)
         learning_record = LearningRecord(
             task_id=record.task_id,
             owner_actor_id=owner_actor_id,
@@ -226,20 +283,24 @@ class DraftStore:
             confidence=draft.confidence.value,
             status=LearningStatus.ACTIVE.value,
             review_date=dt.date.fromisoformat(draft.review_date),
+            embedding=dedupe.embed_learning_text(draft.title, draft.action_rule),
         )
         self._session.add(learning_record)
         self._session.flush()
         self._session.refresh(learning_record)
+        return learning_record
 
+    def _mark_confirmed(
+        self,
+        record: DraftLearningRecord,
+        *,
+        learning_id: uuid.UUID,
+    ) -> None:
         record.draft_status = DraftLearningStatus.CONFIRMED.value
-        record.confirmed_learning_id = learning_record.id
+        record.confirmed_learning_id = learning_id
         record.rejection_reason = None
         self._session.flush()
         self._session.refresh(record)
-        return ConfirmedDraftLearningView(
-            draft=self._view(record),
-            learning=LearningModel.model_validate(learning_record),
-        )
 
     def _require_pending(self, draft_id: uuid.UUID) -> DraftLearningRecord:
         record = self._session.get(DraftLearningRecord, draft_id)
@@ -690,7 +751,9 @@ def _string_or_none(value: Any) -> str | None:
 
 
 __all__ = [
+    "ConfirmLearningDraftRequest",
     "ConfirmedDraftLearningView",
+    "DedupeSuggestion",
     "DraftLearning",
     "DraftLearningPatch",
     "DraftLearningRecord",

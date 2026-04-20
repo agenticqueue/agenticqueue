@@ -27,6 +27,7 @@ EDGE_RELATION_ENUM = sa.Enum(
     "contradicts",
     "derived_from",
     "requires_approval",
+    "related_to",
     "learned_from",
     "parent_of",
     name="edge_relation",

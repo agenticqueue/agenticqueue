@@ -33,6 +33,7 @@ class EdgeRelation(StrEnum):
     CONTRADICTS = "contradicts"
     DERIVED_FROM = "derived_from"
     REQUIRES_APPROVAL = "requires_approval"
+    RELATED_TO = "related_to"
     LEARNED_FROM = "learned_from"
     PARENT_OF = "parent_of"
 
