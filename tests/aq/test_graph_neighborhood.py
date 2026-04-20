@@ -234,12 +234,48 @@ def _seed_graph_fixture(db_session: Session) -> uuid.UUID:
     create_project(db_session, _project_payload(project_id, workspace_id))
 
     decision_specs = [
-        (task_ids[0], run_ids[0], decision_ids[0], "Decision newest", "2026-04-20T00:05:00+00:00"),
-        (task_ids[1], run_ids[1], decision_ids[1], "Decision fourth", "2026-04-20T00:04:00+00:00"),
-        (task_ids[2], run_ids[2], decision_ids[2], "Decision third", "2026-04-20T00:03:00+00:00"),
-        (task_ids[3], run_ids[3], decision_ids[3], "Decision second", "2026-04-20T00:02:00+00:00"),
-        (task_ids[4], run_ids[4], decision_ids[4], "Decision oldest", "2026-04-20T00:01:00+00:00"),
-        (task_ids[5], run_ids[5], decision_ids[5], "Ignored related-only decision", "2026-04-20T00:06:00+00:00"),
+        (
+            task_ids[0],
+            run_ids[0],
+            decision_ids[0],
+            "Decision newest",
+            "2026-04-20T00:05:00+00:00",
+        ),
+        (
+            task_ids[1],
+            run_ids[1],
+            decision_ids[1],
+            "Decision fourth",
+            "2026-04-20T00:04:00+00:00",
+        ),
+        (
+            task_ids[2],
+            run_ids[2],
+            decision_ids[2],
+            "Decision third",
+            "2026-04-20T00:03:00+00:00",
+        ),
+        (
+            task_ids[3],
+            run_ids[3],
+            decision_ids[3],
+            "Decision second",
+            "2026-04-20T00:02:00+00:00",
+        ),
+        (
+            task_ids[4],
+            run_ids[4],
+            decision_ids[4],
+            "Decision oldest",
+            "2026-04-20T00:01:00+00:00",
+        ),
+        (
+            task_ids[5],
+            run_ids[5],
+            decision_ids[5],
+            "Ignored related-only decision",
+            "2026-04-20T00:06:00+00:00",
+        ),
     ]
     for task_id, run_id, decision_id, title, decided_at in decision_specs:
         create_task(
