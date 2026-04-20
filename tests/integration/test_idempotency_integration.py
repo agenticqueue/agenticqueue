@@ -217,7 +217,7 @@ def test_same_key_same_payload_creates_one_task_and_cli_stats_report_hits(
         response = client.post("/v1/tasks", headers=headers, json=payload)
         statuses.append(response.status_code)
 
-    assert statuses == [201] + [200] * 9
+    assert statuses == [201] * 10
 
     with session_factory() as session:
         task_count = int(
@@ -235,7 +235,7 @@ def test_same_key_same_payload_creates_one_task_and_cli_stats_report_hits(
     assert stats_result.exit_code == 0
     stats = json.loads(stats_result.stdout)
     assert stats["hit_count"] == 9
-    assert stats["miss_count"] == 1
+    assert stats["row_count"] == 1
     assert stats["expired_count"] == 1
     assert stats["active_count"] == 0
 

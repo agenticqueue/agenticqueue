@@ -129,7 +129,7 @@ def build_echo_app(
     *,
     actor_id: uuid.UUID | None,
 ) -> tuple[FastAPI, dict[str, int]]:
-    counters = {"echo": 0, "fail": 0}
+    counters = {"echo": 0, "created": 0, "fail": 0}
     app = FastAPI()
     app.state.session_factory = session_factory
     app.add_middleware(IdempotencyKeyMiddleware)
@@ -144,6 +144,14 @@ def build_echo_app(
     def post_echo(payload: dict[str, object]) -> dict[str, object]:
         counters["echo"] += 1
         return {"count": counters["echo"], "payload": payload}
+
+    @app.post("/v1/created")
+    def post_created(payload: dict[str, object]) -> JSONResponse:
+        counters["created"] += 1
+        return JSONResponse(
+            status_code=201,
+            content={"count": counters["created"], "payload": payload},
+        )
 
     @app.post("/v1/fail")
     def post_fail(payload: dict[str, object]) -> JSONResponse:
@@ -318,6 +326,33 @@ def test_miss_hit_conflict_and_expired_key_behaviors(
     assert record.replay_count == 0
 
 
+def test_replayed_response_preserves_original_status_code(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor_id = uuid.uuid4()
+    seed_actor(session_factory, actor_id=actor_id, handle="created-actor")
+    app, counters = build_echo_app(session_factory, actor_id=actor_id)
+    key = str(uuid.uuid4())
+
+    with TestClient(app) as client:
+        first = client.post(
+            "/v1/created",
+            headers={IDEMPOTENCY_KEY_HEADER: key},
+            json={"message": "created"},
+        )
+        second = client.post(
+            "/v1/created",
+            headers={IDEMPOTENCY_KEY_HEADER: key},
+            json={"message": "created"},
+        )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert second.headers[IDEMPOTENCY_REPLAYED_HEADER] == "true"
+    assert second.json() == first.json()
+    assert counters["created"] == 1
+
+
 def test_failed_mutations_do_not_cache_and_cleanup_stats_cover_module(
     session_factory: sessionmaker[Session],
 ) -> None:
@@ -370,14 +405,14 @@ def test_failed_mutations_do_not_cache_and_cleanup_stats_cover_module(
         stats = get_idempotency_stats(session)
         stats_json = json.loads(stats_as_json(stats))
         assert stats.hit_count == 4
-        assert stats.miss_count == 2
+        assert stats.row_count == 2
         assert stats.expired_count == 1
         assert stats.active_count == 1
         assert stats_json == {
             "active_count": 1,
             "expired_count": 1,
             "hit_count": 4,
-            "miss_count": 2,
+            "row_count": 2,
         }
 
         deleted = cleanup_expired_idempotency_keys(session)

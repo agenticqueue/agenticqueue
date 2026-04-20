@@ -37,7 +37,7 @@ class IdempotencyStats:
     """Aggregated cache statistics for CLI inspection."""
 
     hit_count: int
-    miss_count: int
+    row_count: int
     expired_count: int
     active_count: int
 
@@ -175,7 +175,7 @@ def get_idempotency_stats(
         )
         or 0
     )
-    miss_count = int(
+    row_count = int(
         session.scalar(sa.select(sa.func.count()).select_from(record_type)) or 0
     )
     expired_count = int(
@@ -196,7 +196,7 @@ def get_idempotency_stats(
     )
     return IdempotencyStats(
         hit_count=hit_count,
-        miss_count=miss_count,
+        row_count=row_count,
         expired_count=expired_count,
         active_count=active_count,
     )
@@ -235,7 +235,7 @@ def _cached_response(record: "IdempotencyKeyRecord") -> Response:
     headers = {IDEMPOTENCY_REPLAYED_HEADER: "true"}
     return Response(
         content=record.response_body,
-        status_code=200,
+        status_code=record.response_status,
         media_type="application/json",
         headers=headers,
     )
@@ -333,7 +333,7 @@ def stats_as_json(stats: IdempotencyStats) -> str:
             "active_count": stats.active_count,
             "expired_count": stats.expired_count,
             "hit_count": stats.hit_count,
-            "miss_count": stats.miss_count,
+            "row_count": stats.row_count,
         },
         sort_keys=True,
     )

@@ -392,14 +392,14 @@ def test_failed_mutations_do_not_cache_and_cleanup_stats_cover_module(
         stats = get_idempotency_stats(session)
         stats_json = json.loads(stats_as_json(stats))
         assert stats.hit_count == 4
-        assert stats.miss_count == 2
+        assert stats.row_count == 2
         assert stats.expired_count == 1
         assert stats.active_count == 1
         assert stats_json == {
             "active_count": 1,
             "expired_count": 1,
             "hit_count": 4,
-            "miss_count": 2,
+            "row_count": 2,
         }
 
         deleted = cleanup_expired_idempotency_keys(session)
