@@ -7,7 +7,7 @@ from enum import StrEnum
 from typing import Any
 
 import sqlalchemy as sa
-from pydantic import AliasChoices, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,6 +43,10 @@ EDGE_RELATION_ENUM = sa.Enum(
     native_enum=False,
     validate_strings=True,
     values_callable=lambda members: [member.value for member in members],
+)
+
+LEARNED_FROM_ALLOWED_ENTITY_TYPES = frozenset(
+    {"task", "run", "artifact", "decision", "incident", "tool", "actor"},
 )
 
 
@@ -94,6 +98,30 @@ class EdgeModel(CreatedSchema):
         if not isinstance(value, dict):
             raise ValueError("metadata must be an object")
         return dict(value)
+
+    @model_validator(mode="after")
+    def validate_relation_endpoints(self) -> EdgeModel:
+        if self.relation is not EdgeRelation.LEARNED_FROM:
+            return self
+
+        src_is_learning = self.src_entity_type == "learning"
+        dst_is_learning = self.dst_entity_type == "learning"
+        if src_is_learning == dst_is_learning:
+            raise ValueError(
+                "learned_from edges must connect exactly one learning node",
+            )
+
+        related_entity_type = (
+            self.dst_entity_type if src_is_learning else self.src_entity_type
+        )
+        if related_entity_type not in LEARNED_FROM_ALLOWED_ENTITY_TYPES:
+            allowed = ", ".join(sorted(LEARNED_FROM_ALLOWED_ENTITY_TYPES))
+            raise ValueError(
+                "learned_from edges only support learning <-> "
+                + allowed.replace(", ", " | "),
+            )
+
+        return self
 
     @property
     def is_active(self) -> bool:

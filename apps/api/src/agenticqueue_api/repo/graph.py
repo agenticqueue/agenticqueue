@@ -5,17 +5,28 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from collections.abc import Collection
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 import sqlalchemy as sa
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.orm import Session, aliased
 
-from agenticqueue_api.models import EdgeRecord, EdgeRelation
+from agenticqueue_api.models import (
+    EdgeRecord,
+    EdgeRelation,
+    LearningModel,
+    LearningRecord,
+)
 
 DEFAULT_MAX_DEPTH = 100
 DOWNSTREAM_DECISION_ENTITY_TYPES = frozenset({"task", "artifact", "run"})
+LEARNING_SCOPE_FILTERS: dict[str, tuple[str, ...] | None] = {
+    "all": None,
+    "task": ("task",),
+    "project": ("task", "project"),
+    "global": ("task", "project", "global"),
+}
 
 
 class CycleError(ValueError):
@@ -67,6 +78,13 @@ def _normalize_edge_types(
 def _validate_max_depth(max_depth: int) -> None:
     if max_depth < 1:
         raise ValueError("max_depth must be at least 1")
+
+
+def _normalize_learning_scope(scope: str) -> tuple[str, ...] | None:
+    normalized = scope.strip().lower()
+    if normalized not in LEARNING_SCOPE_FILTERS:
+        raise ValueError("scope must be one of all | task | project | global")
+    return LEARNING_SCOPE_FILTERS[normalized]
 
 
 def _active_edge_condition(edge_record: Any) -> sa.ColumnElement[bool]:
@@ -377,6 +395,46 @@ def downstream_of_decision(
         max_depth=max_depth,
     )
     return [hit for hit in hits if hit.entity_type in DOWNSTREAM_DECISION_ENTITY_TYPES]
+
+
+def learnings_for(
+    session: Session,
+    entity_id: uuid.UUID,
+    *,
+    scope: Literal["all", "task", "project", "global"] = "all",
+) -> list[LearningModel]:
+    scope_filter = _normalize_learning_scope(scope)
+    edge = aliased(EdgeRecord)
+    learning = aliased(LearningRecord)
+
+    statement = (
+        sa.select(learning)
+        .join(
+            edge,
+            sa.or_(
+                sa.and_(
+                    edge.src_entity_type == "learning",
+                    edge.src_id == learning.id,
+                    edge.dst_id == entity_id,
+                ),
+                sa.and_(
+                    edge.dst_entity_type == "learning",
+                    edge.dst_id == learning.id,
+                    edge.src_id == entity_id,
+                ),
+            ),
+        )
+        .where(edge.relation == EdgeRelation.LEARNED_FROM)
+        .where(_active_edge_condition(edge))
+        .order_by(learning.created_at.asc(), learning.id.asc())
+    )
+    if scope_filter is not None:
+        statement = statement.where(learning.scope.in_(scope_filter))
+
+    return [
+        LearningModel.model_validate(record)
+        for record in session.scalars(statement).unique().all()
+    ]
 
 
 def ensure_dependency_edge_is_acyclic(

@@ -38,6 +38,7 @@ from agenticqueue_api.repo.graph import (
     ancestors,
     descendants,
     downstream_of_decision,
+    learnings_for,
     neighbors,
     shortest_path,
 )
@@ -86,6 +87,7 @@ __all__ = [
     "get_run",
     "get_task",
     "get_workspace",
+    "learnings_for",
     "neighbors",
     "reclaim_claim",
     "release_claim",
