@@ -168,6 +168,13 @@ def test_pgvector_cosine_queries_return_expected_similarity_order(
     db_session: Session,
     seeded_graph: dict[str, uuid.UUID],
 ) -> None:
+    similarity_query = sa.text("""
+        SELECT title
+        FROM agenticqueue.learning
+        WHERE task_id = :task_id
+          AND embedding IS NOT NULL
+        ORDER BY embedding <=> CAST(:query_vector AS vector)
+        """)
     base_payload = {
         "task_id": seeded_graph["task_id"],
         "owner_actor_id": seeded_graph["actor_id"],
@@ -218,21 +225,17 @@ def test_pgvector_cosine_queries_return_expected_similarity_order(
         ),
     )
 
-    ordered_titles = db_session.execute(
-        sa.text(
-            """
-            SELECT title
-            FROM agenticqueue.learning
-            WHERE task_id = :task_id
-              AND embedding IS NOT NULL
-            ORDER BY embedding <=> CAST(:query_vector AS vector)
-            """
-        ),
-        {
-            "task_id": seeded_graph["task_id"],
-            "query_vector": vector_literal(make_embedding(1.0, 0.0)),
-        },
-    ).scalars().all()
+    ordered_titles = (
+        db_session.execute(
+            similarity_query,
+            {
+                "task_id": seeded_graph["task_id"],
+                "query_vector": vector_literal(make_embedding(1.0, 0.0)),
+            },
+        )
+        .scalars()
+        .all()
+    )
 
     assert ordered_titles == ["nearest", "middle", "farthest"]
 
@@ -241,6 +244,13 @@ def test_pgvector_null_embeddings_are_excluded_from_similarity_but_not_crud(
     db_session: Session,
     seeded_graph: dict[str, uuid.UUID],
 ) -> None:
+    similarity_query = sa.text("""
+        SELECT title
+        FROM agenticqueue.learning
+        WHERE task_id = :task_id
+          AND embedding IS NOT NULL
+        ORDER BY embedding <=> CAST(:query_vector AS vector)
+        """)
     now = dt.datetime.now(dt.UTC)
     embedded_learning = create_learning(
         db_session,
@@ -287,21 +297,17 @@ def test_pgvector_null_embeddings_are_excluded_from_similarity_but_not_crud(
     )
     create_learning(db_session, null_learning)
 
-    ordered_titles = db_session.execute(
-        sa.text(
-            """
-            SELECT title
-            FROM agenticqueue.learning
-            WHERE task_id = :task_id
-              AND embedding IS NOT NULL
-            ORDER BY embedding <=> CAST(:query_vector AS vector)
-            """
-        ),
-        {
-            "task_id": seeded_graph["task_id"],
-            "query_vector": vector_literal(make_embedding(1.0, 0.0)),
-        },
-    ).scalars().all()
+    ordered_titles = (
+        db_session.execute(
+            similarity_query,
+            {
+                "task_id": seeded_graph["task_id"],
+                "query_vector": vector_literal(make_embedding(1.0, 0.0)),
+            },
+        )
+        .scalars()
+        .all()
+    )
 
     loaded_null_learning = get_learning(db_session, null_learning.id)
 
@@ -314,31 +320,30 @@ def test_pgvector_wrong_dimension_raises_db_error(
     seeded_graph: dict[str, uuid.UUID],
 ) -> None:
     bad_vector = vector_literal([1.0, 0.0])
+    bad_insert = sa.text(f"""
+        INSERT INTO agenticqueue.artifact (
+            id,
+            task_id,
+            run_id,
+            kind,
+            uri,
+            details,
+            embedding
+        )
+        VALUES (
+            :artifact_id,
+            :task_id,
+            :run_id,
+            'diff',
+            'file://artifacts/pgvector.diff',
+            '{{}}'::jsonb,
+            '{bad_vector}'::vector
+        )
+        """)
 
     with pytest.raises(sa.exc.DBAPIError) as exc_info:
         db_session.execute(
-            sa.text(
-                f"""
-                INSERT INTO agenticqueue.artifact (
-                    id,
-                    task_id,
-                    run_id,
-                    kind,
-                    uri,
-                    details,
-                    embedding
-                )
-                VALUES (
-                    :artifact_id,
-                    :task_id,
-                    :run_id,
-                    'diff',
-                    'file://artifacts/pgvector.diff',
-                    '{{}}'::jsonb,
-                    '{bad_vector}'::vector
-                )
-                """
-            ),
+            bad_insert,
             {
                 "artifact_id": uuid.uuid4(),
                 "task_id": seeded_graph["task_id"],
@@ -346,38 +351,31 @@ def test_pgvector_wrong_dimension_raises_db_error(
             },
         )
 
-    assert (
-        f"expected {get_embedding_dimension()} dimensions"
-        in str(exc_info.value.orig)
+    assert f"expected {get_embedding_dimension()} dimensions" in str(
+        exc_info.value.orig
     )
 
 
 def test_pgvector_migration_exposes_columns_and_indexes() -> None:
     upgrade(alembic_config(), "head")
+    table_query = sa.text("""
+        SELECT table_name
+        FROM information_schema.columns
+        WHERE table_schema = 'agenticqueue'
+          AND column_name = 'embedding'
+        ORDER BY table_name
+        """)
+    index_query = sa.text("""
+        SELECT indexname
+        FROM pg_indexes
+        WHERE schemaname = 'agenticqueue'
+        ORDER BY indexname
+        """)
 
     engine = sa.create_engine(get_sqlalchemy_sync_database_url(), future=True)
     with engine.connect() as connection:
-        tables = connection.execute(
-            sa.text(
-                """
-                SELECT table_name
-                FROM information_schema.columns
-                WHERE table_schema = 'agenticqueue'
-                  AND column_name = 'embedding'
-                ORDER BY table_name
-                """
-            )
-        ).scalars().all()
-        indexes = connection.execute(
-            sa.text(
-                """
-                SELECT indexname
-                FROM pg_indexes
-                WHERE schemaname = 'agenticqueue'
-                ORDER BY indexname
-                """
-            )
-        ).scalars().all()
+        tables = connection.execute(table_query).scalars().all()
+        indexes = connection.execute(index_query).scalars().all()
 
     assert tables == sorted(EMBEDDING_TABLES)
     assert set(
