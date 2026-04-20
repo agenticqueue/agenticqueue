@@ -1,0 +1,307 @@
+{
+  "definition_of_done": [
+    "GET /v1/tasks/{id} returns 200 with the task payload.",
+    "Missing task id returns 404.",
+    "OpenAPI includes the route."
+  ],
+  "expected_output_schema": {
+    "additionalProperties": false,
+    "properties": {
+      "artifacts": {
+        "items": {
+          "$ref": "#/$defs/artifact"
+        },
+        "minItems": 1,
+        "type": "array"
+      },
+      "diff_url": {
+        "$ref": "#/$defs/nonEmptyString"
+      },
+      "learnings": {
+        "items": {
+          "$ref": "#/$defs/learning"
+        },
+        "type": "array"
+      },
+      "test_report": {
+        "$ref": "#/$defs/nonEmptyString"
+      }
+    },
+    "required": [
+      "diff_url",
+      "test_report",
+      "artifacts",
+      "learnings"
+    ],
+    "type": "object"
+  },
+  "linked_artifacts": [
+    {
+      "created_at": "2026-04-20T00:05:00Z",
+      "details": {
+        "format": "unified-diff"
+      },
+      "embedding": null,
+      "id": "00000000-0000-0000-0000-000000001208",
+      "kind": "patch",
+      "run_id": "00000000-0000-0000-0000-000000001207",
+      "task_id": "00000000-0000-0000-0000-000000001206",
+      "updated_at": "2026-04-20T00:05:00Z",
+      "uri": "artifacts/diffs/packet-transport-parity.patch"
+    }
+  ],
+  "open_questions": [
+    "Should the REST and CLI surfaces share one renderer?"
+  ],
+  "packet_version_id": "55bc2532-0751-5392-8349-f64a9b481069",
+  "permissions": {
+    "autonomy_tier": 3,
+    "capabilities": [
+      "read_repo",
+      "write_branch",
+      "run_tests",
+      "update_task"
+    ],
+    "hitl_required": true,
+    "policy_name": "coding-task",
+    "policy_version": "1.0.0",
+    "source": "task",
+    "validation_mode": "human_review"
+  },
+  "relevant_decisions": [
+    {
+      "actor_id": "00000000-0000-0000-0000-000000001200",
+      "created_at": "2026-04-20T00:02:00Z",
+      "decided_at": "2026-04-20T00:02:00Z",
+      "embedding": null,
+      "id": "00000000-0000-0000-0000-000000001205",
+      "rationale": "Graph ancestors should surface this decision.",
+      "run_id": "00000000-0000-0000-0000-000000001204",
+      "summary": "Keep packet transport outputs field-identical",
+      "task_id": "00000000-0000-0000-0000-000000001203"
+    }
+  ],
+  "relevant_learnings": [
+    {
+      "action_rule": "Use graph traversal before fuzzier learning retrieval.",
+      "applies_when": "A coding-task packet needs a fast, deterministic packet.",
+      "confidence": "confirmed",
+      "created_at": "2026-04-20T00:06:00Z",
+      "does_not_apply_when": "The packet is doing a deliberate fuzzy global search.",
+      "embedding": null,
+      "evidence": [
+        "tests/packets/expected/transport_alignment_packet.json"
+      ],
+      "id": "00000000-0000-0000-0000-000000001209",
+      "learning_type": "pattern",
+      "owner": "packet-compiler",
+      "owner_actor_id": null,
+      "promotion_eligible": false,
+      "review_date": "2026-05-01",
+      "scope": "project",
+      "status": "active",
+      "task_id": "00000000-0000-0000-0000-000000001203",
+      "title": "Packet transports stay calmer when they share one shape",
+      "updated_at": "2026-04-20T00:06:00Z",
+      "what_happened": "The packet compiler benefited from deterministic graph context.",
+      "what_learned": "Graph-first packet assembly keeps the hot path fast."
+    }
+  ],
+  "repo_scope": {
+    "branch": "main",
+    "estimated_token_count": 2516,
+    "file_scope": [
+      "apps/api/src/agenticqueue_api/routers/packets.py",
+      "apps/api/src/agenticqueue_api/mcp/packet_tools.py"
+    ],
+    "repo": "github.com/agenticqueue/agenticqueue",
+    "surface_area": [
+      "packet",
+      "transport",
+      "parity"
+    ]
+  },
+  "retrieval_tiers_used": [
+    "graph",
+    "surface"
+  ],
+  "task": {
+    "claimed_at": null,
+    "claimed_by_actor_id": null,
+    "contract": {
+      "autonomy_tier": 3,
+      "branch": "main",
+      "dod_checklist": [
+        "GET /v1/tasks/{id} returns 200 with the task payload.",
+        "Missing task id returns 404.",
+        "OpenAPI includes the route."
+      ],
+      "dod_checks": [
+        {
+          "item": "GET /v1/tasks/{id} returns 200 with the task payload.",
+          "path": "artifacts/tests/aq-52-pytest.txt",
+          "pattern": "test_get_task_returns_200",
+          "type": "grep_present"
+        },
+        {
+          "item": "Missing task id returns 404.",
+          "path": "artifacts/tests/aq-52-pytest.txt",
+          "pattern": "test_missing_task_returns_404",
+          "type": "grep_present"
+        },
+        {
+          "item": "OpenAPI includes the route.",
+          "path": "artifacts/diffs/aq-52.patch",
+          "pattern": "/v1/tasks/\\{id\\}",
+          "type": "grep_present"
+        }
+      ],
+      "file_scope": [
+        "apps/api/src/agenticqueue_api/routers/packets.py",
+        "apps/api/src/agenticqueue_api/mcp/packet_tools.py"
+      ],
+      "output": {
+        "artifacts": [
+          {
+            "details": {
+              "format": "unified-diff"
+            },
+            "kind": "patch",
+            "uri": "artifacts/diffs/aq-52.patch"
+          },
+          {
+            "details": {
+              "runner": "pytest"
+            },
+            "kind": "test-report",
+            "uri": "artifacts/tests/aq-52-pytest.txt"
+          }
+        ],
+        "diff_url": "artifacts/diffs/aq-52.patch",
+        "learnings": [
+          {
+            "action_rule": "Model required output artifacts explicitly in the contract schema.",
+            "applies_when": "A task handoff depends on downstream validation or reuse.",
+            "confidence": "confirmed",
+            "does_not_apply_when": "The task is exploratory and has no durable outputs.",
+            "evidence": [
+              "docs/contracts/coding-task.md#output"
+            ],
+            "owner": "agenticqueue-core",
+            "review_date": "2026-05-01",
+            "scope": "project",
+            "status": "active",
+            "title": "Schema contracts must encode explicit output artifacts",
+            "type": "pattern",
+            "what_happened": "A coding-task contract was ambiguous about which execution artifacts had to be returned.",
+            "what_learned": "Typed output fields keep validators and downstream agents aligned."
+          }
+        ],
+        "test_report": "artifacts/tests/aq-52-pytest.txt"
+      },
+      "repo": "github.com/agenticqueue/agenticqueue",
+      "spec": "## Goal\nKeep packet transport surfaces field-identical.\n\n## Open Questions\n- Should the REST and CLI surfaces share one renderer?\n",
+      "surface_area": [
+        "packet",
+        "transport",
+        "parity"
+      ]
+    },
+    "created_at": "2026-04-20T00:03:00Z",
+    "definition_of_done": [
+      "GET /v1/tasks/{id} returns 200 with the task payload.",
+      "Missing task id returns 404.",
+      "OpenAPI includes the route."
+    ],
+    "description": "## Goal\nKeep packet transport surfaces field-identical.\n\n## Open Questions\n- Should the REST and CLI surfaces share one renderer?\n",
+    "id": "00000000-0000-0000-0000-000000001206",
+    "labels": [],
+    "policy_id": null,
+    "priority": 0,
+    "project_id": "00000000-0000-0000-0000-000000001202",
+    "sequence": 2,
+    "state": "queued",
+    "task_type": "coding-task",
+    "title": "Align packet transport surfaces",
+    "updated_at": "2026-04-20T00:03:00Z"
+  },
+  "task_contract": {
+    "autonomy_tier": 3,
+    "branch": "main",
+    "dod_checklist": [
+      "GET /v1/tasks/{id} returns 200 with the task payload.",
+      "Missing task id returns 404.",
+      "OpenAPI includes the route."
+    ],
+    "dod_checks": [
+      {
+        "item": "GET /v1/tasks/{id} returns 200 with the task payload.",
+        "path": "artifacts/tests/aq-52-pytest.txt",
+        "pattern": "test_get_task_returns_200",
+        "type": "grep_present"
+      },
+      {
+        "item": "Missing task id returns 404.",
+        "path": "artifacts/tests/aq-52-pytest.txt",
+        "pattern": "test_missing_task_returns_404",
+        "type": "grep_present"
+      },
+      {
+        "item": "OpenAPI includes the route.",
+        "path": "artifacts/diffs/aq-52.patch",
+        "pattern": "/v1/tasks/\\{id\\}",
+        "type": "grep_present"
+      }
+    ],
+    "file_scope": [
+      "apps/api/src/agenticqueue_api/routers/packets.py",
+      "apps/api/src/agenticqueue_api/mcp/packet_tools.py"
+    ],
+    "output": {
+      "artifacts": [
+        {
+          "details": {
+            "format": "unified-diff"
+          },
+          "kind": "patch",
+          "uri": "artifacts/diffs/aq-52.patch"
+        },
+        {
+          "details": {
+            "runner": "pytest"
+          },
+          "kind": "test-report",
+          "uri": "artifacts/tests/aq-52-pytest.txt"
+        }
+      ],
+      "diff_url": "artifacts/diffs/aq-52.patch",
+      "learnings": [
+        {
+          "action_rule": "Model required output artifacts explicitly in the contract schema.",
+          "applies_when": "A task handoff depends on downstream validation or reuse.",
+          "confidence": "confirmed",
+          "does_not_apply_when": "The task is exploratory and has no durable outputs.",
+          "evidence": [
+            "docs/contracts/coding-task.md#output"
+          ],
+          "owner": "agenticqueue-core",
+          "review_date": "2026-05-01",
+          "scope": "project",
+          "status": "active",
+          "title": "Schema contracts must encode explicit output artifacts",
+          "type": "pattern",
+          "what_happened": "A coding-task contract was ambiguous about which execution artifacts had to be returned.",
+          "what_learned": "Typed output fields keep validators and downstream agents aligned."
+        }
+      ],
+      "test_report": "artifacts/tests/aq-52-pytest.txt"
+    },
+    "repo": "github.com/agenticqueue/agenticqueue",
+    "spec": "## Goal\nKeep packet transport surfaces field-identical.\n\n## Open Questions\n- Should the REST and CLI surfaces share one renderer?\n",
+    "surface_area": [
+      "packet",
+      "transport",
+      "parity"
+    ]
+  }
+}
