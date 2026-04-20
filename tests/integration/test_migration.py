@@ -12,6 +12,7 @@ from agenticqueue_api.config import get_sync_database_url
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_CONFIG_PATH = REPO_ROOT / "apps" / "api" / "alembic.ini"
 ENTITY_TABLES = {
+    "api_token",
     "actor",
     "artifact",
     "audit_log",
@@ -26,8 +27,8 @@ ENTITY_TABLES = {
     "task",
     "workspace",
 }
-PHASE_1_ENTITY_TABLES = ENTITY_TABLES - {"edge"}
-PHASE_1_ENTITIES_REVISION = "4d68ebda8f16"
+PRE_AUTH_TABLES = ENTITY_TABLES - {"api_token"}
+EDGE_REVISION = "20260419_02"
 
 
 def alembic_config() -> Config:
@@ -105,9 +106,9 @@ def test_migration_reaches_head_with_extensions() -> None:
 def test_latest_migration_is_reversible() -> None:
     config = alembic_config()
     downgrade(config, "-1")
-    assert current_revision() == PHASE_1_ENTITIES_REVISION
-    assert_foundation_state(PHASE_1_ENTITIES_REVISION)
-    assert_entity_tables(PHASE_1_ENTITY_TABLES)
+    assert current_revision() == EDGE_REVISION
+    assert_foundation_state(EDGE_REVISION)
+    assert_entity_tables(PRE_AUTH_TABLES)
     upgrade(config, "head")
     expected_head = ScriptDirectory.from_config(config).get_current_head()
     assert expected_head is not None

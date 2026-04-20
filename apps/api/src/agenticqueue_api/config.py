@@ -7,6 +7,7 @@ import os
 DEFAULT_DATABASE_URL = (
     "postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:54329/agenticqueue"
 )
+DEFAULT_TOKEN_SIGNING_SECRET = "agenticqueue-dev-token-signing-secret"
 ASYNC_PREFIX = "postgresql+asyncpg://"
 SQLALCHEMY_SYNC_PREFIX = "postgresql+psycopg://"
 PSYCOPG_PREFIX = "postgresql://"
@@ -43,3 +44,12 @@ def get_sqlalchemy_sync_database_url() -> str:
     if url.startswith(SQLALCHEMY_SYNC_PREFIX):
         return url
     return url
+
+
+def get_token_signing_secret() -> str:
+    """Return the HMAC secret used for API token hashing."""
+    return (
+        os.getenv("AGENTICQUEUE_TOKEN_SIGNING_SECRET")
+        or os.getenv("TOKEN_SIGNING_SECRET")
+        or DEFAULT_TOKEN_SIGNING_SECRET
+    )

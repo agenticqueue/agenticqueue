@@ -1,5 +1,6 @@
 """AgenticQueue entity model exports."""
 
+from agenticqueue_api.models.api_token import ApiTokenModel, ApiTokenRecord
 from agenticqueue_api.models.actor import ActorModel, ActorRecord
 from agenticqueue_api.models.artifact import ArtifactModel, ArtifactRecord
 from agenticqueue_api.models.audit_log import AuditLogModel, AuditLogRecord
@@ -18,6 +19,8 @@ from agenticqueue_api.models.task import TaskModel, TaskRecord
 from agenticqueue_api.models.workspace import WorkspaceModel, WorkspaceRecord
 
 __all__ = [
+    "ApiTokenModel",
+    "ApiTokenRecord",
     "ActorModel",
     "ActorRecord",
     "ArtifactModel",
