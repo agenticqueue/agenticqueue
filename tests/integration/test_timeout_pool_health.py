@@ -41,9 +41,7 @@ def _run_concurrent_requests(
             base_url="http://testserver",
         ) as client:
             return list(
-                await asyncio.gather(
-                    *[_request(client) for _ in range(request_count)]
-                )
+                await asyncio.gather(*[_request(client) for _ in range(request_count)])
             )
 
     return asyncio.run(_run())
