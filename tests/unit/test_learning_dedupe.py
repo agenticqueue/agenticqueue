@@ -85,7 +85,9 @@ def _make_actor_payload(*, handle: str) -> ActorModel:
     )
 
 
-def _seed_task_run(session: Session, *, handle: str) -> tuple[uuid.UUID, TaskModel, RunModel]:
+def _seed_task_run(
+    session: Session, *, handle: str
+) -> tuple[uuid.UUID, TaskModel, RunModel]:
     actor = create_actor(session, _make_actor_payload(handle=handle))
     workspace = create_workspace(
         session,
@@ -253,7 +255,7 @@ def db_session(engine: Engine) -> Iterator[Session]:
 
 
 def test_confirm_returns_suggestion_for_near_duplicate(db_session: Session) -> None:
-    title = "Capture validator retry pattern"
+    title = f"Capture validator retry pattern {uuid.uuid4()}"
     action_rule = "Fix the validator payload before retrying the run."
     actor_id, draft_id = _seed_pending_draft(
         db_session,
@@ -288,7 +290,7 @@ def test_confirm_returns_suggestion_for_near_duplicate(db_session: Session) -> N
 def test_accept_merge_keeps_one_learning_and_promotes_confidence(
     db_session: Session,
 ) -> None:
-    title = "Capture validator retry pattern"
+    title = f"Capture validator retry pattern {uuid.uuid4()}"
     action_rule = "Fix the validator payload before retrying the run."
     existing = create_learning(
         db_session,
@@ -346,11 +348,19 @@ def test_accept_merge_keeps_one_learning_and_promotes_confidence(
         "artifact://draft-2",
     ]
     assert result.learning.confidence == LearningConfidence.VALIDATED.value
-    assert db_session.scalar(sa.select(sa.func.count()).select_from(LearningRecord)) == 1
+    matching_ids = set(
+        db_session.scalars(
+            sa.select(LearningRecord.id).where(
+                LearningRecord.title == title,
+                LearningRecord.action_rule == action_rule,
+            )
+        )
+    )
+    assert matching_ids == {existing.id}
 
 
 def test_reject_merge_creates_related_edge(db_session: Session) -> None:
-    title = "Capture validator retry pattern"
+    title = f"Capture validator retry pattern {uuid.uuid4()}"
     action_rule = "Fix the validator payload before retrying the run."
     actor_id, draft_id = _seed_pending_draft(
         db_session,
@@ -393,9 +403,9 @@ def test_reject_merge_creates_related_edge(db_session: Session) -> None:
 
 
 def test_confirm_without_match_creates_new_learning(db_session: Session) -> None:
-    existing_title = "Capture validator retry pattern"
+    existing_title = f"Capture validator retry pattern {uuid.uuid4()}"
     existing_rule = "Fix the validator payload before retrying the run."
-    new_title = "Document graph traversal remediation"
+    new_title = f"Document graph traversal remediation {uuid.uuid4()}"
     new_rule = "Use bounded depth traversal when decision edges fan out."
     actor_id, draft_id = _seed_pending_draft(
         db_session,
