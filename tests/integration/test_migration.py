@@ -114,7 +114,17 @@ def test_migration_reaches_head_with_extensions() -> None:
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
     assert_audit_log_columns(
-        {"action", "actor_id", "after", "before", "created_at", "entity_id", "entity_type", "id", "trace_id"}
+        {
+            "action",
+            "actor_id",
+            "after",
+            "before",
+            "created_at",
+            "entity_id",
+            "entity_type",
+            "id",
+            "trace_id",
+        }
     )
 
 
@@ -125,7 +135,15 @@ def test_latest_migration_is_reversible() -> None:
     assert_foundation_state(PRE_AUDIT_HOOK_REVISION)
     assert_entity_tables(ENTITY_TABLES)
     assert_audit_log_columns(
-        {"action", "actor_id", "created_at", "entity_id", "entity_type", "id", "payload"}
+        {
+            "action",
+            "actor_id",
+            "created_at",
+            "entity_id",
+            "entity_type",
+            "id",
+            "payload",
+        }
     )
     upgrade(config, "head")
     expected_head = ScriptDirectory.from_config(config).get_current_head()
@@ -133,7 +151,17 @@ def test_latest_migration_is_reversible() -> None:
     assert_foundation_state(expected_head)
     assert_entity_tables(ENTITY_TABLES)
     assert_audit_log_columns(
-        {"action", "actor_id", "after", "before", "created_at", "entity_id", "entity_type", "id", "trace_id"}
+        {
+            "action",
+            "actor_id",
+            "after",
+            "before",
+            "created_at",
+            "entity_id",
+            "entity_type",
+            "id",
+            "trace_id",
+        }
     )
 
 

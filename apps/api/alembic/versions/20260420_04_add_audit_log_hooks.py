@@ -33,8 +33,7 @@ def upgrade() -> None:
     )
     op.drop_column("audit_log", "payload", schema="agenticqueue")
 
-    op.execute(
-        """
+    op.execute("""
         CREATE OR REPLACE FUNCTION agenticqueue.prevent_audit_log_mutation()
         RETURNS trigger
         AS $$
@@ -56,22 +55,17 @@ def upgrade() -> None:
           RAISE EXCEPTION 'audit_log is append-only';
         END;
         $$ LANGUAGE plpgsql;
-        """
-    )
-    op.execute(
-        """
+        """)
+    op.execute("""
         CREATE TRIGGER audit_log_append_only
         BEFORE UPDATE OR DELETE ON agenticqueue.audit_log
         FOR EACH ROW
         EXECUTE FUNCTION agenticqueue.prevent_audit_log_mutation();
-        """
-    )
+        """)
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP TRIGGER IF EXISTS audit_log_append_only ON agenticqueue.audit_log"
-    )
+    op.execute("DROP TRIGGER IF EXISTS audit_log_append_only ON agenticqueue.audit_log")
     op.execute("DROP FUNCTION IF EXISTS agenticqueue.prevent_audit_log_mutation()")
 
     op.add_column(
@@ -79,12 +73,10 @@ def downgrade() -> None:
         sa.Column("payload", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         schema="agenticqueue",
     )
-    op.execute(
-        """
+    op.execute("""
         UPDATE agenticqueue.audit_log
         SET payload = COALESCE("after", "before", '{}'::jsonb)
-        """
-    )
+        """)
     op.alter_column("audit_log", "payload", nullable=False, schema="agenticqueue")
     op.drop_column("audit_log", "trace_id", schema="agenticqueue")
     op.drop_column("audit_log", "after", schema="agenticqueue")

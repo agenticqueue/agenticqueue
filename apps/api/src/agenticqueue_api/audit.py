@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 import sqlalchemy as sa
 from fastapi.encoders import jsonable_encoder
@@ -49,14 +49,13 @@ def _load_row_snapshot(
         return None
 
     primary_key_column = mapper.primary_key[0]
+    table = cast(sa.Table, mapper.local_table)
     row = (
-        connection.execute(
-            sa.select(mapper.local_table).where(primary_key_column == entity_id)
-        )
+        connection.execute(sa.select(table).where(primary_key_column == entity_id))
         .mappings()
         .one_or_none()
     )
-    return _serialize_snapshot(row)
+    return _serialize_snapshot(cast(Mapping[str, Any] | None, row))
 
 
 @sa.event.listens_for(Session, "before_flush")
@@ -125,12 +124,14 @@ def _write_audit_row(
     session = object_session(target)
     actor_id = None if session is None else session.info.get(AUDIT_ACTOR_ID_KEY)
     trace_id = None if session is None else session.info.get(AUDIT_TRACE_ID_KEY)
-    entity_id = getattr(target, mapper.primary_key[0].key, None)
+    entity_key = cast(str, mapper.primary_key[0].key)
+    table = cast(sa.Table, mapper.local_table)
+    entity_id = getattr(target, entity_key, None)
 
     connection.execute(
-        sa.insert(AuditLogRecord.__table__).values(
+        sa.insert(cast(sa.Table, AuditLogRecord.__table__)).values(
             actor_id=actor_id,
-            entity_type=mapper.local_table.name,
+            entity_type=table.name,
             entity_id=entity_id,
             action=action,
             before=before,
@@ -146,7 +147,7 @@ def _audit_after_insert(
     connection: sa.Connection,
     target: object,
 ) -> None:
-    entity_id = getattr(target, mapper.primary_key[0].key, None)
+    entity_id = getattr(target, cast(str, mapper.primary_key[0].key), None)
     _write_audit_row(
         mapper,
         connection,
@@ -163,7 +164,7 @@ def _audit_after_update(
     connection: sa.Connection,
     target: object,
 ) -> None:
-    entity_id = getattr(target, mapper.primary_key[0].key, None)
+    entity_id = getattr(target, cast(str, mapper.primary_key[0].key), None)
     _write_audit_row(
         mapper,
         connection,

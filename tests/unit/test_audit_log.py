@@ -261,7 +261,9 @@ def test_direct_delete_on_audit_log_table_is_rejected(
             trace_id="trace-delete-guard",
         )
         session.add(
-            WorkspaceRecord(slug="guard-delete-workspace", name="Guard Delete Workspace")
+            WorkspaceRecord(
+                slug="guard-delete-workspace", name="Guard Delete Workspace"
+            )
         )
         session.commit()
 
@@ -288,7 +290,9 @@ def test_direct_update_on_audit_log_table_is_rejected(
             trace_id="trace-update-guard",
         )
         session.add(
-            WorkspaceRecord(slug="guard-update-workspace", name="Guard Update Workspace")
+            WorkspaceRecord(
+                slug="guard-update-workspace", name="Guard Update Workspace"
+            )
         )
         session.commit()
 
@@ -361,7 +365,9 @@ def test_audit_helpers_handle_none_and_non_dict_snapshots(
 
     with session_factory() as session:
         mapper = sa.inspect(WorkspaceRecord).mapper
-        assert audit_module._load_row_snapshot(session.connection(), mapper, None) is None
+        assert (
+            audit_module._load_row_snapshot(session.connection(), mapper, None) is None
+        )
 
         workspace = WorkspaceRecord(slug="helper-workspace", name="Helper Workspace")
         session.add(workspace)
