@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Any
 import uuid
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
-from starlette.types import Message
+from starlette.types import Message, Receive, Scope, Send
 
 from agenticqueue_api.middleware import secret_redaction as secret_redaction_module
 from agenticqueue_api.middleware.secret_redaction import (
@@ -232,7 +232,7 @@ def test_secret_redaction_skips_get_invalid_json_and_missing_policy(
         health = client.get("/healthz")
         invalid_json = client.post(
             "/v1/tasks",
-            data='{"description": "unterminated"',
+            content='{"description": "unterminated"',
             headers={"Content-Type": "application/json"},
         )
 
@@ -263,7 +263,7 @@ def test_secret_redaction_handles_list_root_payloads(tmp_path: Path) -> None:
     with TestClient(app) as client:
         response = client.post(
             "/v1/tasks",
-            data=json.dumps(["plain", _fake_aws_access_key()]),
+            content=json.dumps(["plain", _fake_aws_access_key()]),
             headers={"Content-Type": "application/json"},
         )
 
@@ -290,7 +290,7 @@ def test_secret_redaction_internal_async_paths_cover_disconnect_and_replay(
 ) -> None:
     app = FastAPI()
 
-    async def downstream(scope: dict[str, Any], receive: Any, send: Any) -> None:
+    async def downstream(scope: Scope, receive: Receive, send: Send) -> None:
         first = await receive()
         second = await receive()
         assert first["body"] == b'{"description":"plain"}'

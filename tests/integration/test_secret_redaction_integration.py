@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 import sqlalchemy as sa
-import yaml
+import yaml  # type: ignore[import-untyped]
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -254,6 +254,7 @@ def test_secret_redaction_redacts_task_payload_before_audit_persistence(
     with session_factory() as session:
         created_task = session.get(TaskRecord, task_id)
         assert created_task is not None
+        assert created_task.description is not None
         assert _fake_aws_access_key() not in created_task.description
         assert "[REDACTED:aws_access_key]" in created_task.description
         assert _fake_github_pat() not in json.dumps(created_task.contract)
