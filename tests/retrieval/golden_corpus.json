@@ -1,0 +1,352 @@
+[
+  {
+    "id": "validator-payload-retry-surface_exact",
+    "expected_family": "validator-payload-retry",
+    "mode": "surface_exact",
+    "title": "Validator payload retry hardening for malformed submissions",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "validator-payload-retry-surface_filescope",
+    "expected_family": "validator-payload-retry",
+    "mode": "surface_filescope",
+    "title": "Validator payload retry hardening for malformed submissions",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "validator-payload-retry-fts_exact",
+    "expected_family": "validator-payload-retry",
+    "mode": "fts_exact",
+    "title": "Validator payload retry hardening for malformed submissions",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "validator-payload-retry-fts_filescope",
+    "expected_family": "validator-payload-retry",
+    "mode": "fts_filescope",
+    "title": "Validator payload retry hardening for malformed submissions",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "validator-payload-retry-trgm_typo",
+    "expected_family": "validator-payload-retry",
+    "mode": "trgm_typo",
+    "title": "Validatr paylod retri hardenng for malformd submissons",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "audit-ledger-hash-chain-surface_exact",
+    "expected_family": "audit-ledger-hash-chain",
+    "mode": "surface_exact",
+    "title": "Audit ledger hash chain verification for worm records",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "audit-ledger-hash-chain-surface_filescope",
+    "expected_family": "audit-ledger-hash-chain",
+    "mode": "surface_filescope",
+    "title": "Audit ledger hash chain verification for worm records",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "audit-ledger-hash-chain-fts_exact",
+    "expected_family": "audit-ledger-hash-chain",
+    "mode": "fts_exact",
+    "title": "Audit ledger hash chain verification for worm records",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "audit-ledger-hash-chain-fts_filescope",
+    "expected_family": "audit-ledger-hash-chain",
+    "mode": "fts_filescope",
+    "title": "Audit ledger hash chain verification for worm records",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "audit-ledger-hash-chain-trgm_typo",
+    "expected_family": "audit-ledger-hash-chain",
+    "mode": "trgm_typo",
+    "title": "Audit ledgr hash chian verfication for worm recrods",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "pgbouncer-transaction-pooling-surface_exact",
+    "expected_family": "pgbouncer-transaction-pooling",
+    "mode": "surface_exact",
+    "title": "PgBouncer transaction pooling verification for API workers",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "pgbouncer-transaction-pooling-surface_filescope",
+    "expected_family": "pgbouncer-transaction-pooling",
+    "mode": "surface_filescope",
+    "title": "PgBouncer transaction pooling verification for API workers",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "pgbouncer-transaction-pooling-fts_exact",
+    "expected_family": "pgbouncer-transaction-pooling",
+    "mode": "fts_exact",
+    "title": "PgBouncer transaction pooling verification for API workers",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "pgbouncer-transaction-pooling-fts_filescope",
+    "expected_family": "pgbouncer-transaction-pooling",
+    "mode": "fts_filescope",
+    "title": "PgBouncer transaction pooling verification for API workers",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "pgbouncer-transaction-pooling-trgm_typo",
+    "expected_family": "pgbouncer-transaction-pooling",
+    "mode": "trgm_typo",
+    "title": "PgBouncr transacton poolng verfication for API workrs",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "statement-timeout-traversal-surface_exact",
+    "expected_family": "statement-timeout-traversal",
+    "mode": "surface_exact",
+    "title": "Statement timeout traversal guardrails for recursive queries",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "statement-timeout-traversal-surface_filescope",
+    "expected_family": "statement-timeout-traversal",
+    "mode": "surface_filescope",
+    "title": "Statement timeout traversal guardrails for recursive queries",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "statement-timeout-traversal-fts_exact",
+    "expected_family": "statement-timeout-traversal",
+    "mode": "fts_exact",
+    "title": "Statement timeout traversal guardrails for recursive queries",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "statement-timeout-traversal-fts_filescope",
+    "expected_family": "statement-timeout-traversal",
+    "mode": "fts_filescope",
+    "title": "Statement timeout traversal guardrails for recursive queries",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "statement-timeout-traversal-trgm_typo",
+    "expected_family": "statement-timeout-traversal",
+    "mode": "trgm_typo",
+    "title": "Statemnt timeot traversl guardrails for recursve quaries",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "redaction-entropy-scanner-surface_exact",
+    "expected_family": "redaction-entropy-scanner",
+    "mode": "surface_exact",
+    "title": "Redaction entropy scanner hardening for submission payloads",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "redaction-entropy-scanner-surface_filescope",
+    "expected_family": "redaction-entropy-scanner",
+    "mode": "surface_filescope",
+    "title": "Redaction entropy scanner hardening for submission payloads",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "redaction-entropy-scanner-fts_exact",
+    "expected_family": "redaction-entropy-scanner",
+    "mode": "fts_exact",
+    "title": "Redaction entropy scanner hardening for submission payloads",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "redaction-entropy-scanner-fts_filescope",
+    "expected_family": "redaction-entropy-scanner",
+    "mode": "fts_filescope",
+    "title": "Redaction entropy scanner hardening for submission payloads",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "redaction-entropy-scanner-trgm_typo",
+    "expected_family": "redaction-entropy-scanner",
+    "mode": "trgm_typo",
+    "title": "Redaction entropi scannr hardenng for submisson payloads",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "trigram-retrieval-fallback-surface_exact",
+    "expected_family": "trigram-retrieval-fallback",
+    "mode": "surface_exact",
+    "title": "Trigram retrieval fallback tuning for typo-heavy queries",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "trigram-retrieval-fallback-surface_filescope",
+    "expected_family": "trigram-retrieval-fallback",
+    "mode": "surface_filescope",
+    "title": "Trigram retrieval fallback tuning for typo-heavy queries",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "trigram-retrieval-fallback-fts_exact",
+    "expected_family": "trigram-retrieval-fallback",
+    "mode": "fts_exact",
+    "title": "Trigram retrieval fallback tuning for typo-heavy queries",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "trigram-retrieval-fallback-fts_filescope",
+    "expected_family": "trigram-retrieval-fallback",
+    "mode": "fts_filescope",
+    "title": "Trigram retrieval fallback tuning for typo-heavy queries",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "trigram-retrieval-fallback-trgm_typo",
+    "expected_family": "trigram-retrieval-fallback",
+    "mode": "trgm_typo",
+    "title": "Trigram retrievel fallbak tuning for typ0-hevy queries",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "packet-cache-invalidation-surface_exact",
+    "expected_family": "packet-cache-invalidation",
+    "mode": "surface_exact",
+    "title": "Packet cache invalidation sequencing for graph mutations",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "packet-cache-invalidation-surface_filescope",
+    "expected_family": "packet-cache-invalidation",
+    "mode": "surface_filescope",
+    "title": "Packet cache invalidation sequencing for graph mutations",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "packet-cache-invalidation-fts_exact",
+    "expected_family": "packet-cache-invalidation",
+    "mode": "fts_exact",
+    "title": "Packet cache invalidation sequencing for graph mutations",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "packet-cache-invalidation-fts_filescope",
+    "expected_family": "packet-cache-invalidation",
+    "mode": "fts_filescope",
+    "title": "Packet cache invalidation sequencing for graph mutations",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "packet-cache-invalidation-trgm_typo",
+    "expected_family": "packet-cache-invalidation",
+    "mode": "trgm_typo",
+    "title": "Packet cach invalidation sequncing for graph mutatons",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "capability-grant-matrix-surface_exact",
+    "expected_family": "capability-grant-matrix",
+    "mode": "surface_exact",
+    "title": "Capability grant matrix verification across actor scopes",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "capability-grant-matrix-surface_filescope",
+    "expected_family": "capability-grant-matrix",
+    "mode": "surface_filescope",
+    "title": "Capability grant matrix verification across actor scopes",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "capability-grant-matrix-fts_exact",
+    "expected_family": "capability-grant-matrix",
+    "mode": "fts_exact",
+    "title": "Capability grant matrix verification across actor scopes",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "capability-grant-matrix-fts_filescope",
+    "expected_family": "capability-grant-matrix",
+    "mode": "fts_filescope",
+    "title": "Capability grant matrix verification across actor scopes",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "capability-grant-matrix-trgm_typo",
+    "expected_family": "capability-grant-matrix",
+    "mode": "trgm_typo",
+    "title": "Capabilty grant matrix verfication acros actor scopes",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "idempotency-replay-key-surface_exact",
+    "expected_family": "idempotency-replay-key",
+    "mode": "surface_exact",
+    "title": "Idempotency replay key handling for duplicate submissions",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "idempotency-replay-key-surface_filescope",
+    "expected_family": "idempotency-replay-key",
+    "mode": "surface_filescope",
+    "title": "Idempotency replay key handling for duplicate submissions",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "idempotency-replay-key-fts_exact",
+    "expected_family": "idempotency-replay-key",
+    "mode": "fts_exact",
+    "title": "Idempotency replay key handling for duplicate submissions",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "idempotency-replay-key-fts_filescope",
+    "expected_family": "idempotency-replay-key",
+    "mode": "fts_filescope",
+    "title": "Idempotency replay key handling for duplicate submissions",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "idempotency-replay-key-trgm_typo",
+    "expected_family": "idempotency-replay-key",
+    "mode": "trgm_typo",
+    "title": "Idempotncy replay ke handling for duplicat submissons",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "mcp-transport-parity-surface_exact",
+    "expected_family": "mcp-transport-parity",
+    "mode": "surface_exact",
+    "title": "MCP transport parity validation across learning surfaces",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "mcp-transport-parity-surface_filescope",
+    "expected_family": "mcp-transport-parity",
+    "mode": "surface_filescope",
+    "title": "MCP transport parity validation across learning surfaces",
+    "fuzzy_global_search": false
+  },
+  {
+    "id": "mcp-transport-parity-fts_exact",
+    "expected_family": "mcp-transport-parity",
+    "mode": "fts_exact",
+    "title": "MCP transport parity validation across learning surfaces",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "mcp-transport-parity-fts_filescope",
+    "expected_family": "mcp-transport-parity",
+    "mode": "fts_filescope",
+    "title": "MCP transport parity validation across learning surfaces",
+    "fuzzy_global_search": true
+  },
+  {
+    "id": "mcp-transport-parity-trgm_typo",
+    "expected_family": "mcp-transport-parity",
+    "mode": "trgm_typo",
+    "title": "MCP transport pariti validaton acros learning surfces",
+    "fuzzy_global_search": true
+  }
+]
