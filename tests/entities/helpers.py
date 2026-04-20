@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 import json
 import uuid
 from collections.abc import Callable, Iterator
@@ -18,12 +19,21 @@ from agenticqueue_api.config import get_sqlalchemy_sync_database_url
 from agenticqueue_api.models import (
     ActorModel,
     ActorRecord,
+    ArtifactModel,
+    ArtifactRecord,
+    AuditLogRecord,
     CapabilityKey,
     CapabilityRecord,
-    PolicyModel,
-    LearningModel,
-    EdgeModel,
-    AuditLogRecord,
+    DecisionModel,
+    DecisionRecord,
+    ProjectModel,
+    ProjectRecord,
+    RunModel,
+    RunRecord,
+    TaskModel,
+    TaskRecord,
+    WorkspaceModel,
+    WorkspaceRecord,
 )
 from agenticqueue_api.repo import (
     create_actor,
@@ -163,9 +173,7 @@ def deps(session_factory: sessionmaker[Session]) -> Dependencies:
         workspace = create_workspace(
             session,
             model_from(
-                __import__(
-                    "agenticqueue_api.models", fromlist=["WorkspaceModel"]
-                ).WorkspaceModel,
+                WorkspaceModel,
                 {
                     "id": str(uuid.uuid4()),
                     "slug": "linked-workspace",
@@ -179,9 +187,7 @@ def deps(session_factory: sessionmaker[Session]) -> Dependencies:
         project = create_project(
             session,
             model_from(
-                __import__(
-                    "agenticqueue_api.models", fromlist=["ProjectModel"]
-                ).ProjectModel,
+                ProjectModel,
                 {
                     "id": str(uuid.uuid4()),
                     "workspace_id": str(workspace.id),
@@ -196,7 +202,7 @@ def deps(session_factory: sessionmaker[Session]) -> Dependencies:
         task = create_task(
             session,
             model_from(
-                __import__("agenticqueue_api.models", fromlist=["TaskModel"]).TaskModel,
+                TaskModel,
                 {
                     "id": str(uuid.uuid4()),
                     "project_id": str(project.id),
@@ -214,7 +220,7 @@ def deps(session_factory: sessionmaker[Session]) -> Dependencies:
         run = create_run(
             session,
             model_from(
-                __import__("agenticqueue_api.models", fromlist=["RunModel"]).RunModel,
+                RunModel,
                 {
                     "id": str(uuid.uuid4()),
                     "task_id": str(task.id),
@@ -264,13 +270,14 @@ def seed_token(
     *,
     actor_id: uuid.UUID,
     scopes: list[str],
+    expires_at: dt.datetime | None = None,
 ) -> str:
     with session_factory() as session:
         _, raw_token = issue_api_token(
             session,
             actor_id=actor_id,
             scopes=scopes,
-            expires_at=None,
+            expires_at=expires_at,
         )
         session.commit()
         return raw_token
@@ -282,9 +289,6 @@ def seed_workspace(
     slug: str,
     name: str,
 ) -> uuid.UUID:
-    WorkspaceModel = __import__(
-        "agenticqueue_api.models", fromlist=["WorkspaceModel"]
-    ).WorkspaceModel
     with session_factory() as session:
         workspace = create_workspace(
             session,
@@ -311,9 +315,6 @@ def seed_project(
     slug: str,
     name: str,
 ) -> uuid.UUID:
-    ProjectModel = __import__(
-        "agenticqueue_api.models", fromlist=["ProjectModel"]
-    ).ProjectModel
     with session_factory() as session:
         project = create_project(
             session,
@@ -340,7 +341,6 @@ def seed_task(
     project_id: uuid.UUID,
     title: str,
 ) -> uuid.UUID:
-    TaskModel = __import__("agenticqueue_api.models", fromlist=["TaskModel"]).TaskModel
     with session_factory() as session:
         task = create_task(
             session,
@@ -371,7 +371,6 @@ def seed_run(
     actor_id: uuid.UUID,
     started_at: str,
 ) -> uuid.UUID:
-    RunModel = __import__("agenticqueue_api.models", fromlist=["RunModel"]).RunModel
     with session_factory() as session:
         run = create_run(
             session,
@@ -402,14 +401,11 @@ def seed_artifact(
     run_id: uuid.UUID,
     uri: str,
 ) -> uuid.UUID:
-    ArtifactModelCls = __import__(
-        "agenticqueue_api.models", fromlist=["ArtifactModel"]
-    ).ArtifactModel
     with session_factory() as session:
         artifact = create_artifact(
             session,
             model_from(
-                ArtifactModelCls,
+                ArtifactModel,
                 {
                     "id": str(uuid.uuid4()),
                     "task_id": str(task_id),
@@ -425,6 +421,35 @@ def seed_artifact(
         )
         session.commit()
         return artifact.id
+
+
+def seed_decision(
+    session_factory: sessionmaker[Session],
+    deps: Dependencies,
+    *,
+    summary: str,
+    decided_at: str,
+) -> uuid.UUID:
+    with session_factory() as session:
+        decision = create_decision(
+            session,
+            model_from(
+                DecisionModel,
+                {
+                    "id": str(uuid.uuid4()),
+                    "task_id": str(deps.task_id),
+                    "run_id": str(deps.run_id),
+                    "actor_id": str(deps.actor_id),
+                    "summary": summary,
+                    "rationale": "Sibling rationale",
+                    "decided_at": decided_at,
+                    "embedding": None,
+                    "created_at": decided_at,
+                },
+            ),
+        )
+        session.commit()
+        return decision.id
 
 
 def latest_audit_action(
@@ -483,14 +508,13 @@ def assert_error_shape(
     assert "details" in body
 
 
-def core_specs() -> list[CrudSpec]:
-    return [
+@pytest.fixture(scope="session")
+def core_specs_by_resource() -> dict[str, CrudSpec]:
+    specs = [
         CrudSpec(
             resource="workspaces",
             entity_type="workspace",
-            record_type=__import__(
-                "agenticqueue_api.models", fromlist=["WorkspaceRecord"]
-            ).WorkspaceRecord,
+            record_type=WorkspaceRecord,
             soft_delete=False,
             read_scope="workspace:read",
             write_scope="workspace:write",
@@ -513,9 +537,7 @@ def core_specs() -> list[CrudSpec]:
         CrudSpec(
             resource="projects",
             entity_type="project",
-            record_type=__import__(
-                "agenticqueue_api.models", fromlist=["ProjectRecord"]
-            ).ProjectRecord,
+            record_type=ProjectRecord,
             soft_delete=False,
             read_scope="project:read",
             write_scope="project:write",
@@ -544,9 +566,7 @@ def core_specs() -> list[CrudSpec]:
         CrudSpec(
             resource="tasks",
             entity_type="task",
-            record_type=__import__(
-                "agenticqueue_api.models", fromlist=["TaskRecord"]
-            ).TaskRecord,
+            record_type=TaskRecord,
             soft_delete=False,
             read_scope="task:read",
             write_scope="task:write",
@@ -580,9 +600,7 @@ def core_specs() -> list[CrudSpec]:
         CrudSpec(
             resource="runs",
             entity_type="run",
-            record_type=__import__(
-                "agenticqueue_api.models", fromlist=["RunRecord"]
-            ).RunRecord,
+            record_type=RunRecord,
             soft_delete=False,
             read_scope="run:read",
             write_scope="run:write",
@@ -612,9 +630,7 @@ def core_specs() -> list[CrudSpec]:
         CrudSpec(
             resource="artifacts",
             entity_type="artifact",
-            record_type=__import__(
-                "agenticqueue_api.models", fromlist=["ArtifactRecord"]
-            ).ArtifactRecord,
+            record_type=ArtifactRecord,
             soft_delete=False,
             read_scope="artifact:read",
             write_scope="artifact:write",
@@ -648,9 +664,7 @@ def core_specs() -> list[CrudSpec]:
         CrudSpec(
             resource="decisions",
             entity_type="decision",
-            record_type=__import__(
-                "agenticqueue_api.models", fromlist=["DecisionRecord"]
-            ).DecisionRecord,
+            record_type=DecisionRecord,
             soft_delete=False,
             read_scope="decision:read",
             write_scope="decision:write",
@@ -705,417 +719,169 @@ def core_specs() -> list[CrudSpec]:
             ),
         ),
     ]
+    return {spec.resource: spec for spec in specs}
 
 
-def seed_decision(
-    session_factory: sessionmaker[Session],
-    deps: Dependencies,
-    *,
-    summary: str,
-    decided_at: str,
-) -> uuid.UUID:
-    DecisionModelCls = __import__(
-        "agenticqueue_api.models", fromlist=["DecisionModel"]
-    ).DecisionModel
-    with session_factory() as session:
-        decision = create_decision(
-            session,
-            model_from(
-                DecisionModelCls,
-                {
-                    "id": str(uuid.uuid4()),
-                    "task_id": str(deps.task_id),
-                    "run_id": str(deps.run_id),
-                    "actor_id": str(deps.actor_id),
-                    "summary": summary,
-                    "rationale": "Sibling rationale",
-                    "decided_at": decided_at,
-                    "embedding": None,
-                    "created_at": decided_at,
-                },
-            ),
+@pytest.fixture
+def exercise_core_entity_crud_flow() -> Callable[..., None]:
+    def _exercise(
+        spec: CrudSpec,
+        client: TestClient,
+        session_factory: sessionmaker[Session],
+        deps: Dependencies,
+    ) -> None:
+        actor = seed_actor(
+            session_factory,
+            handle=f"{spec.entity_type}-admin",
+            actor_type="admin",
+            display_name=f"{spec.entity_type.capitalize()} Admin",
         )
-        session.commit()
-        return decision.id
-
-
-def test_openapi_route_is_available_with_bearer_auth(
-    client: TestClient,
-    session_factory: sessionmaker[Session],
-) -> None:
-    actor = seed_actor(
-        session_factory,
-        handle="openapi-admin",
-        actor_type="admin",
-        display_name="OpenAPI Admin",
-    )
-    token = seed_token(session_factory, actor_id=actor.id, scopes=["admin"])
-
-    response = client.get("/openapi.json", headers=auth_headers(token))
-
-    assert response.status_code == 200
-    assert "/v1/workspaces" in response.json()["paths"]
-    assert "/v1/edges/{entity_id}" in response.json()["paths"]
-
-
-def test_missing_auth_and_wrong_scope_are_structured(
-    client: TestClient,
-    session_factory: sessionmaker[Session],
-    deps: Dependencies,
-) -> None:
-    actor = seed_actor(
-        session_factory,
-        handle="scope-user",
-        actor_type="agent",
-        display_name="Scope User",
-    )
-    token = seed_token(session_factory, actor_id=actor.id, scopes=["workspace:read"])
-
-    missing_auth = client.get("/v1/workspaces")
-    assert_error_shape(missing_auth, status_code=401, error_code="unauthorized")
-
-    forbidden = client.post(
-        "/v1/workspaces",
-        headers=auth_headers(token),
-        json=core_specs()[0].create_payload(deps),
-    )
-    assert_error_shape(forbidden, status_code=403, error_code="forbidden")
-
-
-@pytest.mark.parametrize("spec_index", range(6))
-def test_core_entities_support_crud_filtering_and_audit(
-    spec_index: int,
-    client: TestClient,
-    session_factory: sessionmaker[Session],
-    deps: Dependencies,
-) -> None:
-    spec = core_specs()[spec_index]
-    actor = seed_actor(
-        session_factory,
-        handle=f"{spec.entity_type}-admin",
-        actor_type="admin",
-        display_name=f"{spec.entity_type.capitalize()} Admin",
-    )
-    token = seed_token(
-        session_factory,
-        actor_id=actor.id,
-        scopes=[spec.read_scope, spec.write_scope],
-    )
-    spec.seed_sibling(session_factory, deps)
-
-    create_response = client.post(
-        f"/v1/{spec.resource}",
-        headers=auth_headers(token),
-        json=spec.create_payload(deps),
-    )
-    assert create_response.status_code == 201
-    created = create_response.json()
-    created_id = uuid.UUID(created["id"])
-    assert (
-        latest_audit_action(
-            session_factory, entity_type=spec.entity_type, entity_id=created_id
+        token = seed_token(
+            session_factory,
+            actor_id=actor.id,
+            scopes=[spec.read_scope, spec.write_scope],
         )
-        == "CREATE"
-    )
+        spec.seed_sibling(session_factory, deps)
 
-    get_response = client.get(
-        f"/v1/{spec.resource}/{created_id}",
-        headers=auth_headers(token),
-    )
-    assert get_response.status_code == 200
-    assert get_response.json()["id"] == str(created_id)
-
-    list_response = client.get(
-        f"/v1/{spec.resource}",
-        headers=auth_headers(token),
-        params=spec.filter_params(created, deps),
-    )
-    assert list_response.status_code == 200
-    assert [item["id"] for item in list_response.json()] == [str(created_id)]
-
-    update_response = client.patch(
-        f"/v1/{spec.resource}/{created_id}",
-        headers=auth_headers(token),
-        json=spec.update_payload,
-    )
-    assert update_response.status_code == 200
-    assert update_response.json()[spec.updated_field] == spec.updated_value
-    assert (
-        latest_audit_action(
-            session_factory, entity_type=spec.entity_type, entity_id=created_id
-        )
-        == "UPDATE"
-    )
-
-    delete_response = client.delete(
-        f"/v1/{spec.resource}/{created_id}",
-        headers=auth_headers(token),
-    )
-    assert delete_response.status_code == 204
-    assert (
-        latest_audit_action(
-            session_factory, entity_type=spec.entity_type, entity_id=created_id
-        )
-        == "DELETE"
-    )
-    assert record_exists(session_factory, spec.record_type, created_id) is False
-
-    missing_response = client.get(
-        f"/v1/{spec.resource}/{uuid.uuid4()}",
-        headers=auth_headers(token),
-    )
-    assert_error_shape(missing_response, status_code=404, error_code="not_found")
-
-
-def test_actor_soft_delete_and_boolean_filtering(
-    client: TestClient,
-    session_factory: sessionmaker[Session],
-    deps: Dependencies,
-) -> None:
-    spec = core_specs()[6]
-    actor = seed_actor(
-        session_factory,
-        handle="actor-admin",
-        actor_type="admin",
-        display_name="Actor Admin",
-    )
-    token = seed_token(
-        session_factory,
-        actor_id=actor.id,
-        scopes=[spec.read_scope, spec.write_scope],
-    )
-    spec.seed_sibling(session_factory, deps)
-
-    create_response = client.post(
-        "/v1/actors",
-        headers=auth_headers(token),
-        json=spec.create_payload(deps),
-    )
-    assert create_response.status_code == 201
-    created_id = uuid.UUID(create_response.json()["id"])
-
-    active_list = client.get(
-        "/v1/actors",
-        headers=auth_headers(token),
-        params={"is_active": "true"},
-    )
-    assert active_list.status_code == 200
-    assert str(created_id) in {item["id"] for item in active_list.json()}
-
-    delete_response = client.delete(
-        f"/v1/actors/{created_id}",
-        headers=auth_headers(token),
-    )
-    assert delete_response.status_code == 204
-    assert (
-        latest_audit_action(session_factory, entity_type="actor", entity_id=created_id)
-        == "UPDATE"
-    )
-    assert record_exists(session_factory, ActorRecord, created_id) is True
-    assert actor_is_active(session_factory, created_id) is False
-
-    inactive_list = client.get(
-        "/v1/actors",
-        headers=auth_headers(token),
-        params={"is_active": "false"},
-    )
-    assert inactive_list.status_code == 200
-    assert [item["id"] for item in inactive_list.json()] == [str(created_id)]
-
-
-def test_policy_learning_and_edge_filters_cover_int_date_and_enum_paths(
-    client: TestClient,
-    session_factory: sessionmaker[Session],
-    deps: Dependencies,
-) -> None:
-    actor = seed_actor(
-        session_factory,
-        handle="meta-admin",
-        actor_type="admin",
-        display_name="Meta Admin",
-    )
-    token = seed_token(
-        session_factory,
-        actor_id=actor.id,
-        scopes=[
-            "policy:read",
-            "policy:write",
-            "learning:read",
-            "learning:write",
-            "edge:read",
-            "edge:write",
-        ],
-    )
-
-    policy_payload = model_from(
-        PolicyModel,
-        {
-            "id": str(uuid.uuid4()),
-            "workspace_id": str(deps.workspace_id),
-            "name": "default-coding",
-            "version": "1.0.0",
-            "hitl_required": False,
-            "autonomy_tier": 3,
-            "body": {"rule": "allow"},
-            "created_at": "2026-04-20T00:00:00+00:00",
-            "updated_at": "2026-04-20T00:00:00+00:00",
-        },
-    ).model_dump(mode="json")
-    policy_response = client.post(
-        "/v1/policies", headers=auth_headers(token), json=policy_payload
-    )
-    assert policy_response.status_code == 201
-    assert (
-        client.get(
-            "/v1/policies",
+        create_response = client.post(
+            f"/v1/{spec.resource}",
             headers=auth_headers(token),
-            params={"autonomy_tier": "3"},
-        ).status_code
-        == 200
-    )
+            json=spec.create_payload(deps),
+        )
+        assert create_response.status_code == 201
+        created = create_response.json()
+        created_id = uuid.UUID(created["id"])
+        assert (
+            latest_audit_action(
+                session_factory, entity_type=spec.entity_type, entity_id=created_id
+            )
+            == "CREATE"
+        )
 
-    learning_payload = model_from(
-        LearningModel,
-        {
-            "id": str(uuid.uuid4()),
-            "task_id": str(deps.task_id),
-            "owner_actor_id": str(deps.actor_id),
-            "title": "Learning Alpha",
-            "learning_type": "pattern",
-            "what_happened": "A thing happened",
-            "what_learned": "A thing was learned",
-            "action_rule": "Do the better thing",
-            "applies_when": "Always",
-            "does_not_apply_when": "Never",
-            "evidence": ["run:1"],
-            "scope": "project",
-            "confidence": "confirmed",
-            "status": "active",
-            "review_date": "2026-04-21",
-            "embedding": None,
-            "created_at": "2026-04-20T00:00:00+00:00",
-            "updated_at": "2026-04-20T00:00:00+00:00",
-        },
-    ).model_dump(mode="json")
-    learning_response = client.post(
-        "/v1/learnings", headers=auth_headers(token), json=learning_payload
-    )
-    assert learning_response.status_code == 201
-    assert (
-        client.get(
-            "/v1/learnings",
+        get_response = client.get(
+            f"/v1/{spec.resource}/{created_id}",
             headers=auth_headers(token),
-            params={"review_date": "2026-04-21"},
-        ).status_code
-        == 200
-    )
+        )
+        assert get_response.status_code == 200
+        assert get_response.json()["id"] == str(created_id)
 
-    edge_payload = model_from(
-        EdgeModel,
-        {
-            "id": str(uuid.uuid4()),
-            "src_entity_type": "task",
-            "src_id": str(deps.task_id),
-            "dst_entity_type": "project",
-            "dst_id": str(deps.project_id),
-            "relation": "depends_on",
-            "metadata": {},
-            "created_by": str(deps.actor_id),
-            "created_at": "2026-04-20T00:00:00+00:00",
-        },
-    ).model_dump(mode="json")
-    edge_response = client.post(
-        "/v1/edges", headers=auth_headers(token), json=edge_payload
-    )
-    assert edge_response.status_code == 201
-    assert (
-        client.get(
-            "/v1/edges",
+        list_response = client.get(
+            f"/v1/{spec.resource}",
             headers=auth_headers(token),
-            params={"relation": "depends_on"},
-        ).status_code
-        == 200
-    )
+            params=spec.filter_params(created, deps),
+        )
+        assert list_response.status_code == 200
+        assert [item["id"] for item in list_response.json()] == [str(created_id)]
+
+        update_response = client.patch(
+            f"/v1/{spec.resource}/{created_id}",
+            headers=auth_headers(token),
+            json=spec.update_payload,
+        )
+        assert update_response.status_code == 200
+        assert update_response.json()[spec.updated_field] == spec.updated_value
+        assert (
+            latest_audit_action(
+                session_factory, entity_type=spec.entity_type, entity_id=created_id
+            )
+            == "UPDATE"
+        )
+
+        if spec.soft_delete:
+            active_list = client.get(
+                f"/v1/{spec.resource}",
+                headers=auth_headers(token),
+                params={"is_active": "true"},
+            )
+            assert active_list.status_code == 200
+            assert str(created_id) in {item["id"] for item in active_list.json()}
+
+        delete_response = client.delete(
+            f"/v1/{spec.resource}/{created_id}",
+            headers=auth_headers(token),
+        )
+        assert delete_response.status_code == 204
+
+        if spec.soft_delete:
+            assert (
+                latest_audit_action(
+                    session_factory, entity_type=spec.entity_type, entity_id=created_id
+                )
+                == "UPDATE"
+            )
+            assert record_exists(session_factory, spec.record_type, created_id) is True
+            assert actor_is_active(session_factory, created_id) is False
+
+            inactive_list = client.get(
+                f"/v1/{spec.resource}",
+                headers=auth_headers(token),
+                params={"is_active": "false"},
+            )
+            assert inactive_list.status_code == 200
+            assert [item["id"] for item in inactive_list.json()] == [str(created_id)]
+        else:
+            assert (
+                latest_audit_action(
+                    session_factory, entity_type=spec.entity_type, entity_id=created_id
+                )
+                == "DELETE"
+            )
+            assert record_exists(session_factory, spec.record_type, created_id) is False
+
+        missing_response = client.get(
+            f"/v1/{spec.resource}/{uuid.uuid4()}",
+            headers=auth_headers(token),
+        )
+        assert_error_shape(missing_response, status_code=404, error_code="not_found")
+
+    return _exercise
 
 
-def test_duplicate_create_invalid_filter_invalid_value_invalid_payload_and_immutable_patch_are_structured(
-    client: TestClient,
-    session_factory: sessionmaker[Session],
-    deps: Dependencies,
-) -> None:
-    actor = seed_actor(
-        session_factory,
-        handle="workspace-admin",
-        actor_type="admin",
-        display_name="Workspace Admin",
-    )
-    token = seed_token(
-        session_factory,
-        actor_id=actor.id,
-        scopes=["workspace:read", "workspace:write", "actor:read", "edge:read"],
-    )
+@pytest.fixture
+def assert_core_entity_auth_failures() -> Callable[..., None]:
+    def _assert(
+        spec: CrudSpec,
+        client: TestClient,
+        session_factory: sessionmaker[Session],
+        deps: Dependencies,
+    ) -> None:
+        missing_auth = client.get(f"/v1/{spec.resource}")
+        assert_error_shape(missing_auth, status_code=401, error_code="unauthorized")
 
-    workspace_payload = core_specs()[0].create_payload(deps)
-    create_response = client.post(
-        "/v1/workspaces",
-        headers=auth_headers(token),
-        json=workspace_payload,
-    )
-    assert create_response.status_code == 201
-    created_id = create_response.json()["id"]
+        expired_actor = seed_actor(
+            session_factory,
+            handle=f"{spec.entity_type}-expired-admin",
+            actor_type="admin",
+            display_name=f"{spec.entity_type.capitalize()} Expired Admin",
+        )
+        expired_token = seed_token(
+            session_factory,
+            actor_id=expired_actor.id,
+            scopes=[spec.read_scope, spec.write_scope],
+            expires_at=dt.datetime.now(dt.UTC) - dt.timedelta(minutes=1),
+        )
+        expired_response = client.get(
+            f"/v1/{spec.resource}",
+            headers=auth_headers(expired_token),
+        )
+        assert_error_shape(expired_response, status_code=401, error_code="unauthorized")
 
-    duplicate_response = client.post(
-        "/v1/workspaces",
-        headers=auth_headers(token),
-        json={
-            **core_specs()[0].create_payload(deps),
-            "slug": workspace_payload["slug"],
-        },
-    )
-    assert_error_shape(duplicate_response, status_code=409, error_code="conflict")
+        limited_actor = seed_actor(
+            session_factory,
+            handle=f"{spec.entity_type}-limited-user",
+            actor_type="agent",
+            display_name=f"{spec.entity_type.capitalize()} Limited User",
+        )
+        limited_token = seed_token(
+            session_factory,
+            actor_id=limited_actor.id,
+            scopes=[spec.read_scope],
+        )
+        forbidden_response = client.post(
+            f"/v1/{spec.resource}",
+            headers=auth_headers(limited_token),
+            json=spec.create_payload(deps),
+        )
+        assert_error_shape(forbidden_response, status_code=403, error_code="forbidden")
 
-    conflicting_slug = "workspace-conflict"
-    seed_workspace(session_factory, slug=conflicting_slug, name="Workspace Conflict")
-    conflict_update = client.patch(
-        f"/v1/workspaces/{created_id}",
-        headers=auth_headers(token),
-        json={"slug": conflicting_slug},
-    )
-    assert_error_shape(conflict_update, status_code=409, error_code="conflict")
-
-    unknown_filter_response = client.get(
-        "/v1/workspaces",
-        headers=auth_headers(token),
-        params={"unknown": "value"},
-    )
-    assert_error_shape(
-        unknown_filter_response, status_code=400, error_code="bad_request"
-    )
-
-    invalid_bool_filter = client.get(
-        "/v1/actors",
-        headers=auth_headers(token),
-        params={"is_active": "maybe"},
-    )
-    assert_error_shape(invalid_bool_filter, status_code=400, error_code="bad_request")
-
-    invalid_enum_filter = client.get(
-        "/v1/edges",
-        headers=auth_headers(token),
-        params={"relation": "not-a-relation"},
-    )
-    assert_error_shape(invalid_enum_filter, status_code=400, error_code="bad_request")
-
-    invalid_payload = client.post(
-        "/v1/workspaces",
-        headers=auth_headers(token),
-        json={"slug": "missing-fields"},
-    )
-    assert_error_shape(invalid_payload, status_code=422, error_code="validation_error")
-
-    immutable_patch = client.patch(
-        f"/v1/workspaces/{created_id}",
-        headers=auth_headers(token),
-        json={"id": str(uuid.uuid4())},
-    )
-    assert_error_shape(immutable_patch, status_code=400, error_code="bad_request")
+    return _assert
