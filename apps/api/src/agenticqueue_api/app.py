@@ -55,8 +55,6 @@ from agenticqueue_api.learnings import (
     DraftLearningView,
     DraftRejectRequest,
     DraftStore,
-    LearningPromotionService,
-    PromoteLearningRequest,
 )
 from agenticqueue_api.models import (
     ActorModel,
@@ -64,11 +62,11 @@ from agenticqueue_api.models import (
     ApiTokenModel,
     CapabilityGrantModel,
     CapabilityKey,
-    LearningModel,
     LearningRecord,
     TaskRecord,
 )
 from agenticqueue_api.models.shared import SchemaModel
+from agenticqueue_api.routers import build_learnings_router
 from agenticqueue_api.task_type_registry import TaskTypeDefinition, TaskTypeRegistry
 
 
@@ -377,6 +375,7 @@ def create_app(
     )
     app.add_middleware(ContentSizeLimitMiddleware)
     install_exception_handlers(app)
+    app.include_router(build_learnings_router(get_db_session))
     app.include_router(build_crud_router(get_db_session))
 
     @app.get(
@@ -704,50 +703,6 @@ def create_app(
                     status.HTTP_409_CONFLICT,
                     str(error),
                     details={"draft_id": str(draft_id), "actor_id": str(actor.id)},
-                )
-
-    @app.post(
-        "/learnings/{learning_id}/promote",
-        include_in_schema=False,
-        response_model=LearningModel,
-    )
-    @app.post(
-        "/v1/learnings/{learning_id}/promote",
-        response_model=LearningModel,
-    )
-    def promote_learning(
-        learning_id: uuid.UUID,
-        payload: PromoteLearningRequest,
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> LearningModel:
-        actor = _require_actor(request)
-        _require_token_scope(request, "learning:write")
-        service = LearningPromotionService(session)
-        with write_timeout(session, endpoint="v1.learnings.promote"):
-            _require_learning_promotion_capability(
-                request=request,
-                session=session,
-                entity_id=learning_id,
-            )
-            try:
-                return service.promote(
-                    learning_id=learning_id,
-                    target_scope=payload.target_scope,
-                )
-            except KeyError:
-                raise_api_error(
-                    status.HTTP_404_NOT_FOUND,
-                    "Learning not found",
-                )
-            except ValueError as error:
-                raise_api_error(
-                    status.HTTP_409_CONFLICT,
-                    str(error),
-                    details={
-                        "learning_id": str(learning_id),
-                        "actor_id": str(actor.id),
-                    },
                 )
 
     return app

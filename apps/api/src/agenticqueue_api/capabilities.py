@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from agenticqueue_api.errors import raise_api_error
 from agenticqueue_api.models import (
+    ActorModel,
     AuditLogRecord,
     CapabilityGrantModel,
     CapabilityGrantRecord,
@@ -228,6 +229,44 @@ def list_capabilities_for_actor(
     ]
 
 
+def ensure_actor_has_capability(
+    session: Session,
+    *,
+    actor: ActorModel | None,
+    capability: CapabilityKey,
+    required_scope: Mapping[str, Any] | None = None,
+    entity_type: str,
+    entity_id: uuid.UUID | None = None,
+) -> None:
+    """Raise unless the actor holds the required capability for the scope."""
+
+    if actor is None:
+        raise_api_error(status.HTTP_401_UNAUTHORIZED, "Invalid bearer token")
+
+    if actor.actor_type == "admin":
+        return
+
+    normalized_scope = _normalize_scope(required_scope)
+    for grant in list_capabilities_for_actor(session, actor.id):
+        if grant.capability not in {capability, CapabilityKey.ADMIN}:
+            continue
+        if _grant_covers_scope(grant.scope, normalized_scope):
+            return
+
+    _write_capability_denial(
+        session,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        capability=capability,
+        required_scope=normalized_scope,
+    )
+    raise_api_error(
+        status.HTTP_403_FORBIDDEN,
+        "Capability grant required",
+        details=_capability_denial_details(capability, normalized_scope),
+    )
+
+
 def require_capability(
     capability: CapabilityKey,
     scope_func: CapabilityScopeFunc | None = None,
@@ -248,32 +287,19 @@ def require_capability(
         if actor is None:
             raise_api_error(status.HTTP_401_UNAUTHORIZED, "Invalid bearer token")
 
-        if actor.actor_type == "admin":
-            return
-
         required_scope = _normalize_scope(
             resolved_scope_func(request, session, payload, entity_id)
         )
-        for grant in list_capabilities_for_actor(session, actor.id):
-            if grant.capability not in {capability, CapabilityKey.ADMIN}:
-                continue
-            if _grant_covers_scope(grant.scope, required_scope):
-                return
-
         denied_entity_id = entity_id
         if denied_entity_id is None and payload is not None:
             denied_entity_id = _coerce_entity_id(payload.get("id"))
-        _write_capability_denial(
+        ensure_actor_has_capability(
             session,
-            entity_type=entity_type,
-            entity_id=denied_entity_id,
+            actor=actor,
             capability=capability,
             required_scope=required_scope,
-        )
-        raise_api_error(
-            status.HTTP_403_FORBIDDEN,
-            "Capability grant required",
-            details=_capability_denial_details(capability, required_scope),
+            entity_type=entity_type,
+            entity_id=denied_entity_id,
         )
 
     dependency.__name__ = f"require_capability_{entity_type}_{capability.value}"

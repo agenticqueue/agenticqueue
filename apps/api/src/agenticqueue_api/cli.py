@@ -9,6 +9,7 @@ import sqlalchemy as sa
 import typer
 from sqlalchemy.orm import Session, sessionmaker
 
+from agenticqueue_cli.commands.learnings import build_learnings_app
 from agenticqueue_api.audit import set_session_audit_context
 from agenticqueue_api.config import (
     get_psycopg_connect_args,
@@ -26,8 +27,6 @@ from agenticqueue_api.seed import load_seed_fixture, seed_example_data
 app = typer.Typer(help="AgenticQueue local developer commands.")
 idempotency_app = typer.Typer(help="Inspect and maintain idempotency cache rows.")
 learning_app = typer.Typer(help="Inspect and promote learnings.")
-app.add_typer(idempotency_app, name="idempotency")
-app.add_typer(learning_app, name="learning")
 
 
 def _default_session_factory() -> sessionmaker[Session]:
@@ -108,6 +107,12 @@ def learning_promote_command(
         session.commit()
 
     typer.echo(json.dumps(promoted.model_dump(mode="json"), sort_keys=True))
+
+
+learnings_app = build_learnings_app(session_factory=_default_session_factory())
+app.add_typer(idempotency_app, name="idempotency")
+app.add_typer(learning_app, name="learning")
+app.add_typer(learnings_app, name="learnings")
 
 
 if __name__ == "__main__":
