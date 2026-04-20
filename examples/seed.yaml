@@ -1,0 +1,49 @@
+workspace:
+  id: "7d59fa2a-2b4f-4f2c-839a-b2f1929fdf0f"
+  slug: "example-workspace"
+  name: "Example Workspace"
+  description: "Deterministic local seed workspace."
+  created_at: "2026-04-20T00:00:00+00:00"
+  updated_at: "2026-04-20T00:00:00+00:00"
+
+project:
+  id: "4efeba0d-a95a-4a47-934f-30f4f5bf1be0"
+  slug: "example-project"
+  name: "Example Project"
+  description: "Deterministic local seed project."
+  created_at: "2026-04-20T00:00:00+00:00"
+  updated_at: "2026-04-20T00:00:00+00:00"
+
+actor:
+  id: "8c39da51-f993-43cf-a60f-9f47136d58c3"
+  handle: "example-admin"
+  actor_type: "admin"
+  display_name: "Example Admin"
+  auth_subject: "example-admin-subject"
+  is_active: true
+  created_at: "2026-04-20T00:00:00+00:00"
+  updated_at: "2026-04-20T00:00:00+00:00"
+
+token:
+  id: "7c1fe404-2d4c-48e0-8773-6f04180eeedd"
+  raw_secret: "example-seed-admin-token"
+  scopes:
+    - "admin"
+  created_at: "2026-04-20T00:00:00+00:00"
+  updated_at: "2026-04-20T00:00:00+00:00"
+
+task:
+  id: "8d7ef906-2fd0-4f59-a1e5-267af2e7c0f5"
+  task_type: "coding-task"
+  title: "Example coding task"
+  state: "todo"
+  description: "Seeded coding-task for local claim and API smoke tests."
+  contract:
+    surface_area:
+      - "apps/api/src/agenticqueue_api"
+      - "tests/integration"
+      - "examples/seed.yaml"
+  definition_of_done:
+    - "GET /v1/tasks?state=todo returns this task."
+  created_at: "2026-04-20T00:00:00+00:00"
+  updated_at: "2026-04-20T00:00:00+00:00"
