@@ -247,15 +247,13 @@ def test_verify_endpoint_finds_first_tampered_row(
 
     with psycopg.connect(get_sync_database_url()) as connection:
         with connection.cursor() as cursor:
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT id
                 FROM agenticqueue.audit_log
                 ORDER BY chain_position
                 OFFSET 2
                 LIMIT 1
-                """
-            )
+                """)
             row = cursor.fetchone()
             assert row is not None
             tampered_id = row[0]

@@ -31,8 +31,7 @@ def upgrade() -> None:
         schema="agenticqueue",
     )
     op.execute("DROP TRIGGER IF EXISTS audit_log_append_only ON agenticqueue.audit_log")
-    op.execute(
-        """
+    op.execute("""
         CREATE SEQUENCE IF NOT EXISTS agenticqueue.audit_log_chain_position_seq
         AS bigint
         START WITH 1
@@ -40,11 +39,9 @@ def upgrade() -> None:
         NO MINVALUE
         NO MAXVALUE
         CACHE 1
-        """
-    )
+        """)
 
-    op.execute(
-        f"""
+    op.execute(f"""
         CREATE OR REPLACE FUNCTION agenticqueue.audit_log_chain_digest(
           previous_hash bytea,
           audit_id uuid,
@@ -82,11 +79,9 @@ def upgrade() -> None:
             'sha256'
           )
         $$;
-        """
-    )
+        """)
 
-    op.execute(
-        f"""
+    op.execute(f"""
         WITH RECURSIVE ordered AS (
           SELECT
             audit_log.id,
@@ -152,10 +147,11 @@ def upgrade() -> None:
           row_hash = chain.row_hash
         FROM chain
         WHERE audit_log.id = chain.id;
-        """
-    )
+        """)
 
-    op.alter_column("audit_log", "chain_position", nullable=False, schema="agenticqueue")
+    op.alter_column(
+        "audit_log", "chain_position", nullable=False, schema="agenticqueue"
+    )
     op.alter_column("audit_log", "prev_hash", nullable=False, schema="agenticqueue")
     op.alter_column("audit_log", "row_hash", nullable=False, schema="agenticqueue")
     op.create_index(
@@ -165,18 +161,15 @@ def upgrade() -> None:
         unique=True,
         schema="agenticqueue",
     )
-    op.execute(
-        """
+    op.execute("""
         SELECT setval(
           'agenticqueue.audit_log_chain_position_seq',
           COALESCE((SELECT MAX(chain_position) FROM agenticqueue.audit_log), 1),
           COALESCE((SELECT COUNT(*) > 0 FROM agenticqueue.audit_log), FALSE)
         )
-        """
-    )
+        """)
 
-    op.execute(
-        f"""
+    op.execute(f"""
         CREATE OR REPLACE FUNCTION agenticqueue.audit_log_set_chain_hashes()
         RETURNS trigger
         AS $$
@@ -210,20 +203,18 @@ def upgrade() -> None:
           RETURN NEW;
         END;
         $$ LANGUAGE plpgsql;
-        """
-    )
-    op.execute("DROP TRIGGER IF EXISTS audit_log_set_chain_hashes ON agenticqueue.audit_log")
+        """)
     op.execute(
-        """
+        "DROP TRIGGER IF EXISTS audit_log_set_chain_hashes ON agenticqueue.audit_log"
+    )
+    op.execute("""
         CREATE TRIGGER audit_log_set_chain_hashes
         BEFORE INSERT ON agenticqueue.audit_log
         FOR EACH ROW
         EXECUTE FUNCTION agenticqueue.audit_log_set_chain_hashes();
-        """
-    )
+        """)
 
-    op.execute(
-        """
+    op.execute("""
         CREATE OR REPLACE FUNCTION agenticqueue.prevent_audit_log_mutation()
         RETURNS trigger
         AS $$
@@ -233,19 +224,15 @@ def upgrade() -> None:
                   ERRCODE = '55000';
         END;
         $$ LANGUAGE plpgsql;
-        """
-    )
-    op.execute(
-        """
+        """)
+    op.execute("""
         CREATE TRIGGER audit_log_append_only
         BEFORE UPDATE OR DELETE ON agenticqueue.audit_log
         FOR EACH ROW
         EXECUTE FUNCTION agenticqueue.prevent_audit_log_mutation();
-        """
-    )
+        """)
 
-    op.execute(
-        f"""
+    op.execute(f"""
         CREATE OR REPLACE FUNCTION agenticqueue.verify_audit_log_chain()
         RETURNS TABLE (
           chain_length bigint,
@@ -312,11 +299,9 @@ def upgrade() -> None:
             ) AS verified_count,
             (SELECT first_break.id FROM first_break) AS first_break_id_or_null
         $$;
-        """
-    )
+        """)
 
-    op.execute(
-        """
+    op.execute("""
         DO $$
         BEGIN
           IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'agenticqueue_app') THEN
@@ -324,8 +309,7 @@ def upgrade() -> None:
           END IF;
         END
         $$;
-        """
-    )
+        """)
     op.execute("GRANT agenticqueue_app TO CURRENT_USER")
     op.execute("GRANT USAGE ON SCHEMA agenticqueue TO agenticqueue_app")
     op.execute("GRANT SELECT, INSERT ON agenticqueue.audit_log TO agenticqueue_app")
@@ -345,12 +329,13 @@ def downgrade() -> None:
     op.execute("REVOKE USAGE ON SCHEMA agenticqueue FROM agenticqueue_app")
 
     op.execute("DROP FUNCTION IF EXISTS agenticqueue.verify_audit_log_chain()")
-    op.execute("DROP TRIGGER IF EXISTS audit_log_set_chain_hashes ON agenticqueue.audit_log")
+    op.execute(
+        "DROP TRIGGER IF EXISTS audit_log_set_chain_hashes ON agenticqueue.audit_log"
+    )
     op.execute("DROP FUNCTION IF EXISTS agenticqueue.audit_log_set_chain_hashes()")
     op.execute("DROP INDEX IF EXISTS agenticqueue.uq_audit_log_chain_position")
     op.execute("DROP SEQUENCE IF EXISTS agenticqueue.audit_log_chain_position_seq")
-    op.execute(
-        """
+    op.execute("""
         DROP FUNCTION IF EXISTS agenticqueue.audit_log_chain_digest(
           bytea,
           uuid,
@@ -364,11 +349,9 @@ def downgrade() -> None:
           text,
           jsonb
         )
-        """
-    )
+        """)
 
-    op.execute(
-        """
+    op.execute("""
         CREATE OR REPLACE FUNCTION agenticqueue.prevent_audit_log_mutation()
         RETURNS trigger
         AS $$
@@ -391,9 +374,10 @@ def downgrade() -> None:
           RAISE EXCEPTION 'audit_log is append-only';
         END;
         $$ LANGUAGE plpgsql;
-        """
-    )
+        """)
 
-    op.execute("ALTER TABLE agenticqueue.audit_log DROP COLUMN IF EXISTS chain_position")
+    op.execute(
+        "ALTER TABLE agenticqueue.audit_log DROP COLUMN IF EXISTS chain_position"
+    )
     op.drop_column("audit_log", "row_hash", schema="agenticqueue")
     op.drop_column("audit_log", "prev_hash", schema="agenticqueue")

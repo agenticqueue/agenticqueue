@@ -302,17 +302,14 @@ def create_app(
         session: Session = Depends(get_db_session),
     ) -> AuditVerifyResponse:
         _require_admin_actor(request)
-        report = session.execute(
-            sa.text(
-                """
-                SELECT
-                  chain_length,
-                  verified_count,
-                  first_break_id_or_null
-                FROM agenticqueue.verify_audit_log_chain()
-                """
-            )
-        ).mappings().one()
+        query = sa.text("""
+            SELECT
+              chain_length,
+              verified_count,
+              first_break_id_or_null
+            FROM agenticqueue.verify_audit_log_chain()
+            """)
+        report = session.execute(query).mappings().one()
         return AuditVerifyResponse.model_validate(dict(report))
 
     @app.get("/task-types", include_in_schema=False, response_model=list[TaskTypeView])
