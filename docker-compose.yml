@@ -29,6 +29,7 @@ services:
       MAX_CLIENT_CONN: 200
       RESERVE_POOL_SIZE: 5
       MAX_PREPARED_STATEMENTS: 0
+      SERVER_RESET_QUERY_ALWAYS: 1
       ADMIN_USERS: agenticqueue
       STATS_USERS: agenticqueue
     healthcheck:

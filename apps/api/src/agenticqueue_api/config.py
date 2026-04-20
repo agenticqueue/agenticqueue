@@ -12,6 +12,9 @@ DEFAULT_DATABASE_URL = (
 DEFAULT_TOKEN_SIGNING_SECRET = "agenticqueue-dev-token-signing-secret"
 DEFAULT_EMBEDDING_DIMENSION = 768
 DEFAULT_VECTOR_IVFFLAT_LISTS = 100
+DEFAULT_ROLE_STATEMENT_TIMEOUT_MS = 5000
+DEFAULT_GRAPH_TRAVERSAL_TIMEOUT_MS = 2000
+DEFAULT_WRITE_STATEMENT_TIMEOUT_MS = 10000
 DEFAULT_TASK_TYPES_DIR = Path(__file__).resolve().parents[4] / "task_types"
 DEFAULT_POLICIES_DIR = Path(__file__).resolve().parents[4] / "policies"
 ASYNC_PREFIX = "postgresql+asyncpg://"
@@ -100,6 +103,39 @@ def get_vector_ivfflat_lists() -> int:
     """Return the ivfflat list count used for embedding indexes."""
     return int(
         os.getenv("AGENTICQUEUE_VECTOR_IVFFLAT_LISTS", DEFAULT_VECTOR_IVFFLAT_LISTS)
+    )
+
+
+def get_role_statement_timeout_ms() -> int:
+    """Return the default role-level statement timeout in milliseconds."""
+
+    return int(
+        os.getenv(
+            "AGENTICQUEUE_ROLE_STATEMENT_TIMEOUT_MS",
+            DEFAULT_ROLE_STATEMENT_TIMEOUT_MS,
+        )
+    )
+
+
+def get_graph_traversal_timeout_ms() -> int:
+    """Return the graph-read timeout budget in milliseconds."""
+
+    return int(
+        os.getenv(
+            "AGENTICQUEUE_GRAPH_TRAVERSAL_TIMEOUT_MS",
+            DEFAULT_GRAPH_TRAVERSAL_TIMEOUT_MS,
+        )
+    )
+
+
+def get_write_statement_timeout_ms() -> int:
+    """Return the mutating-request timeout budget in milliseconds."""
+
+    return int(
+        os.getenv(
+            "AGENTICQUEUE_WRITE_STATEMENT_TIMEOUT_MS",
+            DEFAULT_WRITE_STATEMENT_TIMEOUT_MS,
+        )
     )
 
 

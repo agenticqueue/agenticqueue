@@ -9,6 +9,7 @@ from alembic.script import ScriptDirectory
 
 from agenticqueue_api.config import get_sync_database_url
 from agenticqueue_api.pgvector import EMBEDDING_TABLES, embedding_index_name
+from tests.timeout_support import role_timeout_is_persisted
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_CONFIG_PATH = REPO_ROOT / "apps" / "api" / "alembic.ini"
@@ -33,7 +34,7 @@ ENTITY_TABLES = {
 PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
 PRE_IDEMPOTENCY_TABLES = ENTITY_TABLES - {"idempotency_key"}
-PRE_LATEST_REVISION = "20260420_10"
+PRE_LATEST_REVISION = "20260420_11"
 
 
 def alembic_config() -> Config:
@@ -269,6 +270,7 @@ def test_migration_reaches_head_with_extensions() -> None:
         }
     )
     assert_embedding_columns_and_indexes()
+    assert role_timeout_is_persisted() is True
 
 
 def test_latest_migration_is_reversible() -> None:
@@ -305,11 +307,14 @@ def test_latest_migration_is_reversible() -> None:
             "actor_id",
             "after",
             "before",
+            "chain_position",
             "created_at",
             "entity_id",
             "entity_type",
             "id",
+            "prev_hash",
             "redaction",
+            "row_hash",
             "trace_id",
         }
     )
@@ -331,6 +336,7 @@ def test_latest_migration_is_reversible() -> None:
     assert_policy_attachment_columns("project", expected_present=True)
     assert_policy_attachment_columns("task", expected_present=True)
     assert_embedding_columns_and_indexes()
+    assert role_timeout_is_persisted() is False
     upgrade(config, "head")
     expected_head = ScriptDirectory.from_config(config).get_current_head()
     assert expected_head is not None
@@ -385,6 +391,7 @@ def test_latest_migration_is_reversible() -> None:
         }
     )
     assert_embedding_columns_and_indexes()
+    assert role_timeout_is_persisted() is True
 
 
 def test_full_migration_stack_is_reversible_to_base() -> None:
@@ -428,3 +435,4 @@ def test_full_migration_stack_is_reversible_to_base() -> None:
     assert_policy_attachment_columns("project", expected_present=True)
     assert_policy_attachment_columns("task", expected_present=True)
     assert_embedding_columns_and_indexes()
+    assert role_timeout_is_persisted() is True

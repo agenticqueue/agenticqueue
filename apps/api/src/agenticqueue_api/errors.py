@@ -9,6 +9,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
 
+from agenticqueue_api.db import StatementTimeoutError
+
 ERROR_CODE_BY_STATUS = {
     status.HTTP_400_BAD_REQUEST: "bad_request",
     status.HTTP_401_UNAUTHORIZED: "unauthorized",
@@ -17,6 +19,7 @@ ERROR_CODE_BY_STATUS = {
     status.HTTP_409_CONFLICT: "conflict",
     status.HTTP_413_CONTENT_TOO_LARGE: "payload_too_large",
     status.HTTP_422_UNPROCESSABLE_CONTENT: "validation_error",
+    status.HTTP_504_GATEWAY_TIMEOUT: "gateway_timeout",
     status.HTTP_500_INTERNAL_SERVER_ERROR: "internal_server_error",
 }
 
@@ -101,8 +104,35 @@ async def handle_validation_exception(request: Request, exc: Exception) -> JSONR
     )
 
 
+async def handle_statement_timeout_exception(
+    request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    """Render statement timeout failures as HTTP 504s."""
+
+    del request
+    timeout_exc = cast(StatementTimeoutError, exc)
+    return JSONResponse(
+        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        content=error_payload(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            message="Database statement timed out",
+            details={
+                "endpoint": timeout_exc.endpoint,
+                "sql_fingerprint": timeout_exc.sql_fingerprint,
+                "elapsed_ms": timeout_exc.elapsed_ms,
+                "timeout_ms": timeout_exc.timeout_ms,
+            },
+        ),
+    )
+
+
 def install_exception_handlers(app: FastAPI) -> None:
     """Install the API exception handlers on a FastAPI app."""
 
     app.add_exception_handler(HTTPException, handle_http_exception)
     app.add_exception_handler(RequestValidationError, handle_validation_exception)
+    app.add_exception_handler(
+        StatementTimeoutError,
+        handle_statement_timeout_exception,
+    )

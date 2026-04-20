@@ -38,6 +38,7 @@ from agenticqueue_api.config import (
     get_task_types_dir,
 )
 from agenticqueue_api.crud import build_crud_router
+from agenticqueue_api.db import write_timeout
 from agenticqueue_api.errors import install_exception_handlers, raise_api_error
 from agenticqueue_api.middleware import (
     ContentSizeLimitMiddleware,
@@ -372,20 +373,22 @@ def create_app(
         request: Request,
         session: Session = Depends(get_db_session),
     ) -> ProvisionApiTokenResponse:
-        _require_admin_actor(request)
-        actor_exists = session.get(ActorRecord, payload.actor_id)
-        if actor_exists is None:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
+        with write_timeout(session, endpoint="v1.auth.tokens.provision"):
+            _require_admin_actor(request)
+            actor_exists = session.get(ActorRecord, payload.actor_id)
+            if actor_exists is None:
+                raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
 
-        api_token, raw_token = issue_api_token(
-            session,
-            actor_id=payload.actor_id,
-            scopes=payload.scopes,
-            expires_at=payload.expires_at,
-        )
-        return ProvisionApiTokenResponse(
-            token=raw_token, api_token=_token_view(api_token)
-        )
+            api_token, raw_token = issue_api_token(
+                session,
+                actor_id=payload.actor_id,
+                scopes=payload.scopes,
+                expires_at=payload.expires_at,
+            )
+            return ProvisionApiTokenResponse(
+                token=raw_token,
+                api_token=_token_view(api_token),
+            )
 
     @app.post("/v1/auth/tokens/{token_id}/revoke", response_model=ApiTokenView)
     def revoke_token(
@@ -393,17 +396,18 @@ def create_app(
         request: Request,
         session: Session = Depends(get_db_session),
     ) -> ApiTokenView:
-        actor = _require_actor(request)
-        existing = get_api_token(session, token_id)
-        if existing is None:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "Token not found")
-        if actor.actor_type != "admin" and existing.actor_id != actor.id:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "Token not found")
+        with write_timeout(session, endpoint="v1.auth.tokens.revoke"):
+            actor = _require_actor(request)
+            existing = get_api_token(session, token_id)
+            if existing is None:
+                raise_api_error(status.HTTP_404_NOT_FOUND, "Token not found")
+            if actor.actor_type != "admin" and existing.actor_id != actor.id:
+                raise_api_error(status.HTTP_404_NOT_FOUND, "Token not found")
 
-        revoked = revoke_api_token(session, token_id)
-        if revoked is None:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "Token not found")
-        return _token_view(revoked)
+            revoked = revoke_api_token(session, token_id)
+            if revoked is None:
+                raise_api_error(status.HTTP_404_NOT_FOUND, "Token not found")
+            return _token_view(revoked)
 
     @app.post(
         "/v1/capabilities/grant",
@@ -415,23 +419,24 @@ def create_app(
         request: Request,
         session: Session = Depends(get_db_session),
     ) -> CapabilityGrantView:
-        admin_actor = _require_admin_actor(request)
-        actor_exists = session.get(ActorRecord, payload.actor_id)
-        if actor_exists is None:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
+        with write_timeout(session, endpoint="v1.capabilities.grant"):
+            admin_actor = _require_admin_actor(request)
+            actor_exists = session.get(ActorRecord, payload.actor_id)
+            if actor_exists is None:
+                raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
 
-        try:
-            grant = grant_capability(
-                session,
-                actor_id=payload.actor_id,
-                capability=payload.capability,
-                scope=payload.scope,
-                granted_by_actor_id=admin_actor.id,
-                expires_at=payload.expires_at,
-            )
-        except ValueError as error:
-            raise_api_error(status.HTTP_404_NOT_FOUND, str(error))
-        return _capability_grant_view(grant)
+            try:
+                grant = grant_capability(
+                    session,
+                    actor_id=payload.actor_id,
+                    capability=payload.capability,
+                    scope=payload.scope,
+                    granted_by_actor_id=admin_actor.id,
+                    expires_at=payload.expires_at,
+                )
+            except ValueError as error:
+                raise_api_error(status.HTTP_404_NOT_FOUND, str(error))
+            return _capability_grant_view(grant)
 
     @app.post("/v1/capabilities/revoke", response_model=CapabilityGrantView)
     def revoke_capability_endpoint(
@@ -439,11 +444,15 @@ def create_app(
         request: Request,
         session: Session = Depends(get_db_session),
     ) -> CapabilityGrantView:
-        _require_admin_actor(request)
-        revoked_grant = revoke_capability_grant(session, payload.grant_id)
-        if revoked_grant is None:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "Capability grant not found")
-        return _capability_grant_view(revoked_grant)
+        with write_timeout(session, endpoint="v1.capabilities.revoke"):
+            _require_admin_actor(request)
+            revoked_grant = revoke_capability_grant(session, payload.grant_id)
+            if revoked_grant is None:
+                raise_api_error(
+                    status.HTTP_404_NOT_FOUND,
+                    "Capability grant not found",
+                )
+            return _capability_grant_view(revoked_grant)
 
     @app.get(
         "/v1/actors/{actor_id}/capabilities",

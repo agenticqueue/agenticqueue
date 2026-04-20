@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from agenticqueue_api.capabilities import require_capability
+from agenticqueue_api.db import write_timeout
 from agenticqueue_api.errors import raise_api_error
 from agenticqueue_api.models import (
     ActorModel,
@@ -552,23 +553,29 @@ def _register_entity_routes(
         session: Session = Depends(get_db_session),
     ) -> SchemaModel:
         _require_scope(request, config.write_scope)
-        validated = _validate_payload(config, payload)
-        _validate_task_contract(request, config, validated)
-        _maybe_validate_edge(config, session, validated)
+        with write_timeout(
+            session,
+            endpoint=f"v1.{config.resource_name}.create",
+        ):
+            validated = _validate_payload(config, payload)
+            _validate_task_contract(request, config, validated)
+            _maybe_validate_edge(config, session, validated)
 
-        record = config.record_type()
-        _apply_schema_to_record(config, record, validated, exclude_none=True)
-        session.add(record)
-        try:
-            session.flush()
-        except IntegrityError as error:
-            raise_api_error(
-                status.HTTP_409_CONFLICT,
-                f"{config.scope_name.capitalize()} could not be created",
-                details={"reason": str(error.orig) if error.orig is not None else None},
-            )
-        session.refresh(record)
-        return _serialize_record(config, record)
+            record = config.record_type()
+            _apply_schema_to_record(config, record, validated, exclude_none=True)
+            session.add(record)
+            try:
+                session.flush()
+            except IntegrityError as error:
+                raise_api_error(
+                    status.HTTP_409_CONFLICT,
+                    f"{config.scope_name.capitalize()} could not be created",
+                    details={
+                        "reason": str(error.orig) if error.orig is not None else None
+                    },
+                )
+            session.refresh(record)
+            return _serialize_record(config, record)
 
     def get_entity(
         entity_id: uuid.UUID,
@@ -599,31 +606,41 @@ def _register_entity_routes(
         session: Session = Depends(get_db_session),
     ) -> SchemaModel:
         _require_scope(request, config.write_scope)
-        record = _get_record_or_404(session, config, entity_id)
-        if (
-            config.resource_name == "policies"
-            and payload
-            and _policy_is_attached(session, entity_id)
+        with write_timeout(
+            session,
+            endpoint=f"v1.{config.resource_name}.update",
         ):
-            raise_api_error(
-                status.HTTP_409_CONFLICT,
-                "Policy version is immutable once attached",
-                details={"policy_id": str(entity_id)},
+            record = _get_record_or_404(session, config, entity_id)
+            if (
+                config.resource_name == "policies"
+                and payload
+                and _policy_is_attached(session, entity_id)
+            ):
+                raise_api_error(
+                    status.HTTP_409_CONFLICT,
+                    "Policy version is immutable once attached",
+                    details={"policy_id": str(entity_id)},
+                )
+            validated = _validate_patch(
+                config,
+                _serialize_record(config, record),
+                payload,
             )
-        validated = _validate_patch(config, _serialize_record(config, record), payload)
-        _validate_task_contract(request, config, validated)
-        _maybe_validate_edge(config, session, validated)
-        _apply_schema_to_record(config, record, validated)
-        try:
-            session.flush()
-        except IntegrityError as error:
-            raise_api_error(
-                status.HTTP_409_CONFLICT,
-                f"{config.scope_name.capitalize()} could not be updated",
-                details={"reason": str(error.orig) if error.orig is not None else None},
-            )
-        session.refresh(record)
-        return _serialize_record(config, record)
+            _validate_task_contract(request, config, validated)
+            _maybe_validate_edge(config, session, validated)
+            _apply_schema_to_record(config, record, validated)
+            try:
+                session.flush()
+            except IntegrityError as error:
+                raise_api_error(
+                    status.HTTP_409_CONFLICT,
+                    f"{config.scope_name.capitalize()} could not be updated",
+                    details={
+                        "reason": str(error.orig) if error.orig is not None else None
+                    },
+                )
+            session.refresh(record)
+            return _serialize_record(config, record)
 
     def delete_entity(
         entity_id: uuid.UUID,
@@ -631,15 +648,19 @@ def _register_entity_routes(
         session: Session = Depends(get_db_session),
     ) -> Response:
         _require_scope(request, config.write_scope)
-        record = _get_record_or_404(session, config, entity_id)
-        if hasattr(record, "is_active"):
-            setattr(record, "is_active", False)
+        with write_timeout(
+            session,
+            endpoint=f"v1.{config.resource_name}.delete",
+        ):
+            record = _get_record_or_404(session, config, entity_id)
+            if hasattr(record, "is_active"):
+                setattr(record, "is_active", False)
+                session.flush()
+                return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+            session.delete(record)
             session.flush()
             return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-        session.delete(record)
-        session.flush()
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     create_entity.__name__ = f"create_{config.resource_name}"
     get_entity.__name__ = f"get_{config.resource_name}"
