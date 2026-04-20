@@ -617,5 +617,5 @@ def test_promote_endpoint_requires_capability_and_updates_learning(
     )
 
     assert response.status_code == 200
-    assert response.json()["scope"] == LearningScope.PROJECT.value
-    assert response.json()["promotion_eligible"] is False
+    assert response.json()["learning"]["scope"] == LearningScope.PROJECT.value
+    assert response.json()["learning"]["promotion_eligible"] is False
