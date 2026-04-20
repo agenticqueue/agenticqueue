@@ -26,7 +26,10 @@ from agenticqueue_api.models import (
     TaskModel,
     WorkspaceModel,
 )
-from agenticqueue_api.packet_versions import get_current_packet_version, packet_content_hash
+from agenticqueue_api.packet_versions import (
+    get_current_packet_version,
+    packet_content_hash,
+)
 from agenticqueue_api.repo import (
     create_actor,
     create_project,
@@ -104,7 +107,9 @@ def _actor_payload(*, handle: str, actor_type: str = "agent") -> ActorModel:
     )
 
 
-def _mcp_call(server, tool_name: str, arguments: dict[str, object]) -> dict[str, object]:
+def _mcp_call(
+    server, tool_name: str, arguments: dict[str, object]
+) -> dict[str, object]:
     async def _invoke() -> dict[str, object]:
         async with FastMCPClient(server) as client:
             result = await client.call_tool(tool_name, arguments)
@@ -257,7 +262,9 @@ def test_compile_packet_mcp_matches_rest_and_records_audit(
 
     assert rest_response.status_code == 200
     assert mcp_response == rest_response.json()
-    assert packet_content_hash(mcp_response) == packet_content_hash(rest_response.json())
+    assert packet_content_hash(mcp_response) == packet_content_hash(
+        rest_response.json()
+    )
 
     with session_factory() as session:
         rows = session.scalars(
