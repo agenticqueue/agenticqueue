@@ -167,3 +167,86 @@ jobs:
           else
             echo "No Vitest suite yet; skipping vitest."
           fi
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Python SBOM tooling
+        shell: bash
+        run: python -m pip install --upgrade pip cyclonedx-bom
+
+      - name: Generate Python SBOM pre-flight
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python -m venv .sbom-venv
+          . .sbom-venv/bin/activate
+          python -m pip install --upgrade pip .
+          deactivate
+          cyclonedx-py environment .sbom-venv --output-format JSON --output-file dist/sbom.cdx.json
+
+      - name: Generate npm SBOM pre-flight when manifests exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t manifests < <(git ls-files '*package.json')
+          if [ "${#manifests[@]}" -eq 0 ]; then
+            echo "No npm manifests yet; skipping npm SBOM generation."
+            exit 0
+          fi
+
+          manifest="package.json"
+          if [ ! -f "$manifest" ]; then
+            manifest="${manifests[0]}"
+          fi
+
+          manifest_dir="$(dirname "$manifest")"
+          manifest_file="$(basename "$manifest")"
+
+          pushd "$manifest_dir" >/dev/null
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+          npx --yes @cyclonedx/cyclonedx-npm \
+            --output-format JSON \
+            --output-file "$GITHUB_WORKSPACE/dist/sbom.node.cdx.json" \
+            "$manifest_file"
+          popd >/dev/null
+
+      - name: Download Grype
+        uses: anchore/scan-action/download-grype@v3
+        id: grype
+
+      - name: Generate vulnerability report
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${{ steps.grype.outputs.cmd }}" dir:. --output json > dist/grype-report.json
+
+      - name: Upload supply-chain artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: supply-chain
+          path: |
+            dist/sbom.cdx.json
+            dist/sbom.node.cdx.json
+            dist/grype-report.json
+          if-no-files-found: ignore

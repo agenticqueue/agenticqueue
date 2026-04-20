@@ -1,0 +1,199 @@
+name: release
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG_NAME: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Python release tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip cyclonedx-bom
+
+      - name: Build source tarball
+        id: bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          version="${TAG_NAME#v}"
+          tarball="agenticqueue-${version}.tar.gz"
+          git archive \
+            --format=tar.gz \
+            --prefix="agenticqueue-${version}/" \
+            --output="dist/${tarball}" \
+            HEAD
+          echo "path=dist/${tarball}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Python SBOM
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .sbom-venv
+          . .sbom-venv/bin/activate
+          python -m pip install --upgrade pip .
+          deactivate
+          cyclonedx-py environment .sbom-venv --output-format JSON --output-file dist/sbom.cdx.json
+
+      - name: Generate npm SBOM when a manifest exists
+        id: node_sbom
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t manifests < <(git ls-files '*package.json')
+          if [ "${#manifests[@]}" -eq 0 ]; then
+            echo "generated=false" >> "$GITHUB_OUTPUT"
+            echo "No npm manifests yet; skipping npm SBOM generation."
+            exit 0
+          fi
+
+          manifest="package.json"
+          if [ ! -f "$manifest" ]; then
+            manifest="${manifests[0]}"
+          fi
+
+          manifest_dir="$(dirname "$manifest")"
+          manifest_file="$(basename "$manifest")"
+
+          pushd "$manifest_dir" >/dev/null
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+          npx --yes @cyclonedx/cyclonedx-npm \
+            --output-format JSON \
+            --output-file "$GITHUB_WORKSPACE/dist/sbom.node.cdx.json" \
+            "$manifest_file"
+          popd >/dev/null
+
+          echo "generated=true" >> "$GITHUB_OUTPUT"
+
+      - name: Download Grype
+        uses: anchore/scan-action/download-grype@v3
+        id: grype
+
+      - name: Generate vulnerability report
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${{ steps.grype.outputs.cmd }}" dir:. --output json > dist/grype-report.json
+
+      - name: Summarize vulnerabilities
+        id: vuln
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          matches = json.loads(Path("dist/grype-report.json").read_text(encoding="utf-8")).get("matches", [])
+          counts = {}
+          for match in matches:
+              vulnerability = match.get("vulnerability") or {}
+              severity = (vulnerability.get("severity") or "UNKNOWN").upper()
+              counts[severity] = counts.get(severity, 0) + 1
+
+          ordered = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "NEGLIGIBLE", "UNKNOWN"]
+          summary = ",".join(f"{severity.lower()}={counts.get(severity, 0)}" for severity in ordered)
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"total={len(matches)}\n")
+              handle.write(f"summary={summary}\n")
+          PY
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets=(
+            "${{ steps.bundle.outputs.path }}"
+            "dist/sbom.cdx.json"
+            "dist/grype-report.json"
+          )
+          if [ "${{ steps.node_sbom.outputs.generated }}" = "true" ]; then
+            assets+=("dist/sbom.node.cdx.json")
+          fi
+          gh release upload "$TAG_NAME" "${assets[@]}" --clobber
+
+      - name: Update release notes with supply-chain summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VULN_SUMMARY: ${{ steps.vuln.outputs.summary }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view "$TAG_NAME" --json body --jq '.body // ""' > dist/release-body.txt
+
+          asset_summary="$(basename "${{ steps.bundle.outputs.path }}"), sbom.cdx.json, grype-report.json"
+          if [ "${{ steps.node_sbom.outputs.generated }}" = "true" ]; then
+            asset_summary="${asset_summary}, sbom.node.cdx.json"
+          fi
+          export ASSET_SUMMARY="$asset_summary"
+
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          start_marker = "<!-- aq-supply-chain:start -->"
+          end_marker = "<!-- aq-supply-chain:end -->"
+          body_path = Path("dist/release-body.txt")
+          notes_path = Path("dist/release-notes.txt")
+
+          body = body_path.read_text(encoding="utf-8")
+          section = "\n".join(
+              [
+                  start_marker,
+                  "## Supply chain",
+                  f"- Vulnerabilities: {os.environ['VULN_SUMMARY']}",
+                  f"- Assets: {os.environ['ASSET_SUMMARY']}",
+                  end_marker,
+              ]
+          )
+
+          pattern = re.compile(
+              rf"{re.escape(start_marker)}.*?{re.escape(end_marker)}",
+              re.DOTALL,
+          )
+          if pattern.search(body):
+              updated = pattern.sub(section, body)
+          elif body.strip():
+              updated = body.rstrip() + "\n\n" + section + "\n"
+          else:
+              updated = section + "\n"
+
+          notes_path.write_text(updated, encoding="utf-8")
+          PY
+
+          gh release edit "$TAG_NAME" --notes-file dist/release-notes.txt
