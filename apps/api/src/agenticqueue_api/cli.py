@@ -10,6 +10,7 @@ import typer
 from sqlalchemy.orm import Session, sessionmaker
 
 from agenticqueue_cli.commands.learnings import build_learnings_app
+from agenticqueue_cli.commands.packet import register_packet_command
 from agenticqueue_api.audit import set_session_audit_context
 from agenticqueue_api.config import (
     get_psycopg_connect_args,
@@ -113,6 +114,7 @@ learnings_app = build_learnings_app(session_factory=_default_session_factory())
 app.add_typer(idempotency_app, name="idempotency")
 app.add_typer(learning_app, name="learning")
 app.add_typer(learnings_app, name="learnings")
+register_packet_command(app, session_factory=_default_session_factory())
 
 
 if __name__ == "__main__":
