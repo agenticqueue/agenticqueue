@@ -71,6 +71,24 @@ jobs:
             echo "No Python tests yet; skipping pytest."
           fi
 
+      - name: Enforce Phase 2 safety coverage gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          pytest \
+            tests/unit/test_validator.py \
+            tests/unit/test_transitions.py \
+            tests/unit/test_dod.py \
+            tests/unit/test_capability_enforcement.py \
+            tests/unit/test_policy.py \
+            --cov=agenticqueue_api.validator \
+            --cov=agenticqueue_api.transitions \
+            --cov=agenticqueue_api.dod \
+            --cov=agenticqueue_api.capabilities \
+            --cov-branch \
+            --cov-report=term-missing \
+            --cov-fail-under=100
+
       - name: Stop Postgres
         if: ${{ always() }}
         shell: bash
