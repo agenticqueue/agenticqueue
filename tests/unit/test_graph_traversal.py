@@ -217,13 +217,16 @@ def test_shortest_path_returns_directed_path_and_no_path_case(
         EdgeRelation.DEPENDS_ON,
         EdgeRelation.DEPENDS_ON,
     ]
-    assert shortest_path(
-        db_session,
-        "artifact",
-        ARTIFACT_Y,
-        "learning",
-        LEARNING_Q,
-    ) is None
+    assert (
+        shortest_path(
+            db_session,
+            "artifact",
+            ARTIFACT_Y,
+            "learning",
+            LEARNING_Q,
+        )
+        is None
+    )
 
 
 def test_downstream_of_decision_filters_to_task_artifact_and_run(
@@ -294,23 +297,29 @@ def test_shortest_path_respects_depth_bounds_and_skips_longer_revisits(
     ]:
         create_edge(db_session, payload)
 
-    assert shortest_path(
-        db_session,
-        "task",
-        TASK_A,
-        "task",
-        task_e,
-        edge_types=(EdgeRelation.DEPENDS_ON,),
-        max_depth=1,
-    ) is None
-    assert shortest_path(
-        db_session,
-        "task",
-        TASK_A,
-        "task",
-        task_f,
-        edge_types=(EdgeRelation.DEPENDS_ON,),
-    ) is None
+    assert (
+        shortest_path(
+            db_session,
+            "task",
+            TASK_A,
+            "task",
+            task_e,
+            edge_types=(EdgeRelation.DEPENDS_ON,),
+            max_depth=1,
+        )
+        is None
+    )
+    assert (
+        shortest_path(
+            db_session,
+            "task",
+            TASK_A,
+            "task",
+            task_f,
+            edge_types=(EdgeRelation.DEPENDS_ON,),
+        )
+        is None
+    )
 
 
 def test_create_edge_rejects_cycles_and_self_reference(db_session: Session) -> None:
@@ -367,8 +376,7 @@ def test_create_edge_rejects_cycles_and_self_reference(db_session: Session) -> N
 def test_descendants_truncate_at_default_max_depth(db_session: Session) -> None:
     root_id = uuid.UUID("00000000-0000-0000-0000-000000000500")
     chain_ids = [
-        uuid.UUID(f"00000000-0000-0000-0000-{index:012d}")
-        for index in range(501, 603)
+        uuid.UUID(f"00000000-0000-0000-0000-{index:012d}") for index in range(501, 603)
     ]
 
     current_id = root_id

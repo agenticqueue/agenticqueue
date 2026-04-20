@@ -74,7 +74,10 @@ def _active_edge_condition(edge_record: Any) -> sa.ColumnElement[bool]:
     return sa.and_(
         metadata["superseded_at"].astext.is_(None),
         metadata["superseded_by"].astext.is_(None),
-        sa.or_(metadata["status"].astext.is_(None), metadata["status"].astext != "superseded"),
+        sa.or_(
+            metadata["status"].astext.is_(None),
+            metadata["status"].astext != "superseded",
+        ),
         sa.or_(
             metadata["is_active"].astext.is_(None),
             metadata["is_active"].astext != "false",
@@ -310,7 +313,9 @@ def shortest_path(
     if normalized_edge_types is not None:
         statement = statement.where(EdgeRecord.relation.in_(normalized_edge_types))
 
-    adjacency: dict[tuple[str, uuid.UUID], list[tuple[GraphEntityRef, EdgeRelation]]] = defaultdict(list)
+    adjacency: dict[
+        tuple[str, uuid.UUID], list[tuple[GraphEntityRef, EdgeRelation]]
+    ] = defaultdict(list)
     for row in session.execute(statement):
         adjacency[(row.src_entity_type, row.src_id)].append(
             (
@@ -332,7 +337,9 @@ def shortest_path(
         if len(relation_path) >= max_depth:
             continue
 
-        for next_ref, relation in adjacency[(current_ref.entity_type, current_ref.entity_id)]:
+        for next_ref, relation in adjacency[
+            (current_ref.entity_type, current_ref.entity_id)
+        ]:
             next_key = (next_ref.entity_type, next_ref.entity_id)
             next_depth = len(relation_path) + 1
             prior_depth = visited.get(next_key)
@@ -364,11 +371,7 @@ def downstream_of_decision(
         edge_types=edge_types,
         max_depth=max_depth,
     )
-    return [
-        hit
-        for hit in hits
-        if hit.entity_type in DOWNSTREAM_DECISION_ENTITY_TYPES
-    ]
+    return [hit for hit in hits if hit.entity_type in DOWNSTREAM_DECISION_ENTITY_TYPES]
 
 
 def ensure_dependency_edge_is_acyclic(
@@ -403,7 +406,8 @@ def ensure_dependency_edge_is_acyclic(
         *cycle_path.nodes,
     ]
     cycle_text = " -> ".join(
-        f"{node.entity_type}:{node.entity_id}"
-        for node in cycle_nodes
+        f"{node.entity_type}:{node.entity_id}" for node in cycle_nodes
     )
-    raise CycleError(f"depends_on edges must remain acyclic; proposed edge closes {cycle_text}")
+    raise CycleError(
+        f"depends_on edges must remain acyclic; proposed edge closes {cycle_text}"
+    )
