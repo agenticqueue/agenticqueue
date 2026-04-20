@@ -7,6 +7,7 @@ from typing import Any, NoReturn, cast
 from fastapi import FastAPI, HTTPException, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 
 from agenticqueue_api.db import StatementTimeoutError
@@ -131,6 +132,7 @@ def install_exception_handlers(app: FastAPI) -> None:
     """Install the API exception handlers on a FastAPI app."""
 
     app.add_exception_handler(HTTPException, handle_http_exception)
+    app.add_exception_handler(StarletteHTTPException, handle_http_exception)
     app.add_exception_handler(RequestValidationError, handle_validation_exception)
     app.add_exception_handler(
         StatementTimeoutError,

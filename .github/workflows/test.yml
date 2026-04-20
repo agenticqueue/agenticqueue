@@ -70,20 +70,20 @@ jobs:
         run: |
           set -euo pipefail
           if test -d tests || git ls-files 'test_*.py' '*_test.py' | grep -q .; then
-            pytest
+            pytest --no-cov
           else
             echo "No Python tests yet; skipping pytest."
           fi
 
       - name: Run claim concurrency integration test
         shell: bash
-        run: pytest tests/integration/test_claim_concurrency_integration.py -x --timeout=120
+        run: pytest --no-cov tests/integration/test_claim_concurrency_integration.py -x --timeout=120
 
       - name: Enforce Phase 2 safety coverage gate
         shell: bash
         run: |
           set -euo pipefail
-          pytest \
+          pytest --no-cov \
             tests/unit/test_validator.py \
             tests/unit/test_transitions.py \
             tests/unit/test_dod.py \
@@ -97,6 +97,49 @@ jobs:
             --cov-branch \
             --cov-report=term-missing \
             --cov-fail-under=100
+
+  firewall-fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip downloads
+        if: ${{ hashFiles('requirements*.txt', 'pyproject.toml', 'poetry.lock') != '' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-firewall-${{ hashFiles('requirements*.txt', 'pyproject.toml', 'poetry.lock') }}
+
+      - name: Install Python test dependencies
+        shell: bash
+        run: python -m pip install --upgrade pip uv .
+
+      - name: Start Postgres + PgBouncer
+        shell: bash
+        run: docker compose up -d db pgbouncer
+
+      - name: Wait for Postgres
+        shell: bash
+        run: python apps/api/scripts/wait_for_db.py
+
+      - name: Apply Alembic migrations
+        shell: bash
+        run: alembic -c apps/api/alembic.ini upgrade head
+
+      - name: Run firewall fuzz suite
+        shell: bash
+        run: uv run pytest tests/security/firewall/ --cov-fail-under=100
+
+      - name: Stop Postgres
+        if: ${{ always() }}
+        shell: bash
+        run: docker compose down
 
       - name: Stop Postgres
         if: ${{ always() }}

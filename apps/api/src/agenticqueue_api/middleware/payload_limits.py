@@ -73,7 +73,7 @@ def parse_json_payload_depth(body: bytes) -> int | None:
         return None
     try:
         payload = json.loads(body)
-    except json.JSONDecodeError:
+    except (UnicodeDecodeError, json.JSONDecodeError):
         return None
     return payload_depth(payload)
 

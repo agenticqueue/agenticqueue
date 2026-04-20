@@ -346,7 +346,7 @@ class SecretRedactionMiddleware:
 
         try:
             payload = json.loads(body)
-        except json.JSONDecodeError:
+        except (UnicodeDecodeError, json.JSONDecodeError):
             await self._forward(scope, body, send)
             return
 
