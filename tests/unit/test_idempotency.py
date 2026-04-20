@@ -175,7 +175,10 @@ def latest_idempotency_row(
 
 def test_requires_idempotency_and_normalization_helpers() -> None:
     assert normalize_idempotency_key("550e8400-e29b-41d4-a716-446655440000")
-    assert normalize_idempotency_key("01ARZ3NDEKTSV4RRFFQ69G5FAV") == "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+    assert (
+        normalize_idempotency_key("01ARZ3NDEKTSV4RRFFQ69G5FAV")
+        == "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+    )
 
     with pytest.raises(ValueError, match="UUID or ULID"):
         normalize_idempotency_key("not-a-key")

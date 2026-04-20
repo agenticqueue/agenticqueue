@@ -21,6 +21,7 @@ ENTITY_TABLES = {
     "capability_grant",
     "decision",
     "edge",
+    "idempotency_key",
     "learning",
     "packet_version",
     "policy",
@@ -31,7 +32,8 @@ ENTITY_TABLES = {
 }
 PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
-PRE_LATEST_REVISION = "20260420_06"
+PRE_IDEMPOTENCY_TABLES = ENTITY_TABLES - {"idempotency_key"}
+PRE_LATEST_REVISION = "20260420_07"
 
 
 def alembic_config() -> Config:
@@ -270,7 +272,7 @@ def test_latest_migration_is_reversible() -> None:
     downgrade(config, "-1")
     assert current_revision() == PRE_LATEST_REVISION
     assert_foundation_state(PRE_LATEST_REVISION)
-    assert_entity_tables(ENTITY_TABLES)
+    assert_entity_tables(PRE_IDEMPOTENCY_TABLES)
     assert_capability_columns(
         {
             "created_at",
@@ -310,6 +312,7 @@ def test_latest_migration_is_reversible() -> None:
         {
             "autonomy_tier",
             "body",
+            "capabilities",
             "created_at",
             "hitl_required",
             "id",
@@ -319,9 +322,9 @@ def test_latest_migration_is_reversible() -> None:
             "workspace_id",
         }
     )
-    assert_policy_attachment_columns("workspace", expected_present=False)
-    assert_policy_attachment_columns("project", expected_present=False)
-    assert_policy_attachment_columns("task", expected_present=False)
+    assert_policy_attachment_columns("workspace", expected_present=True)
+    assert_policy_attachment_columns("project", expected_present=True)
+    assert_policy_attachment_columns("task", expected_present=True)
     assert_embedding_columns_and_indexes()
     upgrade(config, "head")
     expected_head = ScriptDirectory.from_config(config).get_current_head()

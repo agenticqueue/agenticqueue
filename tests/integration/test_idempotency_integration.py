@@ -19,7 +19,12 @@ from agenticqueue_api.capabilities import grant_capability
 from agenticqueue_api.cli import app as cli_app
 from agenticqueue_api.config import get_sqlalchemy_sync_database_url
 from agenticqueue_api.middleware.idempotency import IDEMPOTENCY_KEY_HEADER
-from agenticqueue_api.models import ActorModel, CapabilityKey, CapabilityRecord, TaskRecord
+from agenticqueue_api.models import (
+    ActorModel,
+    CapabilityKey,
+    CapabilityRecord,
+    TaskRecord,
+)
 from agenticqueue_api.models.idempotency_key import IdempotencyKeyRecord
 from agenticqueue_api.models.project import ProjectModel
 from agenticqueue_api.models.workspace import WorkspaceModel
