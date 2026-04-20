@@ -55,6 +55,8 @@ from agenticqueue_api.learnings import (
     DraftLearningView,
     DraftRejectRequest,
     DraftStore,
+    LearningPromotionService,
+    PromoteLearningRequest,
 )
 from agenticqueue_api.models import (
     ActorModel,
@@ -62,6 +64,8 @@ from agenticqueue_api.models import (
     ApiTokenModel,
     CapabilityGrantModel,
     CapabilityKey,
+    LearningModel,
+    LearningRecord,
     TaskRecord,
 )
 from agenticqueue_api.models.shared import SchemaModel
@@ -296,6 +300,30 @@ def _learning_draft_capability_scope(
 _require_learning_draft_write_capability = require_capability(
     CapabilityKey.WRITE_LEARNING,
     _learning_draft_capability_scope,
+    entity_type="learning",
+)
+
+
+def _learning_promotion_capability_scope(
+    request: Request,
+    session: Session,
+    payload: dict[str, Any] | None,
+    entity_id: uuid.UUID | None,
+) -> dict[str, str]:
+    del request, payload
+    if entity_id is None:
+        return {}
+    project_id = session.scalar(
+        sa.select(TaskRecord.project_id)
+        .join(LearningRecord, LearningRecord.task_id == TaskRecord.id)
+        .where(LearningRecord.id == entity_id)
+    )
+    return {} if project_id is None else {"project_id": str(project_id)}
+
+
+_require_learning_promotion_capability = require_capability(
+    CapabilityKey.PROMOTE_LEARNING,
+    _learning_promotion_capability_scope,
     entity_type="learning",
 )
 
@@ -676,6 +704,47 @@ def create_app(
                     status.HTTP_409_CONFLICT,
                     str(error),
                     details={"draft_id": str(draft_id), "actor_id": str(actor.id)},
+                )
+
+    @app.post(
+        "/learnings/{learning_id}/promote",
+        include_in_schema=False,
+        response_model=LearningModel,
+    )
+    @app.post(
+        "/v1/learnings/{learning_id}/promote",
+        response_model=LearningModel,
+    )
+    def promote_learning(
+        learning_id: uuid.UUID,
+        payload: PromoteLearningRequest,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> LearningModel:
+        actor = _require_actor(request)
+        _require_token_scope(request, "learning:write")
+        service = LearningPromotionService(session)
+        with write_timeout(session, endpoint="v1.learnings.promote"):
+            _require_learning_promotion_capability(
+                request=request,
+                session=session,
+                entity_id=learning_id,
+            )
+            try:
+                return service.promote(
+                    learning_id=learning_id,
+                    target_scope=payload.target_scope,
+                )
+            except KeyError:
+                raise_api_error(
+                    status.HTTP_404_NOT_FOUND,
+                    "Learning not found",
+                )
+            except ValueError as error:
+                raise_api_error(
+                    status.HTTP_409_CONFLICT,
+                    str(error),
+                    details={"learning_id": str(learning_id), "actor_id": str(actor.id)},
                 )
 
     return app

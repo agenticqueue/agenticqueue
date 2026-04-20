@@ -48,6 +48,9 @@ from agenticqueue_api.schemas.learning import LearningStatus
 from agenticqueue_api.task_type_registry import SchemaLoadError, TaskTypeRegistry
 
 IMMUTABLE_FIELDS = frozenset({"id", "created_at", "updated_at"})
+SYSTEM_MANAGED_FIELDS_BY_RESOURCE = {
+    "learnings": frozenset({"promotion_eligible"}),
+}
 
 
 @dataclass(frozen=True)
@@ -385,7 +388,20 @@ def _apply_schema_to_record(
 def _validate_payload(
     config: CrudEntityConfig,
     payload: dict[str, Any],
+    *,
+    allow_system_managed: bool = False,
 ) -> SchemaModel:
+    if not allow_system_managed:
+        managed_fields = SYSTEM_MANAGED_FIELDS_BY_RESOURCE.get(
+            config.resource_name, frozenset()
+        )
+        unexpected_fields = sorted(managed_fields.intersection(payload.keys()))
+        if unexpected_fields:
+            raise_api_error(
+                status.HTTP_400_BAD_REQUEST,
+                "System-managed fields cannot be set",
+                details={"fields": unexpected_fields},
+            )
     try:
         return config.schema_type.model_validate(payload)
     except pydantic.ValidationError as error:
@@ -444,10 +460,21 @@ def _validate_patch(
             "Immutable fields cannot be updated",
             details={"fields": immutable_fields},
         )
+    managed_fields = sorted(
+        SYSTEM_MANAGED_FIELDS_BY_RESOURCE.get(
+            config.resource_name, frozenset()
+        ).intersection(patch.keys())
+    )
+    if managed_fields:
+        raise_api_error(
+            status.HTTP_400_BAD_REQUEST,
+            "System-managed fields cannot be updated",
+            details={"fields": managed_fields},
+        )
 
     merged = existing.model_dump()
     merged.update(patch)
-    return _validate_payload(config, merged)
+    return _validate_payload(config, merged, allow_system_managed=True)
 
 
 def _order_columns(record_type: type[Any]) -> list[Any]:

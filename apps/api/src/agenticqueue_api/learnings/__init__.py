@@ -22,6 +22,10 @@ from agenticqueue_api.learnings.lifecycle import (
     EXPIRATION_REVIEW_WINDOW_DAYS,
     LearningLifecycleService,
 )
+from agenticqueue_api.learnings.promotion import (
+    LearningPromotionService,
+    PromoteLearningRequest,
+)
 from agenticqueue_api.schemas.learning import (
     LearningConfidence,
     LearningScope,
@@ -43,11 +47,13 @@ __all__ = [
     "EXPIRATION_REVIEW_WINDOW_DAYS",
     "LearningDedupeService",
     "LearningLifecycleService",
+    "LearningPromotionService",
     "LearningConfidence",
     "LearningScope",
     "LearningStatus",
     "LearningType",
     "MergeDecision",
+    "PromoteLearningRequest",
     "build_dedupe_text",
     "draft_learnings",
 ]

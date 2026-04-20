@@ -35,6 +35,7 @@ class LearningModel(TimestampedSchema):
     does_not_apply_when: str
     evidence: list[str] = Field(default_factory=list)
     scope: str
+    promotion_eligible: bool = False
     confidence: str
     status: str
     review_date: dt.date | None = None
@@ -71,6 +72,12 @@ class LearningRecord(IdentifiedTable, TimestampedTable, Base):
     does_not_apply_when: Mapped[str] = mapped_column(sa.Text(), nullable=False)
     evidence: Mapped[list[str]] = jsonb_list_column()
     scope: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    promotion_eligible: Mapped[bool] = mapped_column(
+        sa.Boolean(),
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
     confidence: Mapped[str] = mapped_column(sa.String(32), nullable=False)
     status: Mapped[str] = mapped_column(sa.String(32), nullable=False)
     review_date: Mapped[dt.date | None] = mapped_column(sa.Date(), nullable=True)
