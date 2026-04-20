@@ -164,6 +164,7 @@ ENTITY_FIXTURES = {
         "id": LEARNING_ID,
         "task_id": TASK_ID,
         "owner_actor_id": ACTOR_ID,
+        "owner": "codex",
         "title": "Keep models explicit in Phase 1",
         "learning_type": "pattern",
         "what_happened": "The entity slice needed stable schema contracts.",

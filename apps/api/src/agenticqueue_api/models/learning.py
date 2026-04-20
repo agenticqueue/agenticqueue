@@ -25,6 +25,7 @@ class LearningModel(TimestampedSchema):
 
     task_id: uuid.UUID | None = None
     owner_actor_id: uuid.UUID | None = None
+    owner: str | None = None
     title: str
     learning_type: str
     what_happened: str
@@ -60,6 +61,7 @@ class LearningRecord(IdentifiedTable, TimestampedTable, Base):
         sa.ForeignKey("agenticqueue.actor.id", ondelete="SET NULL"),
         nullable=True,
     )
+    owner: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
     title: Mapped[str] = mapped_column(sa.String(255), nullable=False)
     learning_type: Mapped[str] = mapped_column(sa.String(64), nullable=False)
     what_happened: Mapped[str] = mapped_column(sa.Text(), nullable=False)

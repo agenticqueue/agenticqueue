@@ -1,6 +1,16 @@
 """Learning draft helpers."""
 
-from agenticqueue_api.learnings.draft import DraftLearning, draft_learnings
+from agenticqueue_api.learnings.draft import (
+    ConfirmedDraftLearningView,
+    DraftLearning,
+    DraftLearningPatch,
+    DraftLearningRecord,
+    DraftLearningStatus,
+    DraftLearningView,
+    DraftRejectRequest,
+    DraftStore,
+    draft_learnings,
+)
 from agenticqueue_api.schemas.learning import (
     LearningConfidence,
     LearningScope,
@@ -9,7 +19,14 @@ from agenticqueue_api.schemas.learning import (
 )
 
 __all__ = [
+    "ConfirmedDraftLearningView",
     "DraftLearning",
+    "DraftLearningPatch",
+    "DraftLearningRecord",
+    "DraftLearningStatus",
+    "DraftLearningView",
+    "DraftRejectRequest",
+    "DraftStore",
     "LearningConfidence",
     "LearningScope",
     "LearningStatus",

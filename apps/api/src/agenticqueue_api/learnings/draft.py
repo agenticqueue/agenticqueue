@@ -1,19 +1,39 @@
-"""Deterministic learning-draft generation for task closeout."""
+"""Deterministic learning drafts plus the persisted draft lifecycle."""
 
 from __future__ import annotations
 
 import datetime as dt
 from collections.abc import Mapping, Sequence
+from enum import StrEnum
 from typing import Any
+import uuid
 
+from pydantic import Field, model_validator
+import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, Session, mapped_column
+
+from agenticqueue_api.db import Base
+from agenticqueue_api.models.learning import LearningModel, LearningRecord
 from agenticqueue_api.models.run import RunModel
+from agenticqueue_api.models.shared import (
+    IdentifiedTable,
+    SchemaModel,
+    TimestampedSchema,
+    TimestampedTable,
+    jsonb_dict_column,
+)
 from agenticqueue_api.models.task import TaskModel
 from agenticqueue_api.schemas.learning import (
+    DateText,
     LearningConfidence,
-    LearningScope,
     LearningSchemaModel,
+    LearningScope,
     LearningStatus,
     LearningType,
+    LongText,
+    MediumText,
+    ShortText,
 )
 from agenticqueue_api.schemas.submit import (
     TaskCompletionSubmission,
@@ -25,8 +45,228 @@ _REVIEW_WINDOW_DAYS = 14
 _MAX_EVIDENCE_ITEMS = 16
 
 
+class DraftLearningStatus(StrEnum):
+    """Lifecycle states for a persisted learning draft."""
+
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+
+
 class DraftLearning(LearningSchemaModel):
     """One deterministic learning draft ready for review/edit."""
+
+
+class DraftLearningPatch(SchemaModel):
+    """Mutable fields on a persisted learning draft."""
+
+    title: MediumText | None = None
+    type: LearningType | None = None
+    what_happened: LongText | None = None
+    what_learned: LongText | None = None
+    action_rule: LongText | None = None
+    applies_when: MediumText | None = None
+    does_not_apply_when: MediumText | None = None
+    evidence: list[str] | None = Field(default=None, min_length=1, max_length=16)
+    scope: LearningScope | None = None
+    confidence: LearningConfidence | None = None
+    status: LearningStatus | None = None
+    owner: ShortText | None = None
+    review_date: DateText | None = None
+
+    @model_validator(mode="after")
+    def validate_any_field_present(self) -> DraftLearningPatch:
+        if not self.model_fields_set:
+            raise ValueError("At least one draft field must be provided")
+        return self
+
+
+class DraftRejectRequest(SchemaModel):
+    """Reject payload for a persisted learning draft."""
+
+    reason: MediumText
+
+
+class DraftLearningView(TimestampedSchema):
+    """Persisted learning draft surfaced over the API."""
+
+    task_id: uuid.UUID
+    run_id: uuid.UUID
+    draft_status: DraftLearningStatus
+    rejection_reason: str | None = None
+    confirmed_learning_id: uuid.UUID | None = None
+    draft: DraftLearning
+
+
+class ConfirmedDraftLearningView(SchemaModel):
+    """Draft confirmation response with the promoted learning."""
+
+    draft: DraftLearningView
+    learning: LearningModel
+
+
+class DraftLearningRecord(IdentifiedTable, TimestampedTable, Base):
+    """SQLAlchemy row for one persisted learning draft."""
+
+    __tablename__ = "learning_drafts"
+    __table_args__ = (
+        sa.Index("ix_learning_drafts_task_id", "task_id"),
+        sa.Index("ix_learning_drafts_run_id", "run_id"),
+        sa.Index("ix_learning_drafts_draft_status", "draft_status"),
+    )
+
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("agenticqueue.task.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("agenticqueue.run.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    payload: Mapped[dict[str, Any]] = jsonb_dict_column()
+    draft_status: Mapped[str] = mapped_column(
+        sa.String(32),
+        nullable=False,
+        default=DraftLearningStatus.PENDING.value,
+        server_default=sa.text("'pending'"),
+    )
+    rejection_reason: Mapped[str | None] = mapped_column(sa.Text(), nullable=True)
+    confirmed_learning_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("agenticqueue.learning.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+
+class DraftStore:
+    """Persist and transition learning drafts."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def create_drafts(
+        self,
+        *,
+        task: TaskModel,
+        run: RunModel,
+        submission: Mapping[str, Any] | TaskCompletionSubmission,
+    ) -> list[DraftLearningView]:
+        drafts = draft_learnings(task, run, submission)
+        created: list[DraftLearningView] = []
+        for draft in drafts:
+            record = DraftLearningRecord(
+                task_id=task.id,
+                run_id=run.id,
+                payload=draft.model_dump(mode="json"),
+                draft_status=DraftLearningStatus.PENDING.value,
+            )
+            self._session.add(record)
+            self._session.flush()
+            self._session.refresh(record)
+            created.append(self._view(record))
+        return created
+
+    def get(self, draft_id: uuid.UUID) -> DraftLearningView | None:
+        record = self._session.get(DraftLearningRecord, draft_id)
+        if record is None:
+            return None
+        return self._view(record)
+
+    def edit(
+        self,
+        draft_id: uuid.UUID,
+        patch: DraftLearningPatch,
+    ) -> DraftLearningView:
+        record = self._require_pending(draft_id)
+        updated_payload = self._payload(record).model_dump(mode="json")
+        updated_payload.update(patch.model_dump(mode="json", exclude_none=True))
+        record.payload = DraftLearning.model_validate(updated_payload).model_dump(
+            mode="json"
+        )
+        self._session.flush()
+        self._session.refresh(record)
+        return self._view(record)
+
+    def reject(
+        self,
+        draft_id: uuid.UUID,
+        *,
+        reason: str,
+    ) -> DraftLearningView:
+        record = self._require_pending(draft_id)
+        record.draft_status = DraftLearningStatus.REJECTED.value
+        record.rejection_reason = reason
+        self._session.flush()
+        self._session.refresh(record)
+        return self._view(record)
+
+    def confirm(
+        self,
+        draft_id: uuid.UUID,
+        *,
+        owner_actor_id: uuid.UUID | None,
+    ) -> ConfirmedDraftLearningView:
+        record = self._require_pending(draft_id)
+        draft = LearningSchemaModel.model_validate(record.payload)
+        learning_record = LearningRecord(
+            task_id=record.task_id,
+            owner_actor_id=owner_actor_id,
+            owner=draft.owner,
+            title=draft.title,
+            learning_type=draft.type.value,
+            what_happened=draft.what_happened,
+            what_learned=draft.what_learned,
+            action_rule=draft.action_rule,
+            applies_when=draft.applies_when,
+            does_not_apply_when=draft.does_not_apply_when,
+            evidence=draft.evidence,
+            scope=draft.scope.value,
+            confidence=draft.confidence.value,
+            status=LearningStatus.ACTIVE.value,
+            review_date=dt.date.fromisoformat(draft.review_date),
+        )
+        self._session.add(learning_record)
+        self._session.flush()
+        self._session.refresh(learning_record)
+
+        record.draft_status = DraftLearningStatus.CONFIRMED.value
+        record.confirmed_learning_id = learning_record.id
+        record.rejection_reason = None
+        self._session.flush()
+        self._session.refresh(record)
+        return ConfirmedDraftLearningView(
+            draft=self._view(record),
+            learning=LearningModel.model_validate(learning_record),
+        )
+
+    def _require_pending(self, draft_id: uuid.UUID) -> DraftLearningRecord:
+        record = self._session.get(DraftLearningRecord, draft_id)
+        if record is None:
+            raise KeyError(str(draft_id))
+        if record.draft_status != DraftLearningStatus.PENDING.value:
+            raise ValueError(
+                f"Learning draft {draft_id} is not pending; current status is "
+                f"{record.draft_status}."
+            )
+        return record
+
+    def _payload(self, record: DraftLearningRecord) -> DraftLearning:
+        return DraftLearning.model_validate(record.payload)
+
+    def _view(self, record: DraftLearningRecord) -> DraftLearningView:
+        return DraftLearningView(
+            id=record.id,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+            task_id=record.task_id,
+            run_id=record.run_id,
+            draft_status=DraftLearningStatus(record.draft_status),
+            rejection_reason=record.rejection_reason,
+            confirmed_learning_id=record.confirmed_learning_id,
+            draft=self._payload(record),
+        )
 
 
 def draft_learnings(
@@ -449,4 +689,14 @@ def _string_or_none(value: Any) -> str | None:
     return None
 
 
-__all__ = ["DraftLearning", "draft_learnings"]
+__all__ = [
+    "ConfirmedDraftLearningView",
+    "DraftLearning",
+    "DraftLearningPatch",
+    "DraftLearningRecord",
+    "DraftLearningStatus",
+    "DraftLearningView",
+    "DraftRejectRequest",
+    "DraftStore",
+    "draft_learnings",
+]
