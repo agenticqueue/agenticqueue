@@ -6,3 +6,5 @@ capabilities:
   - write_branch
   - run_tests
   - update_task
+body:
+  hard_block_secrets: true

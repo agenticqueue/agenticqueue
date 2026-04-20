@@ -6,13 +6,17 @@ import datetime as dt
 import uuid
 from collections.abc import Iterator
 from typing import Any, cast
+from pathlib import Path
 
 import sqlalchemy as sa
 from fastapi import Depends, FastAPI, Request, status
 from pydantic import ConfigDict, Field
 from sqlalchemy.orm import Session, sessionmaker
 
-from agenticqueue_api.audit import set_session_audit_context
+from agenticqueue_api.audit import (
+    set_session_audit_context,
+    set_session_redaction_context,
+)
 from agenticqueue_api.auth import (
     AgenticQueueAuthMiddleware,
     get_api_token,
@@ -27,6 +31,7 @@ from agenticqueue_api.capabilities import (
     revoke_capability_grant,
 )
 from agenticqueue_api.config import (
+    get_policies_dir,
     get_reload_enabled,
     get_sqlalchemy_sync_database_url,
     get_task_types_dir,
@@ -36,6 +41,7 @@ from agenticqueue_api.errors import install_exception_handlers, raise_api_error
 from agenticqueue_api.middleware import (
     ContentSizeLimitMiddleware,
     IdempotencyKeyMiddleware,
+    SecretRedactionMiddleware,
 )
 from agenticqueue_api.models import (
     ActorModel,
@@ -230,12 +236,14 @@ def get_db_session(request: Request) -> Iterator[Session]:
     session = request.app.state.session_factory()
     actor = getattr(request.state, "actor", None)
     trace_id = request.headers.get("X-Trace-Id") or str(uuid.uuid4())
+    redaction = getattr(request.state, "secret_redaction_context", None)
     request.state.trace_id = trace_id
     set_session_audit_context(
         session,
         actor_id=None if actor is None else actor.id,
         trace_id=trace_id,
     )
+    set_session_redaction_context(session, redaction=redaction)
     try:
         yield session
         session.commit()
@@ -254,6 +262,7 @@ def create_app(
     *,
     session_factory: sessionmaker[Session] | None = None,
     task_type_registry: TaskTypeRegistry | None = None,
+    policies_dir: Path | None = None,
 ) -> FastAPI:
     """Create the FastAPI app with auth, CRUD, and task type routes."""
     app = FastAPI(
@@ -266,6 +275,10 @@ def create_app(
     app.state.task_type_registry = task_type_registry or _default_task_type_registry()
     app.add_middleware(IdempotencyKeyMiddleware)
     app.add_middleware(AgenticQueueAuthMiddleware)
+    app.add_middleware(
+        SecretRedactionMiddleware,
+        policy_directory=policies_dir or get_policies_dir(),
+    )
     app.add_middleware(ContentSizeLimitMiddleware)
     install_exception_handlers(app)
     app.include_router(build_crud_router(get_db_session))

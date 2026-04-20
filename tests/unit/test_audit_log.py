@@ -12,7 +12,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from agenticqueue_api import audit as audit_module
 from agenticqueue_api.app import create_app
-from agenticqueue_api.audit import set_session_audit_context
+from agenticqueue_api.audit import (
+    set_session_audit_context,
+    set_session_redaction_context,
+)
 from agenticqueue_api.auth import issue_api_token
 from agenticqueue_api.config import get_sqlalchemy_sync_database_url
 from agenticqueue_api.models import (
@@ -371,6 +374,48 @@ def test_trace_id_propagates_from_request_context(
 
     assert audit_row.actor_id == admin.id
     assert audit_row.trace_id == "trace-request-123"
+
+
+def test_redaction_context_propagates_to_audit_rows(
+    session_factory: sessionmaker[Session],
+) -> None:
+    auditor = seed_actor(
+        session_factory,
+        handle="redaction-admin",
+        actor_type="admin",
+        display_name="Redaction Admin",
+    )
+
+    with session_factory() as session:
+        set_session_audit_context(
+            session,
+            actor_id=auditor.id,
+            trace_id="trace-redaction",
+        )
+        set_session_redaction_context(
+            session,
+            redaction={
+                "redaction_count": 2,
+                "types_matched": ["aws_access_key", "github_pat"],
+                "original_sha256": "a" * 64,
+            },
+        )
+        workspace = WorkspaceRecord(slug="redacted-workspace", name="Redacted Workspace")
+        session.add(workspace)
+        session.commit()
+
+        audit_row = latest_audit_row(
+            session,
+            entity_type="workspace",
+            entity_id=workspace.id,
+            action="CREATE",
+        )
+
+    assert audit_row.redaction == {
+        "redaction_count": 2,
+        "types_matched": ["aws_access_key", "github_pat"],
+        "original_sha256": "a" * 64,
+    }
 
 
 def test_audit_helpers_handle_none_and_non_dict_snapshots(

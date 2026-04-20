@@ -16,6 +16,7 @@ from agenticqueue_api.pgvector import normalize_embedding
 
 AUDIT_ACTOR_ID_KEY = "agenticqueue_audit_actor_id"
 AUDIT_TRACE_ID_KEY = "agenticqueue_audit_trace_id"
+AUDIT_REDACTION_KEY = "agenticqueue_audit_redaction"
 _AUDIT_BEFORE_KEY = "agenticqueue_audit_before"
 
 
@@ -29,6 +30,16 @@ def set_session_audit_context(
 
     session.info[AUDIT_ACTOR_ID_KEY] = actor_id
     session.info[AUDIT_TRACE_ID_KEY] = trace_id
+
+
+def set_session_redaction_context(
+    session: Session,
+    *,
+    redaction: Mapping[str, Any] | None,
+) -> None:
+    """Attach secret-redaction metadata to a SQLAlchemy session."""
+
+    session.info[AUDIT_REDACTION_KEY] = None if redaction is None else dict(redaction)
 
 
 def _is_auditable_instance(target: object) -> bool:
@@ -131,6 +142,7 @@ def _write_audit_row(
     session = object_session(target)
     actor_id = None if session is None else session.info.get(AUDIT_ACTOR_ID_KEY)
     trace_id = None if session is None else session.info.get(AUDIT_TRACE_ID_KEY)
+    redaction = None if session is None else session.info.get(AUDIT_REDACTION_KEY)
     entity_key = cast(str, mapper.primary_key[0].key)
     table = cast(sa.Table, mapper.local_table)
     entity_id = getattr(target, entity_key, None)
@@ -144,6 +156,7 @@ def _write_audit_row(
             before=before,
             after=after,
             trace_id=trace_id,
+            redaction=redaction,
         )
     )
 

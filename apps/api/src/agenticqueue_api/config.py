@@ -12,6 +12,7 @@ DEFAULT_TOKEN_SIGNING_SECRET = "agenticqueue-dev-token-signing-secret"
 DEFAULT_EMBEDDING_DIMENSION = 768
 DEFAULT_VECTOR_IVFFLAT_LISTS = 100
 DEFAULT_TASK_TYPES_DIR = Path(__file__).resolve().parents[4] / "task_types"
+DEFAULT_POLICIES_DIR = Path(__file__).resolve().parents[4] / "policies"
 ASYNC_PREFIX = "postgresql+asyncpg://"
 SQLALCHEMY_SYNC_PREFIX = "postgresql+psycopg://"
 PSYCOPG_PREFIX = "postgresql://"
@@ -81,6 +82,15 @@ def get_task_types_dir() -> Path:
     if configured:
         return Path(configured)
     return DEFAULT_TASK_TYPES_DIR
+
+
+def get_policies_dir() -> Path:
+    """Return the policy-pack directory."""
+
+    configured = os.getenv("AGENTICQUEUE_POLICIES_DIR") or os.getenv("POLICIES_DIR")
+    if configured:
+        return Path(configured)
+    return DEFAULT_POLICIES_DIR
 
 
 def get_reload_enabled() -> bool:

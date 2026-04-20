@@ -27,6 +27,7 @@ class AuditLogModel(CreatedSchema):
     before: dict[str, Any] | None = None
     after: dict[str, Any] | None = None
     trace_id: str | None = None
+    redaction: dict[str, Any] | None = None
 
 
 class AuditLogRecord(IdentifiedTable, CreatedTable, Base):
@@ -47,3 +48,4 @@ class AuditLogRecord(IdentifiedTable, CreatedTable, Base):
     before: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     after: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     trace_id: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
+    redaction: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)

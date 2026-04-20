@@ -33,7 +33,7 @@ ENTITY_TABLES = {
 PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
 PRE_IDEMPOTENCY_TABLES = ENTITY_TABLES - {"idempotency_key"}
-PRE_LATEST_REVISION = "20260420_07"
+PRE_LATEST_REVISION = "20260420_08"
 
 
 def alembic_config() -> Config:
@@ -261,6 +261,7 @@ def test_migration_reaches_head_with_extensions() -> None:
             "entity_id",
             "entity_type",
             "id",
+            "redaction",
             "trace_id",
         }
     )
@@ -272,7 +273,7 @@ def test_latest_migration_is_reversible() -> None:
     downgrade(config, "-1")
     assert current_revision() == PRE_LATEST_REVISION
     assert_foundation_state(PRE_LATEST_REVISION)
-    assert_entity_tables(PRE_IDEMPOTENCY_TABLES)
+    assert_entity_tables(ENTITY_TABLES)
     assert_capability_columns(
         {
             "created_at",
@@ -372,6 +373,7 @@ def test_latest_migration_is_reversible() -> None:
             "entity_id",
             "entity_type",
             "id",
+            "redaction",
             "trace_id",
         }
     )
