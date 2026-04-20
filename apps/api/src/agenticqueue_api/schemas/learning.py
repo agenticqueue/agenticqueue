@@ -9,13 +9,26 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-ShortText = Annotated[str, StringConstraints(min_length=1, max_length=255)]
-MediumText = Annotated[str, StringConstraints(min_length=1, max_length=1024)]
-LongText = Annotated[str, StringConstraints(min_length=1, max_length=4096)]
-PathText = Annotated[str, StringConstraints(min_length=1, max_length=2048)]
+ShortText = Annotated[
+    str,
+    StringConstraints(strict=True, min_length=1, max_length=255),
+]
+MediumText = Annotated[
+    str,
+    StringConstraints(strict=True, min_length=1, max_length=1024),
+]
+LongText = Annotated[
+    str,
+    StringConstraints(strict=True, min_length=1, max_length=4096),
+]
+PathText = Annotated[
+    str,
+    StringConstraints(strict=True, min_length=1, max_length=2048),
+]
 DateText = Annotated[
     str,
     StringConstraints(
+        strict=True,
         min_length=10,
         max_length=10,
         pattern=r"^\d{4}-\d{2}-\d{2}$",
@@ -62,7 +75,7 @@ class LearningStatus(StrEnum):
 class LearningSchemaModel(BaseModel):
     """Standalone 13-field learning schema from ADR-AQ-010."""
 
-    model_config = ConfigDict(strict=True, extra="forbid")
+    model_config = ConfigDict(extra="forbid")
 
     title: MediumText
     type: LearningType
