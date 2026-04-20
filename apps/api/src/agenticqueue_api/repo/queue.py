@@ -46,7 +46,7 @@ def _claim_next_statement(
     claimed_at: dt.datetime | None,
     include_latency: bool,
 ) -> Any:
-    filters = [
+    filters: list[sa.ColumnElement[bool]] = [
         TaskRecord.state.in_(
             _normalized_values(claim_states, fallback=DEFAULT_CLAIM_STATES)
         )
@@ -149,7 +149,7 @@ def release_claim(
 ) -> TaskModel | None:
     """Release one active claim back to a claimable state without blocking."""
 
-    filters = [
+    filters: list[sa.ColumnElement[bool]] = [
         TaskRecord.id == task_id,
         TaskRecord.state.in_(
             _normalized_values(active_states, fallback=DEFAULT_ACTIVE_STATES)

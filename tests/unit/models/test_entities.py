@@ -309,7 +309,8 @@ def test_entity_model_round_trip_and_repo_crud(
 
     if entity_name == "task":
         task_payload = cast(TaskModel, payload)
-        payload = task_payload.model_copy(update={"sequence": created.sequence})
+        created_task = cast(TaskModel, created)
+        payload = task_payload.model_copy(update={"sequence": created_task.sequence})
 
     assert created == payload
     assert loaded == payload

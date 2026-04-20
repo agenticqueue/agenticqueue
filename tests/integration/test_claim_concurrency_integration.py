@@ -8,6 +8,7 @@ import threading
 import time
 import uuid
 from collections.abc import Iterator
+from typing import TypeAlias
 
 import pytest
 import sqlalchemy as sa
@@ -54,6 +55,8 @@ TRUNCATE_TABLES = [
     "actor",
 ]
 ACTOR_LABEL = "agent:codex"
+ClaimResult: TypeAlias = tuple[uuid.UUID | None, float]
+LatencyBatch: TypeAlias = list[float]
 
 
 def truncate_all_tables(engine: Engine) -> None:
@@ -260,26 +263,53 @@ async def _gather_claims(
     *,
     actor_id: uuid.UUID,
     worker_count: int,
-    drain_queue: bool,
     labels: list[str] | None = None,
-) -> list[tuple[uuid.UUID | None, float] | list[float]]:
+) -> list[ClaimResult]:
     barrier = threading.Barrier(worker_count)
     loop = asyncio.get_running_loop()
-    target = _run_claim_until_empty if drain_queue else _run_claim_once
     worker_labels = labels or [ACTOR_LABEL] * worker_count
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        return await asyncio.gather(
-            *[
-                loop.run_in_executor(
-                    executor,
-                    target,
-                    session_factory,
-                    actor_id,
-                    barrier,
-                    worker_labels[index],
-                )
-                for index in range(worker_count)
-            ]
+        return list(
+            await asyncio.gather(
+                *[
+                    loop.run_in_executor(
+                        executor,
+                        _run_claim_once,
+                        session_factory,
+                        actor_id,
+                        barrier,
+                        worker_labels[index],
+                    )
+                    for index in range(worker_count)
+                ]
+            )
+        )
+
+
+async def _gather_latency_batches(
+    session_factory: sessionmaker[Session],
+    *,
+    actor_id: uuid.UUID,
+    worker_count: int,
+    labels: list[str],
+) -> list[LatencyBatch]:
+    barrier = threading.Barrier(worker_count)
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        return list(
+            await asyncio.gather(
+                *[
+                    loop.run_in_executor(
+                        executor,
+                        _run_claim_until_empty,
+                        session_factory,
+                        actor_id,
+                        barrier,
+                        labels[index],
+                    )
+                    for index in range(worker_count)
+                ]
+            )
         )
 
 
@@ -376,7 +406,6 @@ def test_claim_next_concurrent_workers_return_distinct_tasks(
             session_factory,
             actor_id=actor_id,
             worker_count=50,
-            drain_queue=False,
         )
     )
 
@@ -395,11 +424,10 @@ def test_claim_next_p99_latency_stays_under_five_ms(
     )
 
     latency_batches = asyncio.run(
-        _gather_claims(
+        _gather_latency_batches(
             session_factory,
             actor_id=actor_id,
             worker_count=50,
-            drain_queue=True,
             labels=worker_labels,
         )
     )
