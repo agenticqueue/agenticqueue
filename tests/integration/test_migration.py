@@ -36,7 +36,7 @@ PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
 PRE_IDEMPOTENCY_TABLES = ENTITY_TABLES - {"idempotency_key"}
 PRE_LATEST_ENTITY_TABLES = ENTITY_TABLES
-PRE_LATEST_REVISION = "20260420_13"
+PRE_LATEST_REVISION = "20260420_15"
 
 
 def alembic_config() -> Config:
@@ -213,6 +213,8 @@ def assert_base_state() -> None:
 
 def test_migration_reaches_head_with_extensions() -> None:
     config = alembic_config()
+    downgrade(config, "base")
+    upgrade(config, "head")
     expected_head = ScriptDirectory.from_config(config).get_current_head()
     assert expected_head is not None
     assert current_revision() == expected_head
@@ -329,6 +331,7 @@ def test_latest_migration_is_reversible() -> None:
             "learning_type",
             "owner",
             "owner_actor_id",
+            "promotion_eligible",
             "review_date",
             "scope",
             "status",
@@ -457,6 +460,22 @@ def test_latest_migration_is_reversible() -> None:
     assert_policy_attachment_columns("workspace", expected_present=True)
     assert_policy_attachment_columns("project", expected_present=True)
     assert_policy_attachment_columns("task", expected_present=True)
+    assert_seeded_capability_keys(
+        {
+            "admin",
+            "create_artifact",
+            "promote_learning",
+            "query_graph",
+            "read_learnings",
+            "read_repo",
+            "run_tests",
+            "search_memory",
+            "trigger_handoff",
+            "update_task",
+            "write_branch",
+            "write_learning",
+        }
+    )
     assert_audit_log_columns(
         {
             "action",
@@ -542,5 +561,21 @@ def test_full_migration_stack_is_reversible_to_base() -> None:
     assert_policy_attachment_columns("workspace", expected_present=True)
     assert_policy_attachment_columns("project", expected_present=True)
     assert_policy_attachment_columns("task", expected_present=True)
+    assert_seeded_capability_keys(
+        {
+            "admin",
+            "create_artifact",
+            "promote_learning",
+            "query_graph",
+            "read_learnings",
+            "read_repo",
+            "run_tests",
+            "search_memory",
+            "trigger_handoff",
+            "update_task",
+            "write_branch",
+            "write_learning",
+        }
+    )
     assert_embedding_columns_and_indexes()
     assert role_timeout_is_persisted() is True

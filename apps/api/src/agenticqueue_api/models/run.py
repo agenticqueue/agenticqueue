@@ -24,6 +24,7 @@ class RunModel(TimestampedSchema):
     """Pydantic schema for a run."""
 
     task_id: uuid.UUID
+    packet_version_id: uuid.UUID | None = None
     actor_id: uuid.UUID | None = None
     status: str
     started_at: dt.datetime
@@ -41,6 +42,11 @@ class RunRecord(IdentifiedTable, TimestampedTable, Base):
         UUID(as_uuid=True),
         sa.ForeignKey("agenticqueue.task.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    packet_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("agenticqueue.packet_version.id", ondelete="SET NULL"),
+        nullable=True,
     )
     actor_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),

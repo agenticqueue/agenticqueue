@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-import hashlib
-import json
 from pathlib import Path
 import re
 import uuid
@@ -36,6 +34,12 @@ from agenticqueue_api.models import (
 )
 from agenticqueue_api.models.edge import EdgeRelation
 from agenticqueue_api.models.shared import SchemaModel
+from agenticqueue_api.packet_versions import (
+    get_packet_version_by_hash,
+    packet_content_hash,
+    packet_version_uuid,
+    persist_packet_version,
+)
 from agenticqueue_api.policy.loader import PolicyPack, PolicyRegistry, load_policy_pack
 from agenticqueue_api.policy.resolver import ResolvedPolicy, resolve_effective_policy
 from agenticqueue_api.repo import ancestors, neighbors
@@ -385,11 +389,6 @@ def _vector_fallback_learnings(
     return [LearningModel.model_validate(record) for _, record in candidates[:limit]]
 
 
-def _packet_hash(payload: dict[str, Any]) -> str:
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
 def assemble_packet(
     session: Session,
     task_id: uuid.UUID,
@@ -443,10 +442,18 @@ def assemble_packet(
         retrieval_tiers_used=retrieval_tiers_used,
     )
 
-    packet.packet_version_id = _packet_hash(
-        packet.model_dump(mode="json", exclude={"packet_version_id"})
-    )
+    packet_hash = packet_content_hash(packet)
+    packet.packet_version_id = str(packet_version_uuid(packet_hash))
     return packet
+
+
+def get_packet_by_hash(session: Session, packet_hash: str) -> dict[str, Any] | None:
+    """Return a previously persisted packet by content hash."""
+
+    packet_version = get_packet_version_by_hash(session, packet_hash)
+    if packet_version is None:
+        return None
+    return dict(packet_version.payload)
 
 
 def compile_packet(
@@ -459,13 +466,15 @@ def compile_packet(
 ) -> dict[str, Any]:
     """Return the compiled packet as a JSON-serializable dict."""
 
-    return assemble_packet(
+    packet = assemble_packet(
         session,
         task_id,
         learning_limit=learning_limit,
         task_type_registry=task_type_registry,
         policy_registry=policy_registry,
-    ).model_dump(mode="json")
+    )
+    packet_version = persist_packet_version(session, task_id, packet)
+    return dict(packet_version.payload)
 
 
 __all__ = [
@@ -474,5 +483,6 @@ __all__ = [
     "PacketV1",
     "assemble_packet",
     "compile_packet",
+    "get_packet_by_hash",
     "packet_decisions",
 ]
