@@ -53,7 +53,7 @@
   "open_questions": [
     "Which mmmmm project should enter observer mode first?"
   ],
-  "packet_version_id": "e5d2b495-f538-529e-a74f-68e8e568b490",
+  "packet_version_id": "9a9f4dd8-f1fb-55ab-a885-ee22083658d7",
   "permissions": {
     "autonomy_tier": 3,
     "capabilities": [
@@ -68,6 +68,7 @@
     "source": "task",
     "validation_mode": "human_review"
   },
+  "redactions_count": 0,
   "relevant_decisions": [
     {
       "actor_id": "00000000-0000-0000-0000-000000001300",

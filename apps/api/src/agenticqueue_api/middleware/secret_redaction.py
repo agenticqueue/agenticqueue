@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 import hashlib
 import json
 import logging
@@ -69,6 +70,18 @@ _ENGLISH_WORDS = {
     "warning",
     "workspace",
 }
+_SECRET_HINTS = (
+    "AKIA",
+    "gh",
+    "service_account",
+    "PRIVATE KEY",
+    "eyJ",
+    "sk_live_",
+    "xoxb-",
+    "Bearer",
+    "token=",
+    "access_token=",
+)
 
 
 @dataclass(frozen=True)
@@ -143,6 +156,36 @@ _PATTERN_RULES = (
         ),
     ),
 )
+
+
+def compile_secret_pattern_rules(raw_rules: object) -> tuple[_PatternRule, ...]:
+    """Compile custom detector rules from policy/body configuration."""
+
+    if not isinstance(raw_rules, Sequence) or isinstance(
+        raw_rules, (str, bytes, bytearray)
+    ):
+        return ()
+
+    compiled: list[_PatternRule] = []
+    for raw_rule in raw_rules:
+        if not isinstance(raw_rule, Mapping):
+            continue
+
+        raw_kind = raw_rule.get("kind", raw_rule.get("name"))
+        raw_pattern = raw_rule.get("pattern")
+        if not isinstance(raw_kind, str) or not isinstance(raw_pattern, str):
+            continue
+
+        kind = raw_kind.strip()
+        pattern = raw_pattern.strip()
+        if not kind or not pattern:
+            continue
+
+        try:
+            compiled.append(_PatternRule(kind=kind, pattern=re.compile(pattern)))
+        except re.error as error:
+            logger.warning("invalid secret-redaction pattern %s: %s", kind, error)
+    return tuple(compiled)
 
 
 def _requires_secret_scan(scope: Scope) -> bool:
@@ -221,11 +264,64 @@ def _looks_generic_high_entropy_secret(value: str) -> bool:
     return shannon_entropy(stripped) > 4.5
 
 
-def find_secret_matches(value: str) -> list[SecretMatch]:
+@lru_cache(maxsize=4096)
+def _might_contain_secret(value: str) -> bool:
+    stripped = value.strip()
+    if not stripped:
+        return False
+    if any(hint in value for hint in _SECRET_HINTS):
+        return True
+    if len(stripped) < 20:
+        return False
+    if _UUID_LIKE.fullmatch(stripped):
+        return False
+    return bool(_HIGH_ENTROPY_ALLOWED_CHARS.fullmatch(stripped))
+
+
+def payload_might_contain_secret(
+    payload: Any,
+    *,
+    extra_rules: Sequence[_PatternRule] = (),
+) -> bool:
+    """Cheap preflight for whether a payload is worth a full secret scan."""
+
+    if isinstance(payload, Mapping):
+        return any(
+            payload_might_contain_secret(value, extra_rules=extra_rules)
+            for value in payload.values()
+        )
+    if isinstance(payload, Sequence) and not isinstance(
+        payload, (str, bytes, bytearray)
+    ):
+        return any(
+            payload_might_contain_secret(value, extra_rules=extra_rules)
+            for value in payload
+        )
+    if isinstance(payload, str):
+        if extra_rules and any(rule.pattern.search(payload) for rule in extra_rules):
+            return True
+        return _might_contain_secret(payload)
+    if hasattr(payload, "__dict__"):
+        return any(
+            payload_might_contain_secret(value, extra_rules=extra_rules)
+            for key, value in vars(payload).items()
+            if not key.startswith("_")
+        )
+    return False
+
+
+def find_secret_matches(
+    value: str,
+    *,
+    extra_rules: Sequence[_PatternRule] = (),
+) -> list[SecretMatch]:
     """Return all non-overlapping secret matches within one string."""
 
+    if not extra_rules and not _might_contain_secret(value):
+        return []
+
     matches: list[SecretMatch] = []
-    for rule in _PATTERN_RULES:
+    for rule in (*_PATTERN_RULES, *extra_rules):
         for matched in rule.pattern.finditer(value):
             start, end = matched.span()
             matches.append(SecretMatch(kind=rule.kind, start=start, end=end))
@@ -252,7 +348,12 @@ def _apply_redactions(value: str, matches: Sequence[SecretMatch]) -> str:
     return "".join(pieces)
 
 
-def scan_json_payload(payload: Any, *, hard_block: bool) -> SecretScanResult:
+def scan_json_payload(
+    payload: Any,
+    *,
+    hard_block: bool,
+    extra_rules: Sequence[_PatternRule] = (),
+) -> SecretScanResult:
     """Scan a JSON-like payload, optionally redacting matched strings."""
 
     collected: list[SecretMatch] = []
@@ -267,7 +368,7 @@ def scan_json_payload(payload: Any, *, hard_block: bool) -> SecretScanResult:
         if not isinstance(value, str):
             return value
 
-        matches = find_secret_matches(value)
+        matches = find_secret_matches(value, extra_rules=extra_rules)
         if not matches:
             return value
 

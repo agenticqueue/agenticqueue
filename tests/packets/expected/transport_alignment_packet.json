@@ -53,7 +53,7 @@
   "open_questions": [
     "Should the REST and CLI surfaces share one renderer?"
   ],
-  "packet_version_id": "41c55dc1-68fa-5e1d-99c3-fe9eb9381e66",
+  "packet_version_id": "cb70df44-f5a7-541c-a05d-cf1b09bac662",
   "permissions": {
     "autonomy_tier": 3,
     "capabilities": [
@@ -68,6 +68,7 @@
     "source": "task",
     "validation_mode": "human_review"
   },
+  "redactions_count": 0,
   "relevant_decisions": [
     {
       "actor_id": "00000000-0000-0000-0000-000000001200",

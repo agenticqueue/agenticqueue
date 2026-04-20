@@ -12,12 +12,18 @@ import sqlalchemy as sa
 from pydantic import Field
 from sqlalchemy.orm import Session
 
+from agenticqueue_api.audit import set_session_redaction_context
 from agenticqueue_api.config import (
     get_packet_scope_max_files,
     get_policies_dir,
     get_reload_enabled,
     get_repo_root,
     get_task_types_dir,
+)
+from agenticqueue_api.middleware.secret_redaction import (
+    compile_secret_pattern_rules,
+    payload_might_contain_secret,
+    scan_json_payload,
 )
 from agenticqueue_api.models import (
     ArtifactModel,
@@ -26,8 +32,12 @@ from agenticqueue_api.models import (
     DecisionRecord,
     EdgeRecord,
     LearningModel,
+    PolicyModel,
+    PolicyRecord,
+    ProjectRecord,
     TaskModel,
     TaskRecord,
+    WorkspaceRecord,
 )
 from agenticqueue_api.models.edge import EdgeRelation
 from agenticqueue_api.models.shared import SchemaModel
@@ -57,6 +67,7 @@ PACKET_DECISION_NEIGHBOR_EDGE_TYPES = (
     EdgeRelation.IMPLEMENTS,
     EdgeRelation.SUPERSEDES,
 )
+PACKET_REDACTION_PATTERNS_KEY = "packet_redaction_patterns"
 OPEN_QUESTIONS_HEADING_RE = re.compile(r"^#{2,6}\s+Open Questions\s*$")
 BULLET_ITEM_RE = re.compile(r"^\s*[-*]\s+(?P<item>.+?)\s*$")
 
@@ -97,6 +108,7 @@ class PacketV1(SchemaModel):
     permissions: PacketPermissions
     expected_output_schema: dict[str, Any] = Field(default_factory=dict)
     packet_version_id: str
+    redactions_count: int = 0
     retrieval_tiers_used: list[str] = Field(default_factory=list)
 
 
@@ -193,15 +205,46 @@ def _load_task(
 
 def _resolved_policy(
     *,
+    session: Session,
+    task: TaskRecord,
     task_definition: TaskTypeDefinition,
     policy_registry: PolicyRegistry,
 ) -> ResolvedPolicy:
     default_policy = policy_registry.get(DEFAULT_POLICY_NAME)
     task_type_policy = _task_type_policy_pack(str(task_definition.policy_path))
-    return resolve_effective_policy(
+    base_policy = resolve_effective_policy(
         default_policy=default_policy,
         task_policy=task_type_policy,
     )
+    project = session.get(ProjectRecord, task.project_id)
+    workspace = (
+        None if project is None else session.get(WorkspaceRecord, project.workspace_id)
+    )
+    workspace_policy = _attached_policy(
+        session, workspace.policy_id if workspace else None
+    )
+    project_policy = _attached_policy(session, project.policy_id if project else None)
+    task_policy = _attached_policy(session, task.policy_id)
+    if workspace_policy is None and project_policy is None and task_policy is None:
+        return base_policy
+    return resolve_effective_policy(
+        default_policy=base_policy,
+        workspace_policy=workspace_policy,
+        project_policy=project_policy,
+        task_policy=task_policy,
+    )
+
+
+def _attached_policy(
+    session: Session,
+    policy_id: uuid.UUID | None,
+) -> PolicyModel | None:
+    if policy_id is None:
+        return None
+    record = session.get(PolicyRecord, policy_id)
+    if record is None:
+        return None
+    return PolicyModel.model_validate(record)
 
 
 def _packet_permissions(policy: ResolvedPolicy) -> PacketPermissions:
@@ -224,6 +267,62 @@ def _expected_output_schema(definition: TaskTypeDefinition) -> dict[str, Any]:
     if not isinstance(output_schema, dict):
         return {}
     return output_schema
+
+
+def _packet_redaction_context(
+    *,
+    redaction_count: object,
+) -> dict[str, Any] | None:
+    if not isinstance(redaction_count, int) or redaction_count < 1:
+        return None
+    return {
+        "redaction_count": redaction_count,
+        "source": "packet",
+    }
+
+
+def _packet_redaction_probe_payload(packet: PacketV1) -> dict[str, Any]:
+    return {
+        "task_description": packet.task.description,
+        "task_contract": packet.task_contract,
+        "relevant_decisions": [
+            decision.model_dump(mode="json") for decision in packet.relevant_decisions
+        ],
+        "relevant_learnings": [
+            learning.model_dump(mode="json") for learning in packet.relevant_learnings
+        ],
+        "linked_artifacts": [
+            artifact.model_dump(mode="json") for artifact in packet.linked_artifacts
+        ],
+    }
+
+
+def _apply_packet_redaction(
+    packet: PacketV1,
+    *,
+    policy: ResolvedPolicy,
+) -> tuple[PacketV1, dict[str, Any] | None]:
+    extra_rules = compile_secret_pattern_rules(
+        policy.body.get(PACKET_REDACTION_PATTERNS_KEY)
+    )
+    if not payload_might_contain_secret(
+        _packet_redaction_probe_payload(packet),
+        extra_rules=extra_rules,
+    ):
+        packet.redactions_count = 0
+        return packet, None
+
+    scan = scan_json_payload(
+        packet.model_dump(mode="json"),
+        hard_block=False,
+        extra_rules=extra_rules,
+    )
+    payload = dict(scan.sanitized_payload)
+    payload["redactions_count"] = scan.redaction_count
+    redaction = _packet_redaction_context(redaction_count=scan.redaction_count)
+    if redaction is not None:
+        redaction["types_matched"] = list(scan.types_matched)
+    return PacketV1.model_validate(payload), redaction
 
 
 def _anchor_task_ids(
@@ -344,6 +443,8 @@ def assemble_packet(
     policies = policy_registry or _cached_policy_registry()
     task_definition = _load_task(registry, task.task_type)
     resolved_policy = _resolved_policy(
+        session=session,
+        task=task,
         task_definition=task_definition,
         policy_registry=policies,
     )
@@ -374,6 +475,11 @@ def assemble_packet(
         packet_version_id="",
         retrieval_tiers_used=retrieval_tiers_used,
     )
+    packet, redaction_context = _apply_packet_redaction(
+        packet,
+        policy=resolved_policy,
+    )
+    set_session_redaction_context(session, redaction=redaction_context)
 
     packet_hash = packet_content_hash(packet)
     packet.packet_version_id = str(packet_version_uuid(packet_hash))
@@ -409,6 +515,12 @@ def compile_packet(
         assert packet_cache is not None
         cached = packet_cache.get(task_id, learning_limit=learning_limit)
         if cached is not None:
+            set_session_redaction_context(
+                session,
+                redaction=_packet_redaction_context(
+                    redaction_count=cached.get("redactions_count")
+                ),
+            )
             packet_cache.schedule_prefetch(task_id, learning_limit=learning_limit)
             return cached
 
