@@ -100,6 +100,12 @@ jobs:
         uses: anchore/scan-action/download-grype@v3
         id: grype
 
+      - name: Update Grype database
+        shell: bash
+        run: |
+          set -euo pipefail
+          "${{ steps.grype.outputs.cmd }}" db update
+
       - name: Generate vulnerability report
         shell: bash
         run: |
