@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Final
 
-from pgvector.sqlalchemy import Vector
+from pgvector.sqlalchemy import Vector  # type: ignore[import-untyped]
 from sqlalchemy.orm import mapped_column
 
 from agenticqueue_api.config import get_embedding_dimension, get_vector_ivfflat_lists
