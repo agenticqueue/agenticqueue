@@ -25,6 +25,7 @@ ENTITY_TABLES = {
     "idempotency_key",
     "learning",
     "learning_drafts",
+    "memory_item",
     "packet_version",
     "policy",
     "project",
@@ -35,8 +36,8 @@ ENTITY_TABLES = {
 PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
 PRE_IDEMPOTENCY_TABLES = ENTITY_TABLES - {"idempotency_key"}
-PRE_LATEST_ENTITY_TABLES = ENTITY_TABLES
-PRE_LATEST_REVISION = "20260420_15"
+PRE_LATEST_ENTITY_TABLES = ENTITY_TABLES - {"memory_item"}
+PRE_LATEST_REVISION = "20260420_16"
 
 
 def alembic_config() -> Config:
@@ -92,7 +93,11 @@ def assert_audit_log_columns(expected_columns: set[str]) -> None:
             assert {row[0] for row in cursor.fetchall()} == expected_columns
 
 
-def assert_embedding_columns_and_indexes() -> None:
+def assert_embedding_columns_and_indexes(
+    *,
+    expected_tables: set[str],
+    expected_index_tables: set[str],
+) -> None:
     with psycopg.connect(get_sync_database_url()) as connection:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -100,7 +105,7 @@ def assert_embedding_columns_and_indexes() -> None:
                 "WHERE table_schema = 'agenticqueue' AND column_name = 'embedding' "
                 "ORDER BY table_name"
             )
-            assert [row[0] for row in cursor.fetchall()] == sorted(EMBEDDING_TABLES)
+            assert {row[0] for row in cursor.fetchall()} == expected_tables
 
             cursor.execute(
                 "SELECT indexname FROM pg_indexes "
@@ -108,7 +113,7 @@ def assert_embedding_columns_and_indexes() -> None:
                 "ORDER BY indexname"
             )
             assert set(
-                embedding_index_name(table_name) for table_name in EMBEDDING_TABLES
+                embedding_index_name(table_name) for table_name in expected_index_tables
             ).issubset({row[0] for row in cursor.fetchall()})
 
 
@@ -153,6 +158,35 @@ def assert_learning_columns(expected_columns: set[str]) -> None:
                 "ORDER BY column_name"
             )
             assert {row[0] for row in cursor.fetchall()} == expected_columns
+
+
+def assert_memory_item_columns(expected_columns: set[str]) -> None:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'agenticqueue' AND table_name = 'memory_item' "
+                "ORDER BY column_name"
+            )
+            assert {row[0] for row in cursor.fetchall()} == expected_columns
+
+
+def assert_memory_item_indexes(*, expected_present: bool) -> None:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT indexname FROM pg_indexes "
+                "WHERE schemaname = 'agenticqueue' AND tablename = 'memory_item' "
+                "ORDER BY indexname"
+            )
+            indexes = {row[0] for row in cursor.fetchall()}
+
+    if expected_present:
+        assert "ix_memory_item_surface_area_gin" in indexes
+        assert "uq_memory_item_layer_scope_id_content_hash" in indexes
+        return
+
+    assert indexes == set()
 
 
 def assert_policy_columns(expected_columns: set[str]) -> None:
@@ -244,6 +278,22 @@ def test_migration_reaches_head_with_extensions() -> None:
             "what_learned",
         }
     )
+    assert_memory_item_columns(
+        {
+            "access_count",
+            "content_hash",
+            "content_text",
+            "created_at",
+            "embedding",
+            "id",
+            "last_accessed_at",
+            "layer",
+            "scope_id",
+            "source_ref",
+            "surface_area",
+        }
+    )
+    assert_memory_item_indexes(expected_present=True)
     assert_capability_columns({"created_at", "description", "id", "key", "updated_at"})
     assert_capability_grant_columns(
         {
@@ -308,7 +358,10 @@ def test_migration_reaches_head_with_extensions() -> None:
             "trace_id",
         }
     )
-    assert_embedding_columns_and_indexes()
+    assert_embedding_columns_and_indexes(
+        expected_tables=set(EMBEDDING_TABLES) | {"memory_item"},
+        expected_index_tables=set(EMBEDDING_TABLES),
+    )
     assert role_timeout_is_persisted() is True
 
 
@@ -318,6 +371,7 @@ def test_latest_migration_is_reversible() -> None:
     assert current_revision() == PRE_LATEST_REVISION
     assert_foundation_state(PRE_LATEST_REVISION)
     assert_entity_tables(PRE_LATEST_ENTITY_TABLES)
+    assert_memory_item_indexes(expected_present=False)
     assert_learning_columns(
         {
             "action_rule",
@@ -398,7 +452,10 @@ def test_latest_migration_is_reversible() -> None:
     assert_policy_attachment_columns("workspace", expected_present=True)
     assert_policy_attachment_columns("project", expected_present=True)
     assert_policy_attachment_columns("task", expected_present=True)
-    assert_embedding_columns_and_indexes()
+    assert_embedding_columns_and_indexes(
+        expected_tables=set(EMBEDDING_TABLES),
+        expected_index_tables=set(EMBEDDING_TABLES),
+    )
     assert role_timeout_is_persisted() is True
     upgrade(config, "head")
     expected_head = ScriptDirectory.from_config(config).get_current_head()
@@ -493,7 +550,10 @@ def test_latest_migration_is_reversible() -> None:
             "trace_id",
         }
     )
-    assert_embedding_columns_and_indexes()
+    assert_embedding_columns_and_indexes(
+        expected_tables=set(EMBEDDING_TABLES) | {"memory_item"},
+        expected_index_tables=set(EMBEDDING_TABLES),
+    )
     assert role_timeout_is_persisted() is True
 
 
@@ -577,5 +637,8 @@ def test_full_migration_stack_is_reversible_to_base() -> None:
             "write_learning",
         }
     )
-    assert_embedding_columns_and_indexes()
+    assert_embedding_columns_and_indexes(
+        expected_tables=set(EMBEDDING_TABLES) | {"memory_item"},
+        expected_index_tables=set(EMBEDDING_TABLES),
+    )
     assert role_timeout_is_persisted() is True
