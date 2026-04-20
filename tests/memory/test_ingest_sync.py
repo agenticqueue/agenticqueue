@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import datetime as dt
-import logging
 import uuid
 from typing import Iterator
+from unittest.mock import patch
 
 import pytest
 import sqlalchemy as sa
@@ -77,7 +77,6 @@ def session(engine: Engine) -> Iterator[Session]:
 
 def test_ingest_full_sync_prunes_deleted_and_stale_source_rows(
     session: Session,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     scope_id = _uuid("full-sync-scope")
     session.add_all(
@@ -104,19 +103,28 @@ def test_ingest_full_sync_prunes_deleted_and_stale_source_rows(
     )
     session.flush()
 
-    caplog.set_level(logging.INFO, logger="agenticqueue_api.memory.ingest")
-    result = MemoryIngestService(session).ingest(
-        layer=MemoryLayer.PROJECT,
-        scope_id=scope_id,
-        items=[
-            MemoryIngestItem(
-                source_ref="docs/keep.md",
-                content_text="updated keep content",
-                content_hash="keep-new",
-                surface_area=("memory/ingest", "docs/keep.md"),
-            )
-        ],
-        full_sync=True,
+    with patch("agenticqueue_api.memory.ingest.logger.info") as log_info:
+        result = MemoryIngestService(session).ingest(
+            layer=MemoryLayer.PROJECT,
+            scope_id=scope_id,
+            items=[
+                MemoryIngestItem(
+                    source_ref="docs/keep.md",
+                    content_text="updated keep content",
+                    content_hash="keep-new",
+                    surface_area=("memory/ingest", "docs/keep.md"),
+                )
+            ],
+            full_sync=True,
+        )
+    log_info.assert_called_once_with(
+        "memory.ingest.prune",
+        extra={
+            "pruned": 2,
+            "source": "full_sync",
+            "layer": MemoryLayer.PROJECT.value,
+            "scope_id": str(scope_id),
+        },
     )
 
     remaining_rows = session.scalars(
@@ -136,14 +144,6 @@ def test_ingest_full_sync_prunes_deleted_and_stale_source_rows(
         full_sync=True,
         partial=False,
     )
-
-    prune_record = next(
-        record for record in caplog.records if record.msg == "memory.ingest.prune"
-    )
-    assert prune_record.pruned == 2
-    assert prune_record.source == "full_sync"
-    assert prune_record.layer == MemoryLayer.PROJECT.value
-    assert prune_record.scope_id == str(scope_id)
 
 
 def test_ingest_partial_walk_never_prunes_existing_rows(session: Session) -> None:

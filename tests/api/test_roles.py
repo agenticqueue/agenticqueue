@@ -162,7 +162,9 @@ def test_admin_can_list_roles_and_manage_role_assignments_over_rest(
         ),
     )
     admin_token = seed_token(session_factory, actor_id=admin_actor.id, scopes=["admin"])
-    target_token = seed_token(session_factory, actor_id=target_actor.id, scopes=["self"])
+    target_token = seed_token(
+        session_factory, actor_id=target_actor.id, scopes=["self"]
+    )
 
     list_response = client.get(
         "/v1/roles",
@@ -187,7 +189,9 @@ def test_admin_can_list_roles_and_manage_role_assignments_over_rest(
     assert assigned["role_name"] == RoleName.CONTRIBUTOR.value
     assert set(assigned["capabilities"]) == {
         capability.value
-        for capability in STANDARD_ROLE_DEFINITIONS[RoleName.CONTRIBUTOR]["capabilities"]
+        for capability in STANDARD_ROLE_DEFINITIONS[RoleName.CONTRIBUTOR][
+            "capabilities"
+        ]
     }
 
     actor_roles_response = client.get(
@@ -208,7 +212,9 @@ def test_admin_can_list_roles_and_manage_role_assignments_over_rest(
         item["capability"] for item in capability_response.json()["capabilities"]
     } == {
         capability.value
-        for capability in STANDARD_ROLE_DEFINITIONS[RoleName.CONTRIBUTOR]["capabilities"]
+        for capability in STANDARD_ROLE_DEFINITIONS[RoleName.CONTRIBUTOR][
+            "capabilities"
+        ]
     }
 
     revoke_response = client.post(
@@ -267,4 +273,3 @@ def test_non_admin_cannot_assign_roles_over_rest(
 
     assert response.status_code == 403
     assert response.json()["message"] == "Admin actor required"
-

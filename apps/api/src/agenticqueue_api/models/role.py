@@ -239,4 +239,3 @@ class RoleAssignmentRecord(IdentifiedTable, TimestampedTable, Base):
         sa.DateTime(timezone=True),
         nullable=True,
     )
-

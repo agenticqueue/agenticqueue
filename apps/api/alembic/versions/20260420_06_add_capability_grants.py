@@ -131,12 +131,10 @@ def upgrade() -> None:
         schema="agenticqueue",
     )
 
-    insert_capability = sa.text(
-        """
+    insert_capability = sa.text("""
         INSERT INTO agenticqueue.capability (key, description)
         VALUES (:key, :description)
-        """
-    )
+        """)
     for key, description in STANDARD_CAPABILITIES:
         op.execute(
             insert_capability.bindparams(

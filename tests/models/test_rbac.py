@@ -190,4 +190,3 @@ def test_assigning_admin_role_materializes_all_current_capabilities_and_revokes_
     with session_factory() as session:
         assert list_role_assignments_for_actor(session, target_actor.id) == []
         assert list_capabilities_for_actor(session, target_actor.id) == []
-

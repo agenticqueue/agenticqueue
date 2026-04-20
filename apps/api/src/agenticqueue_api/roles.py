@@ -49,7 +49,9 @@ def _build_role_assignment_model(
 def list_roles(session: Session) -> list[RoleModel]:
     """Return the seeded role catalog."""
 
-    statement = sa.select(RoleRecord).order_by(RoleRecord.name.asc(), RoleRecord.id.asc())
+    statement = sa.select(RoleRecord).order_by(
+        RoleRecord.name.asc(), RoleRecord.id.asc()
+    )
     return [_build_role_model(record) for record in session.scalars(statement)]
 
 

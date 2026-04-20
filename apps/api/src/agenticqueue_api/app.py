@@ -675,7 +675,9 @@ def create_app(
         session: Session = Depends(get_db_session),
     ) -> RoleListResponse:
         _require_admin_actor(request)
-        return RoleListResponse(roles=[_role_view(role) for role in list_roles(session)])
+        return RoleListResponse(
+            roles=[_role_view(role) for role in list_roles(session)]
+        )
 
     @app.post(
         "/v1/roles/assign",

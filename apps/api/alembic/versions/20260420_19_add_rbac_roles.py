@@ -225,12 +225,10 @@ def upgrade() -> None:
         schema="agenticqueue",
     )
 
-    insert_role = sa.text(
-        """
+    insert_role = sa.text("""
         INSERT INTO agenticqueue.role (name, description, capabilities, scope)
         VALUES (:name, :description, CAST(:capabilities AS jsonb), CAST(:scope AS jsonb))
-        """
-    )
+        """)
     for role in STANDARD_ROLES:
         op.execute(
             insert_role.bindparams(

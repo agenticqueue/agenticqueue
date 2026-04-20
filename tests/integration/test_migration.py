@@ -341,7 +341,15 @@ def test_migration_reaches_head_with_extensions() -> None:
         }
     )
     assert_role_columns(
-        {"capabilities", "created_at", "description", "id", "name", "scope", "updated_at"}
+        {
+            "capabilities",
+            "created_at",
+            "description",
+            "id",
+            "name",
+            "scope",
+            "updated_at",
+        }
     )
     assert_actor_role_assignment_columns(
         {
@@ -506,7 +514,15 @@ def test_latest_migration_is_reversible() -> None:
         }
     )
     assert_role_columns(
-        {"capabilities", "created_at", "description", "id", "name", "scope", "updated_at"}
+        {
+            "capabilities",
+            "created_at",
+            "description",
+            "id",
+            "name",
+            "scope",
+            "updated_at",
+        }
     )
     assert_actor_role_assignment_columns(
         {
@@ -609,7 +625,15 @@ def test_full_migration_stack_is_reversible_to_base() -> None:
         }
     )
     assert_role_columns(
-        {"capabilities", "created_at", "description", "id", "name", "scope", "updated_at"}
+        {
+            "capabilities",
+            "created_at",
+            "description",
+            "id",
+            "name",
+            "scope",
+            "updated_at",
+        }
     )
     assert_actor_role_assignment_columns(
         {
