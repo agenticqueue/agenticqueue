@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime as dt
 import json
 import uuid
 from collections.abc import Callable, Iterator
@@ -164,7 +163,9 @@ def deps(session_factory: sessionmaker[Session]) -> Dependencies:
         workspace = create_workspace(
             session,
             model_from(
-                __import__("agenticqueue_api.models", fromlist=["WorkspaceModel"]).WorkspaceModel,
+                __import__(
+                    "agenticqueue_api.models", fromlist=["WorkspaceModel"]
+                ).WorkspaceModel,
                 {
                     "id": str(uuid.uuid4()),
                     "slug": "linked-workspace",
@@ -178,7 +179,9 @@ def deps(session_factory: sessionmaker[Session]) -> Dependencies:
         project = create_project(
             session,
             model_from(
-                __import__("agenticqueue_api.models", fromlist=["ProjectModel"]).ProjectModel,
+                __import__(
+                    "agenticqueue_api.models", fromlist=["ProjectModel"]
+                ).ProjectModel,
                 {
                     "id": str(uuid.uuid4()),
                     "workspace_id": str(workspace.id),
@@ -808,9 +811,12 @@ def test_core_entities_support_crud_filtering_and_audit(
     assert create_response.status_code == 201
     created = create_response.json()
     created_id = uuid.UUID(created["id"])
-    assert latest_audit_action(
-        session_factory, entity_type=spec.entity_type, entity_id=created_id
-    ) == "CREATE"
+    assert (
+        latest_audit_action(
+            session_factory, entity_type=spec.entity_type, entity_id=created_id
+        )
+        == "CREATE"
+    )
 
     get_response = client.get(
         f"/v1/{spec.resource}/{created_id}",
@@ -834,18 +840,24 @@ def test_core_entities_support_crud_filtering_and_audit(
     )
     assert update_response.status_code == 200
     assert update_response.json()[spec.updated_field] == spec.updated_value
-    assert latest_audit_action(
-        session_factory, entity_type=spec.entity_type, entity_id=created_id
-    ) == "UPDATE"
+    assert (
+        latest_audit_action(
+            session_factory, entity_type=spec.entity_type, entity_id=created_id
+        )
+        == "UPDATE"
+    )
 
     delete_response = client.delete(
         f"/v1/{spec.resource}/{created_id}",
         headers=auth_headers(token),
     )
     assert delete_response.status_code == 204
-    assert latest_audit_action(
-        session_factory, entity_type=spec.entity_type, entity_id=created_id
-    ) == "DELETE"
+    assert (
+        latest_audit_action(
+            session_factory, entity_type=spec.entity_type, entity_id=created_id
+        )
+        == "DELETE"
+    )
     assert record_exists(session_factory, spec.record_type, created_id) is False
 
     missing_response = client.get(
@@ -895,9 +907,10 @@ def test_actor_soft_delete_and_boolean_filtering(
         headers=auth_headers(token),
     )
     assert delete_response.status_code == 204
-    assert latest_audit_action(
-        session_factory, entity_type="actor", entity_id=created_id
-    ) == "UPDATE"
+    assert (
+        latest_audit_action(session_factory, entity_type="actor", entity_id=created_id)
+        == "UPDATE"
+    )
     assert record_exists(session_factory, ActorRecord, created_id) is True
     assert actor_is_active(session_factory, created_id) is False
 
@@ -952,11 +965,14 @@ def test_policy_learning_and_edge_filters_cover_int_date_and_enum_paths(
         "/v1/policies", headers=auth_headers(token), json=policy_payload
     )
     assert policy_response.status_code == 201
-    assert client.get(
-        "/v1/policies",
-        headers=auth_headers(token),
-        params={"autonomy_tier": "3"},
-    ).status_code == 200
+    assert (
+        client.get(
+            "/v1/policies",
+            headers=auth_headers(token),
+            params={"autonomy_tier": "3"},
+        ).status_code
+        == 200
+    )
 
     learning_payload = model_from(
         LearningModel,
@@ -985,11 +1001,14 @@ def test_policy_learning_and_edge_filters_cover_int_date_and_enum_paths(
         "/v1/learnings", headers=auth_headers(token), json=learning_payload
     )
     assert learning_response.status_code == 201
-    assert client.get(
-        "/v1/learnings",
-        headers=auth_headers(token),
-        params={"review_date": "2026-04-21"},
-    ).status_code == 200
+    assert (
+        client.get(
+            "/v1/learnings",
+            headers=auth_headers(token),
+            params={"review_date": "2026-04-21"},
+        ).status_code
+        == 200
+    )
 
     edge_payload = model_from(
         EdgeModel,
@@ -1009,11 +1028,14 @@ def test_policy_learning_and_edge_filters_cover_int_date_and_enum_paths(
         "/v1/edges", headers=auth_headers(token), json=edge_payload
     )
     assert edge_response.status_code == 201
-    assert client.get(
-        "/v1/edges",
-        headers=auth_headers(token),
-        params={"relation": "depends_on"},
-    ).status_code == 200
+    assert (
+        client.get(
+            "/v1/edges",
+            headers=auth_headers(token),
+            params={"relation": "depends_on"},
+        ).status_code
+        == 200
+    )
 
 
 def test_duplicate_create_invalid_filter_invalid_value_invalid_payload_and_immutable_patch_are_structured(
@@ -1045,14 +1067,15 @@ def test_duplicate_create_invalid_filter_invalid_value_invalid_payload_and_immut
     duplicate_response = client.post(
         "/v1/workspaces",
         headers=auth_headers(token),
-        json={**core_specs()[0].create_payload(deps), "slug": workspace_payload["slug"]},
+        json={
+            **core_specs()[0].create_payload(deps),
+            "slug": workspace_payload["slug"],
+        },
     )
     assert_error_shape(duplicate_response, status_code=409, error_code="conflict")
 
     conflicting_slug = "workspace-conflict"
-    seed_workspace(
-        session_factory, slug=conflicting_slug, name="Workspace Conflict"
-    )
+    seed_workspace(session_factory, slug=conflicting_slug, name="Workspace Conflict")
     conflict_update = client.patch(
         f"/v1/workspaces/{created_id}",
         headers=auth_headers(token),
@@ -1088,9 +1111,7 @@ def test_duplicate_create_invalid_filter_invalid_value_invalid_payload_and_immut
         headers=auth_headers(token),
         json={"slug": "missing-fields"},
     )
-    assert_error_shape(
-        invalid_payload, status_code=422, error_code="validation_error"
-    )
+    assert_error_shape(invalid_payload, status_code=422, error_code="validation_error")
 
     immutable_patch = client.patch(
         f"/v1/workspaces/{created_id}",

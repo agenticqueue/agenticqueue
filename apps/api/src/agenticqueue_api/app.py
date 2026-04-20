@@ -8,7 +8,7 @@ from collections.abc import Iterator
 from typing import Any, cast
 
 import sqlalchemy as sa
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from pydantic import Field
 from sqlalchemy.orm import Session, sessionmaker
 

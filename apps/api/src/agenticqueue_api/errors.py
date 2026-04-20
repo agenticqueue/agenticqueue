@@ -85,9 +85,7 @@ async def handle_http_exception(request: Request, exc: Exception) -> JSONRespons
     )
 
 
-async def handle_validation_exception(
-    request: Request, exc: Exception
-) -> JSONResponse:
+async def handle_validation_exception(request: Request, exc: Exception) -> JSONResponse:
     """Render request validation failures in the standard error shape."""
 
     del request
