@@ -119,7 +119,9 @@ def _truncate_all_tables(engine: Engine) -> None:
 def _actor_payload(*, handle: str, actor_type: str = "agent") -> ActorModel:
     return ActorModel.model_validate(
         {
-            "id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"https://agenticqueue.ai/{handle}")),
+            "id": str(
+                uuid.uuid5(uuid.NAMESPACE_URL, f"https://agenticqueue.ai/{handle}")
+            ),
             "handle": handle,
             "actor_type": actor_type,
             "display_name": handle.replace("-", " ").title(),
