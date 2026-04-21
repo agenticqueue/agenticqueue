@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import uuid
+from typing import Any
+from typing import cast
 
 from fastapi.testclient import TestClient
 import sqlalchemy as sa
@@ -128,6 +130,5 @@ def test_dlq_state_surfaces_via_rest_and_mcp_and_blocks_reclaim(
         ).all()
 
     assert len(audit_rows) == 1
-    after = audit_rows[0].after
-    assert after is not None
+    after = cast(dict[str, Any], audit_rows[0].after)
     assert after["state"] == "dlq"

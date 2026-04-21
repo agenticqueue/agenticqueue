@@ -143,6 +143,7 @@ def _persistable_payload(
     """Drop schema-only fields before touching SQLAlchemy records."""
 
     mapper = sa.inspect(cast(Any, record_type))
+    assert mapper is not None
     column_names = set(mapper.columns.keys())
     return {
         field_name: value

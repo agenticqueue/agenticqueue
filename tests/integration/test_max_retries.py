@@ -3,6 +3,8 @@ from __future__ import annotations
 import datetime as dt
 from pathlib import Path
 import uuid
+from typing import Any
+from typing import cast
 
 from fastapi.testclient import TestClient
 import sqlalchemy as sa
@@ -146,8 +148,7 @@ def test_three_failures_move_task_to_dlq_and_increment_metric(
         assert task.attempt_count == 3
         assert task.last_failure is not None
         assert len(dlq_rows) == 1
-        after = dlq_rows[0].after
-        assert after is not None
+        after = cast(dict[str, Any], dlq_rows[0].after)
         assert after["attempt_count"] == 3
         assert after["max_attempts"] == 3
 

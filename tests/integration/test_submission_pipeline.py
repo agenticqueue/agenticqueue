@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import uuid
 from typing import Any
+from typing import cast
 
 from fastapi.testclient import TestClient
 import sqlalchemy as sa
@@ -160,8 +161,7 @@ def test_submit_route_requeues_invalid_payload_with_attempt_tracking(
             == 0
         )
         assert len(audit_rows) == 1
-        after = audit_rows[0].after
-        assert after is not None
+        after = cast(dict[str, Any], audit_rows[0].after)
         assert after["state"] == "queued"
         assert after["attempt_count"] == 1
         assert after["max_attempts"] == 3
@@ -269,8 +269,7 @@ def test_submit_route_persists_artifacts_and_replays_idempotently(
         assert replay_record is not None
         assert replay_record.replay_count == 1
         assert len(audit_rows) == 1
-        after = audit_rows[0].after
-        assert after is not None
+        after = cast(dict[str, Any], audit_rows[0].after)
         assert after == {
             "run_id": body["run"]["id"],
             "task_state": "validated",
