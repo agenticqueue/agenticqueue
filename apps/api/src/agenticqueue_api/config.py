@@ -94,7 +94,11 @@ def get_direct_sync_database_url() -> str:
     hostname = parts.hostname
     port = parts.port
     direct_hostname = "db" if hostname == "pgbouncer" else hostname
-    direct_port = 5432 if port == 6432 else 54329 if port == 64329 else port
+    configured_direct_port = os.getenv("AGENTICQUEUE_DB_PORT") or os.getenv("DB_PORT")
+    if configured_direct_port:
+        direct_port = int(configured_direct_port)
+    else:
+        direct_port = 5432 if port == 6432 else 54329 if port == 64329 else port
 
     netloc = ""
     if parts.username:

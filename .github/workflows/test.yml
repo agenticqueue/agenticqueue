@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:64329/agenticqueue
+      AGENTICQUEUE_DB_PORT: "5432"
       AGENTICQUEUE_PGBOUNCER_PORT: "64329"
     strategy:
       fail-fast: false
@@ -125,6 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:64329/agenticqueue
+      AGENTICQUEUE_DB_PORT: "5432"
       AGENTICQUEUE_PGBOUNCER_PORT: "64329"
     steps:
       - name: Check out code
