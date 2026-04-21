@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { AgenticQueueWebApp } from "@/components/agenticqueue-web-app";
 
 export default function HomePage() {
-  redirect("/pipelines");
+  return <AgenticQueueWebApp view="pipelines" />;
 }

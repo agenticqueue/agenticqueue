@@ -28,8 +28,48 @@ jobs:
           fi
 
           for dockerfile in "${dockerfiles[@]}"; do
-            context_dir="$(dirname "$dockerfile")"
+            if [[ "$dockerfile" == ./apps/*/Dockerfile* ]]; then
+              context_dir="."
+            else
+              context_dir="$(dirname "$dockerfile")"
+            fi
             tag="agenticqueue-ci-$(echo "$dockerfile" | tr '/.' '--')"
             echo "Building $dockerfile from $context_dir"
             docker build --file "$dockerfile" --tag "$tag" "$context_dir"
           done
+  docker-compose-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Build and start compose stack
+        shell: bash
+        run: docker compose up -d --build
+
+      - name: Wait for web health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for _ in {1..18}; do
+            if curl -fsS http://localhost:3000/api/health > /tmp/aq-web-health.json; then
+              cat /tmp/aq-web-health.json
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose ps
+          exit 1
+
+      - name: Smoke test login shell HTML
+        shell: bash
+        run: curl -fsS http://localhost:3000/ | grep "AgenticQueue"
+
+      - name: Verify web reaches API on the compose network
+        shell: bash
+        run: docker compose exec -T web curl -fsS http://api:8000/v1/health | grep '"status":"ok"'
+
+      - name: Tear down compose stack
+        if: ${{ always() }}
+        shell: bash
+        run: docker compose down

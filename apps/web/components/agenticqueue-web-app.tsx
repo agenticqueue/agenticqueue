@@ -402,7 +402,9 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
       <nav className="aq-nav" aria-label="Primary">
         {NAV_ITEMS.map((item) => {
           const isActive =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+            (item.href === "/pipelines" && pathname === "/") ||
+            pathname === item.href ||
+            pathname.startsWith(`${item.href}/`);
 
           return (
             <Link

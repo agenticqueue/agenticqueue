@@ -587,6 +587,14 @@ def create_app(
     app.include_router(build_packets_router(get_db_session))
     app.include_router(build_crud_router(get_db_session))
 
+    @app.get("/health", include_in_schema=False)
+    @app.get("/v1/health", include_in_schema=False)
+    def health() -> dict[str, str]:
+        return {
+            "status": "ok",
+            "version": app.version,
+        }
+
     @app.get(
         "/audit/verify",
         include_in_schema=False,

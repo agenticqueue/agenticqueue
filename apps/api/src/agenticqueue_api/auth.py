@@ -29,6 +29,10 @@ TOKEN_PREFIX = "aq__"
 TOKEN_HASH_PREFIX_LENGTH = 16
 TOKEN_SEPARATOR = "_"
 WWW_AUTHENTICATE_HEADER = {"WWW-Authenticate": "Bearer"}
+ANONYMOUS_PATHS = {
+    "/health",
+    "/v1/health",
+}
 
 
 @dataclass(frozen=True)
@@ -215,6 +219,9 @@ class AgenticQueueAuthMiddleware(BaseHTTPMiddleware):
         request: Request,
         call_next: RequestResponseEndpoint,
     ) -> Response:
+        if request.url.path in ANONYMOUS_PATHS:
+            return await call_next(request)
+
         session = request.app.state.session_factory()
         try:
             bearer_token = extract_bearer_token(request.headers.get("Authorization"))
