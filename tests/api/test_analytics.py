@@ -344,12 +344,13 @@ def test_analytics_metrics_roll_up_cycle_time_blockers_retrieval_and_review_load
     assert payload["window"]["key"] == "90d"
     assert payload["window"]["days"] == 90
 
-    cycle_time = {
-        metric["task_type"]: metric for metric in payload["cycle_time"]
-    }
+    cycle_time = {metric["task_type"]: metric for metric in payload["cycle_time"]}
     assert cycle_time["coding-task"]["count"] == 3
     assert cycle_time["coding-task"]["median_hours"] > 0
-    assert cycle_time["coding-task"]["p95_hours"] >= cycle_time["coding-task"]["median_hours"]
+    assert (
+        cycle_time["coding-task"]["p95_hours"]
+        >= cycle_time["coding-task"]["median_hours"]
+    )
 
     blocked_heatmap = payload["blocked_heatmap"]
     assert len(blocked_heatmap) == 1

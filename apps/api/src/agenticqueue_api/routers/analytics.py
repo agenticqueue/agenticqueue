@@ -20,11 +20,11 @@ from agenticqueue_api.models import (
     EdgeRecord,
     EdgeRelation,
     PacketVersionRecord,
-    RunRecord,
     TaskRecord,
 )
 from agenticqueue_api.models.edge import edge_metadata_marks_superseded
 from agenticqueue_api.models.shared import SchemaModel
+
 DEFAULT_WINDOW = "90d"
 MAX_PACKET_SAMPLE = 200
 HANDOFF_BUCKETS: tuple[tuple[str, float, float | None], ...] = (
@@ -190,11 +190,7 @@ def _task_ref(sequence: int | None, entity_id: uuid.UUID) -> str:
 def _normalize_surface_area(value: object) -> set[str]:
     if not isinstance(value, list):
         return set()
-    return {
-        item.strip()
-        for item in value
-        if isinstance(item, str) and item.strip()
-    }
+    return {item.strip() for item in value if isinstance(item, str) and item.strip()}
 
 
 def _cycle_time_metrics(
@@ -203,8 +199,7 @@ def _cycle_time_metrics(
     start_at: dt.datetime,
 ) -> list[CycleTimeMetricView]:
     rows = session.execute(
-        sa.text(
-            """
+        sa.text("""
             SELECT
               task_type,
               COUNT(*)::int AS count,
@@ -223,8 +218,7 @@ def _cycle_time_metrics(
               AND updated_at >= :start_at
             GROUP BY task_type
             ORDER BY count DESC, task_type ASC
-            """
-        ),
+            """),
         {"start_at": start_at},
     ).mappings()
 
@@ -358,8 +352,7 @@ def _run_durations(
     start_at: dt.datetime,
 ) -> list[dict[str, Any]]:
     rows = session.execute(
-        sa.text(
-            """
+        sa.text("""
             SELECT
               COALESCE(actor.handle, 'system') AS actor,
               run.status AS status,
@@ -371,15 +364,16 @@ def _run_durations(
               AND run.ended_at IS NOT NULL
               AND run.ended_at >= :start_at
             ORDER BY run.ended_at ASC, run.id ASC
-            """
-        ),
+            """),
         {"start_at": start_at},
     ).mappings()
 
     return [dict(row) for row in rows]
 
 
-def _handoff_latency_histogram(run_rows: list[dict[str, Any]]) -> list[HistogramBucketView]:
+def _handoff_latency_histogram(
+    run_rows: list[dict[str, Any]],
+) -> list[HistogramBucketView]:
     durations = [float(row["duration_minutes"]) for row in run_rows]
     buckets: list[HistogramBucketView] = []
 
@@ -429,7 +423,9 @@ def _success_bucket(status_value: str) -> str:
     return "parked"
 
 
-def _agent_success_rates(run_rows: list[dict[str, Any]]) -> list[AgentSuccessMetricView]:
+def _agent_success_rates(
+    run_rows: list[dict[str, Any]],
+) -> list[AgentSuccessMetricView]:
     aggregates: dict[str, dict[str, int]] = defaultdict(
         lambda: {"complete": 0, "parked": 0, "error": 0}
     )
@@ -464,8 +460,7 @@ def _review_load(
     days: int,
 ) -> list[ReviewLoadPointView]:
     rows = session.execute(
-        sa.text(
-            """
+        sa.text("""
             SELECT
               DATE_TRUNC('day', updated_at)::date AS day,
               COUNT(*)::int AS count
@@ -477,14 +472,10 @@ def _review_load(
               )
             GROUP BY DATE_TRUNC('day', updated_at)::date
             ORDER BY day ASC
-            """
-        ),
+            """),
         {"start_at": start_at},
     ).mappings()
-    count_by_day = {
-        cast_day["day"]: int(cast_day["count"])
-        for cast_day in rows
-    }
+    count_by_day = {cast_day["day"]: int(cast_day["count"]) for cast_day in rows}
 
     end_date = end_at.date()
     start_date = end_date - dt.timedelta(days=days - 1)
@@ -494,9 +485,7 @@ def _review_load(
             day=day,
             count=count_by_day.get(day, 0),
         )
-        for day in (
-            start_date + dt.timedelta(days=offset) for offset in range(days)
-        )
+        for day in (start_date + dt.timedelta(days=offset) for offset in range(days))
     ]
 
 
