@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+import os
 from pathlib import Path
 import re
 import uuid
@@ -177,8 +178,19 @@ def call_internal_api(
 def surface_plan_path() -> Path:
     """Return the canonical public-surface spec path."""
 
+    configured = os.getenv("AGENTICQUEUE_SURFACE_PLAN_PATH") or os.getenv(
+        "SURFACE_PLAN_PATH"
+    )
+    if configured:
+        return Path(configured)
+
     repo_root = get_repo_root()
-    return repo_root.parent / "mmmmm-agenticqueue" / "plans" / "surface-1.0.md"
+    candidate = repo_root / "docs" / "surface-1.0.md"
+    if candidate.is_file():
+        return candidate
+    raise FileNotFoundError(
+        "Unable to locate surface-1.0.md in the public repo docs/ directory."
+    )
 
 
 def canonical_surface_tool_names() -> list[str]:

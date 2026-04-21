@@ -28,3 +28,8 @@ repos:
         entry: python scripts/audit_strict_models.py
         language: system
         pass_filenames: false
+      - id: check-no-private-repo-paths
+        name: check-no-private-repo-paths
+        entry: python scripts/check_no_private_repo_paths.py
+        language: system
+        pass_filenames: false
