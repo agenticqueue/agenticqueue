@@ -7,6 +7,7 @@ import uuid
 from typing import Any
 
 from fastmcp import FastMCP
+import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from agenticqueue_api.models import AuditLogRecord, TaskModel, TaskRecord

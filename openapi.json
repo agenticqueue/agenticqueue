@@ -2594,6 +2594,24 @@
         "title": "SyncMemoryResponse",
         "type": "object"
       },
+      "TaskDecisionRequest": {
+        "description": "Optional reason payload for approve/reject endpoints.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "TaskDecisionRequest",
+        "type": "object"
+      },
       "TaskModel": {
         "description": "Pydantic schema for a task.",
         "properties": {
@@ -6612,6 +6630,63 @@
         "summary": "Update Tasks"
       }
     },
+    "/v1/tasks/{task_id}/approve": {
+      "post": {
+        "operationId": "approve_task_endpoint_v1_tasks__task_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/TaskDecisionRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Task Endpoint"
+      }
+    },
     "/v1/tasks/{task_id}/escrow-unlock": {
       "post": {
         "operationId": "force_unlock_task_escrow_v1_tasks__task_id__escrow_unlock_post",
@@ -6707,6 +6782,63 @@
           }
         },
         "summary": "Get Task Packet Endpoint"
+      }
+    },
+    "/v1/tasks/{task_id}/reject": {
+      "post": {
+        "operationId": "reject_task_endpoint_v1_tasks__task_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/TaskDecisionRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Task Endpoint"
       }
     },
     "/v1/tasks/{task_id}/submit": {
