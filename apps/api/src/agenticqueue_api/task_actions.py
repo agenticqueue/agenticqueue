@@ -253,7 +253,9 @@ def _latest_dod_report(session: Session, *, task_id: uuid.UUID) -> DodReport | N
     if run_record is None or not isinstance(run_record.details, dict):
         return None
     raw_report = run_record.details.get("dod_report")
-    return _dod_report_from_payload(raw_report if isinstance(raw_report, dict) else None)
+    return _dod_report_from_payload(
+        raw_report if isinstance(raw_report, dict) else None
+    )
 
 
 def _effective_transition_policy(
@@ -692,7 +694,9 @@ def reject_task(
     )
 
     requeued = apply_transition(
-        TaskModel.model_validate(task_record).model_copy(update={"state": rejected.state}),
+        TaskModel.model_validate(task_record).model_copy(
+            update={"state": rejected.state}
+        ),
         TaskState.QUEUED,
         task_type_registry,
         actor_capabilities=[CapabilityKey.UPDATE_TASK],

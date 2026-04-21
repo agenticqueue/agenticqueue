@@ -8,7 +8,12 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from agenticqueue_api.app import create_app
-from agenticqueue_api.models import AuditLogRecord, CapabilityKey, PolicyRecord, TaskRecord
+from agenticqueue_api.models import (
+    AuditLogRecord,
+    CapabilityKey,
+    PolicyRecord,
+    TaskRecord,
+)
 from tests.aq.test_packet_mcp import (
     _seed_task_with_token,
     clean_database,
