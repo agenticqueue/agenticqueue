@@ -45,7 +45,25 @@ jobs:
 
       - name: Build and start compose stack
         shell: bash
-        run: docker compose up -d --build
+        run: docker compose -f docker-compose.yml up -d --build
+
+      - name: Validate dev override config
+        shell: bash
+        run: docker compose -f docker-compose.yml -f docker-compose.override.yml config --quiet
+
+      - name: Wait for API health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for _ in {1..18}; do
+            if curl -fsS http://localhost:8000/v1/health > /tmp/aq-api-health.json; then
+              cat /tmp/aq-api-health.json
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose -f docker-compose.yml ps
+          exit 1
 
       - name: Wait for web health
         shell: bash
@@ -58,18 +76,22 @@ jobs:
             fi
             sleep 5
           done
-          docker compose ps
+          docker compose -f docker-compose.yml ps
           exit 1
 
       - name: Smoke test login shell HTML
         shell: bash
         run: curl -fsS http://localhost:3000/ | grep "AgenticQueue"
 
+      - name: Verify API health from the host
+        shell: bash
+        run: curl -fsS http://localhost:8000/v1/health | grep '"status":"ok"'
+
       - name: Verify web reaches API on the compose network
         shell: bash
-        run: docker compose exec -T web curl -fsS http://api:8000/v1/health | grep '"status":"ok"'
+        run: docker compose -f docker-compose.yml exec -T web curl -fsS http://api:8000/v1/health | grep '"status":"ok"'
 
       - name: Tear down compose stack
         if: ${{ always() }}
         shell: bash
-        run: docker compose down
+        run: docker compose -f docker-compose.yml down

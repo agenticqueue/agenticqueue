@@ -1,27 +1,31 @@
 services:
   db:
     image: pgvector/pgvector:pg16
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: agenticqueue
-      POSTGRES_PASSWORD: agenticqueue
-      POSTGRES_USER: agenticqueue
+      POSTGRES_DB: ${POSTGRES_DB:-agenticqueue}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agenticqueue}
+      POSTGRES_USER: ${POSTGRES_USER:-agenticqueue}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agenticqueue -d agenticqueue"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-agenticqueue} -d ${POSTGRES_DB:-agenticqueue}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
-    ports:
-      - "54329:5432"
     volumes:
       - agenticqueue_postgres_data:/var/lib/postgresql/data
 
   pgbouncer:
     image: edoburu/pgbouncer:v1.25.1-p0
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://agenticqueue:agenticqueue@db:5432/agenticqueue
+      DATABASE_URL: postgres://${POSTGRES_USER:-agenticqueue}:${POSTGRES_PASSWORD:-agenticqueue}@db:5432/${POSTGRES_DB:-agenticqueue}
       LISTEN_PORT: 6432
       AUTH_TYPE: scram-sha-256
       POOL_MODE: transaction
@@ -30,49 +34,46 @@ services:
       RESERVE_POOL_SIZE: 5
       MAX_PREPARED_STATEMENTS: 0
       SERVER_RESET_QUERY_ALWAYS: 1
-      ADMIN_USERS: agenticqueue
-      STATS_USERS: agenticqueue
+      ADMIN_USERS: ${POSTGRES_USER:-agenticqueue}
+      STATS_USERS: ${POSTGRES_USER:-agenticqueue}
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "PGPASSWORD=agenticqueue psql postgres://agenticqueue@127.0.0.1:6432/agenticqueue -c 'SELECT 1' > /dev/null",
+          "pg_isready -h localhost -p 6432 -U ${POSTGRES_USER:-agenticqueue}",
         ]
       interval: 5s
       timeout: 5s
       retries: 20
-    ports:
-      - "64329:6432"
 
   api:
-    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
-    working_dir: /workspace
-    command: >-
-      sh -lc "uv sync --frozen && uv run python apps/api/scripts/wait_for_db.py --attempts 60 --delay-seconds 1 && uv run uvicorn agenticqueue_api.app:app --host 0.0.0.0 --port 8000"
-    environment:
-      AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://agenticqueue:agenticqueue@pgbouncer:6432/agenticqueue?prepared_statement_cache_size=0
-      UV_PROJECT_ENVIRONMENT: /tmp/agenticqueue-venv
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
     depends_on:
       pgbouncer:
         condition: service_healthy
+    environment:
+      AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agenticqueue}:${POSTGRES_PASSWORD:-agenticqueue}@pgbouncer:6432/${POSTGRES_DB:-agenticqueue}?prepared_statement_cache_size=0
+      AGENTICQUEUE_TOKEN_SIGNING_SECRET: ${AGENTICQUEUE_TOKEN_SIGNING_SECRET:-agenticqueue-dev-token-signing-secret}
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health').read()\"",
+          "curl -f http://localhost:8000/v1/health || exit 1",
         ]
       interval: 5s
       timeout: 5s
       retries: 20
     ports:
-      - "8010:8000"
-    volumes:
-      - .:/workspace
+      - "${AGENTICQUEUE_API_PORT:-8000}:8000"
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy
@@ -89,8 +90,7 @@ services:
       timeout: 5s
       retries: 20
     ports:
-      - "3000:3000" # Web UI shell
-    restart: unless-stopped
+      - "${AGENTICQUEUE_WEB_PORT:-3000}:3000"
 
 volumes:
   agenticqueue_postgres_data:

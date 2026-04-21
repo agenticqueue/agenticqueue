@@ -1,0 +1,32 @@
+services:
+  db:
+    ports:
+      - "${AGENTICQUEUE_DB_PORT:-5432}:5432"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: dev
+    command: >-
+      sh -lc "uv run python apps/api/scripts/wait_for_db.py --attempts 60 --delay-seconds 1 && uv run uvicorn agenticqueue_api.app:app --host 0.0.0.0 --port 8000 --reload"
+    environment:
+      AGENTICQUEUE_DEBUG: "1"
+      AGENTICQUEUE_RELOAD: "1"
+      AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agenticqueue}:${POSTGRES_PASSWORD:-agenticqueue}@pgbouncer:6432/${POSTGRES_DB:-agenticqueue}?prepared_statement_cache_size=0
+      AGENTICQUEUE_TOKEN_SIGNING_SECRET: ${AGENTICQUEUE_TOKEN_SIGNING_SECRET:-agenticqueue-dev-token-signing-secret}
+    volumes:
+      - ./apps/api/src:/workspace/apps/api/src
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: dev
+    command: ["npm", "run", "dev", "--workspace=@agenticqueue/web", "--", "--hostname", "0.0.0.0", "--port", "3000"]
+    environment:
+      NODE_ENV: development
+      AQ_API_URL: http://api:8000
+      AGENTICQUEUE_API_BASE_URL: http://api:8000
+    volumes:
+      - ./apps/web:/workspace/apps/web

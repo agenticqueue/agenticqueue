@@ -16,6 +16,23 @@ COPY apps/web ./apps/web
 
 RUN npm run build --workspace=@agenticqueue/web
 
+FROM node:22-alpine AS dev
+
+WORKDIR /workspace
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN apk add --no-cache curl libc6-compat wget
+
+COPY package.json package-lock.json ./
+COPY apps/web/package.json apps/web/package.json
+
+RUN npm ci --workspace=apps/web --include-workspace-root
+
+COPY apps/web ./apps/web
+
+EXPOSE 3000
+
 FROM node:22-alpine AS runner
 
 WORKDIR /app

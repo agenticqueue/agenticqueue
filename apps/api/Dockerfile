@@ -21,6 +21,14 @@ COPY task_types ./task_types
 
 RUN uv sync --frozen --no-dev
 
+FROM builder AS dev
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+EXPOSE 8000
+
 FROM python:3.12-slim AS runner
 
 ENV PATH=/opt/venv/bin:$PATH \
@@ -35,7 +43,10 @@ ENV PATH=/opt/venv/bin:$PATH \
 
 WORKDIR /workspace
 
-RUN groupadd --system --gid 10001 app \
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --home-dir /tmp/agenticqueue --shell /usr/sbin/nologin app \
     && mkdir -p /tmp/agenticqueue /workspace \
     && chown -R app:app /tmp/agenticqueue /workspace
