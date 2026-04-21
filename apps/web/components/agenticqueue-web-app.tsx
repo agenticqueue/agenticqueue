@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { AnalyticsView } from "@/components/analytics-view";
 import { DecisionsView } from "@/components/decisions-view";
+import { GraphView } from "@/components/graph-view";
 import { LearningsView } from "@/components/learnings-view";
 import { PipelinesView } from "@/components/pipelines-view";
 import { WorkView } from "@/components/work-view";
@@ -426,6 +427,8 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
           <WorkView authToken={authToken} />
         ) : view === "analytics" && authToken ? (
           <AnalyticsView authToken={authToken} />
+        ) : view === "graph" && authToken ? (
+          <GraphView authToken={authToken} />
         ) : view === "decisions" && authToken ? (
           <DecisionsView authToken={authToken} />
         ) : view === "learnings" && authToken ? (
