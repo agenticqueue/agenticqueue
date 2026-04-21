@@ -250,26 +250,38 @@ def test_hitl_off_full_lifecycle_confirms_learning_and_unblocks_next_task(
         assert task.claimed_by_actor_id is None
         assert downstream is not None
         assert downstream.state == "queued"
-        assert session.scalar(
-            sa.select(sa.func.count())
-            .select_from(RunRecord)
-            .where(RunRecord.task_id == task_id)
-        ) == 1
-        assert session.scalar(
-            sa.select(sa.func.count())
-            .select_from(PacketVersionRecord)
-            .where(PacketVersionRecord.task_id == task_id)
-        ) == 1
-        assert session.scalar(
-            sa.select(sa.func.count())
-            .select_from(ArtifactRecord)
-            .where(ArtifactRecord.task_id == task_id)
-        ) == 2
-        assert session.scalar(
-            sa.select(sa.func.count())
-            .select_from(LearningRecord)
-            .where(LearningRecord.task_id == task_id)
-        ) == 1
+        assert (
+            session.scalar(
+                sa.select(sa.func.count())
+                .select_from(RunRecord)
+                .where(RunRecord.task_id == task_id)
+            )
+            == 1
+        )
+        assert (
+            session.scalar(
+                sa.select(sa.func.count())
+                .select_from(PacketVersionRecord)
+                .where(PacketVersionRecord.task_id == task_id)
+            )
+            == 1
+        )
+        assert (
+            session.scalar(
+                sa.select(sa.func.count())
+                .select_from(ArtifactRecord)
+                .where(ArtifactRecord.task_id == task_id)
+            )
+            == 2
+        )
+        assert (
+            session.scalar(
+                sa.select(sa.func.count())
+                .select_from(LearningRecord)
+                .where(LearningRecord.task_id == task_id)
+            )
+            == 1
+        )
         assert len(unblocked_audits) == 1
         assert unblocked_audits[0].after == {
             "state": "queued",
@@ -402,11 +414,14 @@ def test_retry_after_validator_rejection_keeps_lineage_intact_on_success(
             assert mid_retry_task is not None
             assert mid_retry_task.state == "in_progress"
             assert mid_retry_task.claimed_by_actor_id == actor_id
-            assert session.scalar(
-                sa.select(sa.func.count())
-                .select_from(RunRecord)
-                .where(RunRecord.task_id == task_id)
-            ) == 0
+            assert (
+                session.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(RunRecord)
+                    .where(RunRecord.task_id == task_id)
+                )
+                == 0
+            )
         success_response = client.post(
             f"/v1/tasks/{task_id}/submit",
             headers=_post_headers(token),
@@ -441,19 +456,28 @@ def test_retry_after_validator_rejection_keeps_lineage_intact_on_success(
         assert task is not None
         assert task.state == "done"
         assert task.claimed_by_actor_id is None
-        assert session.scalar(
-            sa.select(sa.func.count())
-            .select_from(RunRecord)
-            .where(RunRecord.task_id == task_id)
-        ) == 1
-        assert session.scalar(
-            sa.select(sa.func.count())
-            .select_from(PacketVersionRecord)
-            .where(PacketVersionRecord.task_id == task_id)
-        ) == 1
-        assert session.scalar(
-            sa.select(sa.func.count())
-            .select_from(ArtifactRecord)
-            .where(ArtifactRecord.task_id == task_id)
-        ) == 2
+        assert (
+            session.scalar(
+                sa.select(sa.func.count())
+                .select_from(RunRecord)
+                .where(RunRecord.task_id == task_id)
+            )
+            == 1
+        )
+        assert (
+            session.scalar(
+                sa.select(sa.func.count())
+                .select_from(PacketVersionRecord)
+                .where(PacketVersionRecord.task_id == task_id)
+            )
+            == 1
+        )
+        assert (
+            session.scalar(
+                sa.select(sa.func.count())
+                .select_from(ArtifactRecord)
+                .where(ArtifactRecord.task_id == task_id)
+            )
+            == 2
+        )
         assert len(submitted_audits) == 1
