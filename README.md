@@ -30,6 +30,7 @@ PgBouncer health for future containerized smoke tests.
 - `CODE_OF_CONDUCT.md` - community standards
 - `CHANGELOG.md` - release notes in Keep a Changelog format
 - `apps/api/` - Alembic config, migration scaffolding, and future FastAPI code
+- `apps/web/` - Next.js 15 Phase 7 shell with bearer-token login and route-aware nav
 - `tests/integration/` - integration coverage for migrations and future API work
 
 Planned code surfaces from the accepted build plan:
