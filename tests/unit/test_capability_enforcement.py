@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 import sqlalchemy as sa
@@ -467,9 +468,10 @@ def test_each_capability_denies_missing_grants(
             )
 
     assert exc_info.value.status_code == 403
-    assert exc_info.value.detail["error_code"] == "forbidden"
-    assert exc_info.value.detail["message"] == "Capability grant required"
-    assert exc_info.value.detail["details"] == {
+    detail = cast(dict[str, Any], exc_info.value.detail)
+    assert detail["error_code"] == "forbidden"
+    assert detail["message"] == "Capability grant required"
+    assert detail["details"] == {
         "missing_capability": capability.value,
         "required_scope": REQUIRED_PROJECT_SCOPE,
     }
@@ -503,9 +505,10 @@ def test_each_capability_rejects_scope_mismatches(
             )
 
     assert exc_info.value.status_code == 403
-    assert exc_info.value.detail["error_code"] == "forbidden"
-    assert exc_info.value.detail["message"] == "Capability grant required"
-    assert exc_info.value.detail["details"] == {
+    detail = cast(dict[str, Any], exc_info.value.detail)
+    assert detail["error_code"] == "forbidden"
+    assert detail["message"] == "Capability grant required"
+    assert detail["details"] == {
         "missing_capability": capability.value,
         "required_scope": REQUIRED_PROJECT_SCOPE,
     }
@@ -545,9 +548,10 @@ def test_each_capability_rejects_revoked_grants(
             )
 
     assert exc_info.value.status_code == 403
-    assert exc_info.value.detail["error_code"] == "forbidden"
-    assert exc_info.value.detail["message"] == "Capability grant required"
-    assert exc_info.value.detail["details"] == {
+    detail = cast(dict[str, Any], exc_info.value.detail)
+    assert detail["error_code"] == "forbidden"
+    assert detail["message"] == "Capability grant required"
+    assert detail["details"] == {
         "missing_capability": capability.value,
         "required_scope": REQUIRED_PROJECT_SCOPE,
     }
