@@ -53,7 +53,7 @@
   "open_questions": [
     "Which mmmmm project should enter observer mode first?"
   ],
-  "packet_version_id": "9a9f4dd8-f1fb-55ab-a885-ee22083658d7",
+  "packet_version_id": "0670ae22-0604-5d4e-8f3e-29a2cf50ef3d",
   "permissions": {
     "autonomy_tier": 3,
     "capabilities": [
@@ -110,7 +110,7 @@
   ],
   "repo_scope": {
     "branch": "main",
-    "estimated_token_count": 2312,
+    "estimated_token_count": 2316,
     "file_scope": [
       "examples/tasks/coding/01-add-endpoint.json",
       "task_types/coding-task.policy.yaml",
