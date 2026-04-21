@@ -128,4 +128,6 @@ def test_dlq_state_surfaces_via_rest_and_mcp_and_blocks_reclaim(
         ).all()
 
     assert len(audit_rows) == 1
-    assert audit_rows[0].after["state"] == "dlq"
+    after = audit_rows[0].after
+    assert after is not None
+    assert after["state"] == "dlq"

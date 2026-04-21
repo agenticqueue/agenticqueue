@@ -50,7 +50,7 @@ def _persistable_payload(
 ) -> dict[str, Any]:
     """Drop schema-only fields before constructing a SQLAlchemy record."""
 
-    column_names = set(record_type.__table__.columns.keys())
+    column_names = set(sa.inspect(record_type).columns.keys())
     return {
         field_name: value
         for field_name, value in payload.model_dump(exclude_none=True).items()

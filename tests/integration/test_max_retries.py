@@ -146,8 +146,10 @@ def test_three_failures_move_task_to_dlq_and_increment_metric(
         assert task.attempt_count == 3
         assert task.last_failure is not None
         assert len(dlq_rows) == 1
-        assert dlq_rows[0].after["attempt_count"] == 3
-        assert dlq_rows[0].after["max_attempts"] == 3
+        after = dlq_rows[0].after
+        assert after is not None
+        assert after["attempt_count"] == 3
+        assert after["max_attempts"] == 3
 
     assert attempt_metric_value("dlq") == 1
 

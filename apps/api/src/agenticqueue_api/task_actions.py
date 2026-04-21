@@ -997,4 +997,6 @@ def unlock_task_escrow(
         action="ESCROW_FORCE_UNLOCKED",
         after={"state": released.state, "reason": reason},
     )
-    return with_retry_fields(session, released)
+    task_record = session.get(TaskRecord, task_id)
+    assert task_record is not None
+    return with_retry_fields(session, task_record)

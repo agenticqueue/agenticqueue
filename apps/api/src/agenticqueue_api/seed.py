@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 from typing import TypeVar
 
+import sqlalchemy as sa
 import yaml  # type: ignore[import-untyped]
 from pydantic import Field
 from sqlalchemy.orm import Session
@@ -141,7 +142,7 @@ def _persistable_payload(
 ) -> dict[str, object]:
     """Drop schema-only fields before touching SQLAlchemy records."""
 
-    column_names = set(record_type.__table__.columns.keys())
+    column_names = set(sa.inspect(record_type).columns.keys())
     return {
         field_name: value
         for field_name, value in payload.model_dump(exclude_none=True).items()

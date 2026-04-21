@@ -267,7 +267,9 @@ def test_submit_route_persists_artifacts_and_replays_idempotently(
         assert replay_record is not None
         assert replay_record.replay_count == 1
         assert len(audit_rows) == 1
-        assert audit_rows[0].after == {
+        after = audit_rows[0].after
+        assert after is not None
+        assert after == {
             "run_id": body["run"]["id"],
             "task_state": "validated",
             "artifact_count": 2,
