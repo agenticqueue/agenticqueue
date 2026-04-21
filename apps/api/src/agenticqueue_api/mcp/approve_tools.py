@@ -6,36 +6,15 @@ import datetime as dt
 import uuid
 from typing import Any
 
-import sqlalchemy as sa
 from fastmcp import FastMCP
 from sqlalchemy.orm import Session, sessionmaker
 
 from agenticqueue_api.models import AuditLogRecord, TaskModel, TaskRecord
-from agenticqueue_api.dod import DodChecklistResult, DodReport
-from agenticqueue_api.dod_checks.common import DodItemState
 from agenticqueue_api.mcp.common import run_session_tool, surface_error
 from agenticqueue_api.repo import release_claim
 from agenticqueue_api.task_type_registry import TaskTypeRegistry
-from agenticqueue_api.transitions import TaskState, apply_transition
-
-
-def _passing_dod_report(task: TaskModel) -> DodReport:
-    checklist = tuple(
-        DodChecklistResult(
-            item=item,
-            state=DodItemState.CHECKED,
-            note="Approved via MCP approval tool.",
-        )
-        for item in task.definition_of_done
-    )
-    checked_count = len(checklist)
-    return DodReport(
-        checklist=checklist,
-        checked_count=checked_count,
-        partial_count=0,
-        unchecked_blocked_count=0,
-        unchecked_unmet_count=0,
-    )
+from agenticqueue_api.task_actions import approve_task, reject_task
+from agenticqueue_api.transitions import TaskState
 
 
 def _audit(
@@ -84,37 +63,17 @@ def register_approve_tools(
     def approve_job(
         job_id: uuid.UUID,
         token: str | None = None,
+        reason: str | None = None,
     ) -> dict[str, Any]:
         def _callback(session: Session, authenticated) -> dict[str, Any]:
-            task = _task_or_error(session, job_id)
-            task_model = TaskModel.model_validate(task)
-            result = apply_transition(
-                task_model,
-                TaskState.DONE,
-                task_type_registry,
-                human_approved=True,
-                dod_report=_passing_dod_report(task_model),
-                actor_capabilities=["update_task"],
-            )
-            if result.guard_blocked is not None:
-                raise surface_error(
-                    409,
-                    result.note or "Job cannot be approved in its current state",
-                    details=result.__dict__,
-                )
-            task.state = result.state
-            task.claimed_by_actor_id = None
-            task.claimed_at = None
-            _audit(
+            approved = approve_task(
                 session,
-                actor_id=authenticated.actor.id,
-                task_id=task.id,
-                action="JOB_APPROVED",
-                after={"state": task.state},
+                task_id=job_id,
+                actor=authenticated.actor,
+                task_type_registry=task_type_registry,
+                reason=reason,
             )
-            session.flush()
-            session.refresh(task)
-            return TaskModel.model_validate(task).model_dump(mode="json")
+            return approved.model_dump(mode="json")
 
         return run_session_tool(
             session_factory,
@@ -136,26 +95,14 @@ def register_approve_tools(
         reason: str | None = None,
     ) -> dict[str, Any]:
         def _callback(session: Session, authenticated) -> dict[str, Any]:
-            task = _task_or_error(session, job_id)
-            if task.state not in {TaskState.SUBMITTED.value, TaskState.VALIDATED.value}:
-                raise surface_error(
-                    409,
-                    "Only submitted or validated jobs can be rejected",
-                    details={"state": task.state},
-                )
-            task.state = TaskState.REJECTED.value
-            task.claimed_by_actor_id = None
-            task.claimed_at = None
-            _audit(
+            rejected = reject_task(
                 session,
-                actor_id=authenticated.actor.id,
-                task_id=task.id,
-                action="JOB_REJECTED",
-                after={"state": task.state, "reason": reason},
+                task_id=job_id,
+                actor=authenticated.actor,
+                task_type_registry=task_type_registry,
+                reason=reason,
             )
-            session.flush()
-            session.refresh(task)
-            return TaskModel.model_validate(task).model_dump(mode="json")
+            return rejected.model_dump(mode="json")
 
         return run_session_tool(
             session_factory,

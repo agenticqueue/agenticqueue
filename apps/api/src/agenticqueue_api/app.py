@@ -102,8 +102,11 @@ from agenticqueue_api.roles import (
 )
 from agenticqueue_api.task_type_registry import TaskTypeDefinition, TaskTypeRegistry
 from agenticqueue_api.task_actions import (
+    TaskDecisionRequest,
     EscrowUnlockRequest,
     SubmitTaskResponse,
+    approve_task,
+    reject_task,
     submit_task,
     unlock_task_escrow,
 )
@@ -1066,6 +1069,56 @@ def create_app(
                 task_type_registry=get_task_type_registry(request),
                 artifact_root=cast(Path, request.app.state.artifact_root),
                 packet_cache=request.app.state.packet_cache,
+            )
+
+    @app.post(
+        "/tasks/{task_id}/approve",
+        include_in_schema=False,
+        response_model=TaskModel,
+    )
+    @app.post(
+        "/v1/tasks/{task_id}/approve",
+        response_model=TaskModel,
+    )
+    def approve_task_endpoint(
+        task_id: uuid.UUID,
+        request: Request,
+        payload: TaskDecisionRequest | None = Body(default=None),
+        session: Session = Depends(get_db_session),
+    ) -> TaskModel:
+        with write_timeout(session, endpoint="v1.tasks.approve"):
+            actor = _require_actor(request)
+            return approve_task(
+                session,
+                task_id=task_id,
+                actor=actor,
+                task_type_registry=get_task_type_registry(request),
+                reason=None if payload is None else payload.reason,
+            )
+
+    @app.post(
+        "/tasks/{task_id}/reject",
+        include_in_schema=False,
+        response_model=TaskModel,
+    )
+    @app.post(
+        "/v1/tasks/{task_id}/reject",
+        response_model=TaskModel,
+    )
+    def reject_task_endpoint(
+        task_id: uuid.UUID,
+        request: Request,
+        payload: TaskDecisionRequest | None = Body(default=None),
+        session: Session = Depends(get_db_session),
+    ) -> TaskModel:
+        with write_timeout(session, endpoint="v1.tasks.reject"):
+            actor = _require_actor(request)
+            return reject_task(
+                session,
+                task_id=task_id,
+                actor=actor,
+                task_type_registry=get_task_type_registry(request),
+                reason=None if payload is None else payload.reason,
             )
 
     @app.post(

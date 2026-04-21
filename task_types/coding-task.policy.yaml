@@ -26,6 +26,7 @@ body:
       - parked
     validated:
       - done
+      - rejected
       - blocked
       - parked
     rejected:

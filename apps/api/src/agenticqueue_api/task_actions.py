@@ -16,6 +16,8 @@ from agenticqueue_api.audit import AUDIT_REDACTION_KEY, AUDIT_TRACE_ID_KEY
 from agenticqueue_api.capabilities import ensure_actor_has_capability
 from agenticqueue_api.capability_keys import CapabilityKey
 from agenticqueue_api.compiler import compile_packet
+from agenticqueue_api.dod import DodChecklistResult, DodReport
+from agenticqueue_api.dod_checks.common import DodItemState
 from agenticqueue_api.errors import raise_api_error
 from agenticqueue_api.learnings.draft import (
     DraftLearningRecord,
@@ -101,6 +103,12 @@ class EscrowUnlockRequest(SchemaModel):
     reason: str | None = None
 
 
+class TaskDecisionRequest(SchemaModel):
+    """Optional reason payload for approve/reject endpoints."""
+
+    reason: str | None = None
+
+
 def _audit(
     session: Session,
     *,
@@ -154,6 +162,97 @@ def _transition_view(result: TransitionResult) -> TransitionResultView:
         note=result.note,
         escalation=result.escalation,
     )
+
+
+def _project_scope(task_record: TaskRecord) -> dict[str, str]:
+    return {"project_id": str(task_record.project_id)}
+
+
+def _require_update_task_capability(
+    session: Session,
+    *,
+    actor: ActorModel,
+    task_record: TaskRecord,
+) -> None:
+    ensure_actor_has_capability(
+        session,
+        actor=actor,
+        capability=CapabilityKey.UPDATE_TASK,
+        required_scope=_project_scope(task_record),
+        entity_type="task",
+        entity_id=task_record.id,
+    )
+
+
+def _transition_or_conflict(
+    result: TransitionResult,
+    *,
+    default_message: str,
+) -> TransitionResult:
+    if result.guard_blocked is None:
+        return result
+    raise_api_error(
+        409,
+        result.note or default_message,
+        details=result.__dict__,
+    )
+
+
+def _dod_report_from_payload(payload: dict[str, Any] | None) -> DodReport | None:
+    if not isinstance(payload, dict):
+        return None
+    raw_checklist = payload.get("checklist")
+    if not isinstance(raw_checklist, list) or not raw_checklist:
+        return None
+
+    checklist: list[DodChecklistResult] = []
+    for item in raw_checklist:
+        if not isinstance(item, dict):
+            return None
+        raw_item = item.get("item")
+        raw_state = item.get("state")
+        raw_note = item.get("note", "")
+        if not isinstance(raw_item, str) or not raw_item.strip():
+            return None
+        if not isinstance(raw_state, str):
+            return None
+        try:
+            state = DodItemState(raw_state)
+        except ValueError:
+            return None
+        note = raw_note if isinstance(raw_note, str) else str(raw_note)
+        checklist.append(
+            DodChecklistResult(
+                item=raw_item,
+                state=state,
+                note=note,
+            )
+        )
+
+    return DodReport(
+        checklist=tuple(checklist),
+        checked_count=sum(item.state == DodItemState.CHECKED for item in checklist),
+        partial_count=sum(item.state == DodItemState.PARTIAL for item in checklist),
+        unchecked_blocked_count=sum(
+            item.state == DodItemState.UNCHECKED_BLOCKED for item in checklist
+        ),
+        unchecked_unmet_count=sum(
+            item.state == DodItemState.UNCHECKED_UNMET for item in checklist
+        ),
+    )
+
+
+def _latest_dod_report(session: Session, *, task_id: uuid.UUID) -> DodReport | None:
+    run_record = session.scalar(
+        sa.select(RunRecord)
+        .where(RunRecord.task_id == task_id)
+        .order_by(RunRecord.created_at.desc(), RunRecord.id.desc())
+        .limit(1)
+    )
+    if run_record is None or not isinstance(run_record.details, dict):
+        return None
+    raw_report = run_record.details.get("dod_report")
+    return _dod_report_from_payload(raw_report if isinstance(raw_report, dict) else None)
 
 
 def _submission_artifacts(
@@ -248,7 +347,7 @@ def submit_task(
         )
 
     task_model = TaskModel.model_validate(task_record)
-    project_scope = {"project_id": str(task_record.project_id)}
+    project_scope = _project_scope(task_record)
 
     ensure_actor_has_capability(
         session,
@@ -308,12 +407,10 @@ def submit_task(
         task_type_registry,
         actor_capabilities=[CapabilityKey.RUN_TESTS],
     )
-    if submitted.guard_blocked is not None:
-        raise_api_error(
-            409,
-            submitted.note or "Task cannot enter submitted state",
-            details=submitted.__dict__,
-        )
+    _transition_or_conflict(
+        submitted,
+        default_message="Task cannot enter submitted state",
+    )
 
     submitted_task = task_model.model_copy(update={"state": submitted.state})
     validated = apply_transition(
@@ -323,27 +420,45 @@ def submit_task(
         actor_capabilities=[CapabilityKey.UPDATE_TASK],
         dod_report=validation.dod_report,
     )
-    if validated.guard_blocked is not None:
-        raise_api_error(
-            409,
-            validated.note or "Task cannot enter validated state",
-            details=validated.__dict__,
-        )
+    _transition_or_conflict(
+        validated,
+        default_message="Task cannot enter validated state",
+    )
 
     now = dt.datetime.now(dt.UTC)
     policy = load_transition_policy(task_record.task_type, task_type_registry)
-    next_action = "await_human_approval" if policy.hitl_required else "ready_for_done"
     transitions = [submitted, validated]
+    task_state = validated.state
+    run_summary = "Task submission accepted and validated."
+    next_action = "await_human_approval"
+
+    if not policy.hitl_required:
+        approved = apply_transition(
+            submitted_task.model_copy(update={"state": validated.state}),
+            TaskState.DONE,
+            task_type_registry,
+            actor_capabilities=[CapabilityKey.UPDATE_TASK],
+            dod_report=validation.dod_report,
+        )
+        _transition_or_conflict(
+            approved,
+            default_message="Task cannot auto-approve into done state",
+        )
+        transitions.append(approved)
+        task_state = approved.state
+        run_summary = "Task submission accepted, validated, and auto-approved."
+        next_action = "done"
+
     dod_report_view = _dod_report_view(validation)
 
     run_record = RunRecord(
         task_id=task_record.id,
         packet_version_id=None if packet_version is None else packet_version.id,
         actor_id=actor.id,
-        status=validated.state,
+        status=task_state,
         started_at=task_record.claimed_at or now,
         ended_at=now,
-        summary="Task submission accepted and validated.",
+        summary=run_summary,
         details={
             "submission": normalized_submission.model_dump(mode="json"),
             "transitions": [result.__dict__ for result in transitions],
@@ -358,15 +473,11 @@ def submit_task(
             ),
             "attempts": [
                 {
-                    "status": "submitted",
-                    "from_state": submitted.from_state,
-                    "to_state": submitted.state,
-                },
-                {
-                    "status": "validated",
-                    "from_state": validated.from_state,
-                    "to_state": validated.state,
-                },
+                    "status": result.state,
+                    "from_state": result.from_state,
+                    "to_state": result.state,
+                }
+                for result in transitions
             ],
         },
     )
@@ -400,7 +511,7 @@ def submit_task(
             )
         )
 
-    task_record.state = validated.state
+    task_record.state = task_state
     task_record.claimed_by_actor_id = None
     task_record.claimed_at = None
     session.flush()
@@ -427,6 +538,15 @@ def submit_task(
         },
     )
 
+    if not policy.hitl_required:
+        _audit(
+            session,
+            actor_id=actor.id,
+            task_id=task_record.id,
+            action="JOB_APPROVED",
+            after={"state": task_record.state, "mode": "automatic"},
+        )
+
     return SubmitTaskResponse(
         task=TaskModel.model_validate(task_record),
         run=RunModel.model_validate(run_record),
@@ -436,6 +556,130 @@ def submit_task(
         transitions=[_transition_view(result) for result in transitions],
         next_action=next_action,
     )
+
+
+def approve_task(
+    session: Session,
+    *,
+    task_id: uuid.UUID,
+    actor: ActorModel,
+    task_type_registry: TaskTypeRegistry,
+    reason: str | None = None,
+) -> TaskModel:
+    """Approve one validated task into the final done state."""
+
+    task_record = session.get(TaskRecord, task_id)
+    if task_record is None:
+        raise_api_error(404, "Task not found")
+    if task_record.state != TaskState.VALIDATED.value:
+        raise_api_error(
+            409,
+            "Task must be awaiting approval before it can be approved",
+            details={"task_id": str(task_id), "state": task_record.state},
+        )
+
+    _require_update_task_capability(session, actor=actor, task_record=task_record)
+    dod_report = _latest_dod_report(session, task_id=task_record.id)
+    if dod_report is None:
+        raise_api_error(
+            409,
+            "Validated task is missing a persisted DoD report",
+            details={"task_id": str(task_id)},
+        )
+
+    approved = apply_transition(
+        TaskModel.model_validate(task_record),
+        TaskState.DONE,
+        task_type_registry,
+        actor_capabilities=[CapabilityKey.UPDATE_TASK],
+        dod_report=dod_report,
+        human_approved=True,
+    )
+    _transition_or_conflict(
+        approved,
+        default_message="Task cannot be approved in its current state",
+    )
+
+    task_record.state = approved.state
+    task_record.claimed_by_actor_id = None
+    task_record.claimed_at = None
+    session.flush()
+    session.refresh(task_record)
+
+    _audit(
+        session,
+        actor_id=actor.id,
+        task_id=task_record.id,
+        action="JOB_APPROVED",
+        after={"state": task_record.state, "mode": "human", "reason": reason},
+    )
+    return TaskModel.model_validate(task_record)
+
+
+def reject_task(
+    session: Session,
+    *,
+    task_id: uuid.UUID,
+    actor: ActorModel,
+    task_type_registry: TaskTypeRegistry,
+    reason: str | None = None,
+) -> TaskModel:
+    """Reject one validated task and return it to the queue."""
+
+    task_record = session.get(TaskRecord, task_id)
+    if task_record is None:
+        raise_api_error(404, "Task not found")
+    if task_record.state != TaskState.VALIDATED.value:
+        raise_api_error(
+            409,
+            "Task must be awaiting approval before it can be rejected",
+            details={"task_id": str(task_id), "state": task_record.state},
+        )
+
+    _require_update_task_capability(session, actor=actor, task_record=task_record)
+
+    rejected = apply_transition(
+        TaskModel.model_validate(task_record),
+        TaskState.REJECTED,
+        task_type_registry,
+        actor_capabilities=[CapabilityKey.UPDATE_TASK],
+    )
+    _transition_or_conflict(
+        rejected,
+        default_message="Task cannot be rejected in its current state",
+    )
+
+    requeued = apply_transition(
+        TaskModel.model_validate(task_record).model_copy(update={"state": rejected.state}),
+        TaskState.QUEUED,
+        task_type_registry,
+        actor_capabilities=[CapabilityKey.UPDATE_TASK],
+        attempt_count=rejected.attempt_count,
+    )
+    _transition_or_conflict(
+        requeued,
+        default_message="Rejected task cannot return to the queue",
+    )
+
+    task_record.state = requeued.state
+    task_record.claimed_by_actor_id = None
+    task_record.claimed_at = None
+    session.flush()
+    session.refresh(task_record)
+
+    _audit(
+        session,
+        actor_id=actor.id,
+        task_id=task_record.id,
+        action="JOB_REJECTED",
+        after={
+            "state": task_record.state,
+            "intermediate_state": rejected.state,
+            "attempt_count": requeued.attempt_count,
+            "reason": reason,
+        },
+    )
+    return TaskModel.model_validate(task_record)
 
 
 def unlock_task_escrow(
