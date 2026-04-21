@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 import datetime as dt
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
@@ -34,6 +34,7 @@ from agenticqueue_api.capabilities import (
 )
 from agenticqueue_api.config import (
     get_max_body_bytes,
+    get_mcp_transports,
     get_policies_dir,
     get_psycopg_connect_args,
     get_rate_limit_burst,
@@ -514,15 +515,21 @@ def create_app(
     """Create the FastAPI app with auth, CRUD, and task type routes."""
     resolved_session_factory = session_factory or _default_session_factory()
     packet_cache = PacketCache(session_factory=resolved_session_factory)
+    mcp_lifespan_apps: list[Any] = []
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         del app
         packet_cache.start()
-        try:
-            yield
-        finally:
-            packet_cache.close()
+        async with AsyncExitStack() as stack:
+            for mounted_app in mcp_lifespan_apps:
+                await stack.enter_async_context(
+                    mounted_app.router.lifespan_context(mounted_app)
+                )
+            try:
+                yield
+            finally:
+                packet_cache.close()
 
     app = FastAPI(
         title="AgenticQueue API",
@@ -1023,6 +1030,30 @@ def create_app(
                     str(error),
                     details={"draft_id": str(draft_id), "actor_id": str(actor.id)},
                 )
+
+    from agenticqueue_api.mcp.server import build_agenticqueue_mcp
+
+    mcp_server = build_agenticqueue_mcp(
+        app=app,
+        session_factory=resolved_session_factory,
+        task_type_registry=cast(TaskTypeRegistry, app.state.task_type_registry),
+    )
+    app.state.mcp_server = mcp_server
+    transports = set(get_mcp_transports())
+    if "sse" in transports:
+        mcp_sse_app = mcp_server.http_app(path="/", transport="sse")
+        mcp_lifespan_apps.append(mcp_sse_app)
+        app.mount(
+            "/mcp/sse",
+            mcp_sse_app,
+        )
+    if "http" in transports:
+        mcp_http_app = mcp_server.http_app(path="/", transport="streamable-http")
+        mcp_lifespan_apps.append(mcp_http_app)
+        app.mount(
+            "/mcp",
+            mcp_http_app,
+        )
 
     return app
 

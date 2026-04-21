@@ -25,6 +25,8 @@ DEFAULT_PACKET_PREFETCH_WIDTH = 2
 DEFAULT_MAX_BODY_BYTES = 1024 * 1024
 DEFAULT_RATE_LIMIT_RPS = 100
 DEFAULT_RATE_LIMIT_BURST = 500
+DEFAULT_MCP_TRANSPORTS = ("stdio", "http", "sse")
+DEFAULT_MCP_HTTP_PORT = 8001
 ASYNC_PREFIX = "postgresql+asyncpg://"
 SQLALCHEMY_SYNC_PREFIX = "postgresql+psycopg://"
 PSYCOPG_PREFIX = "postgresql://"
@@ -263,3 +265,37 @@ def get_reload_enabled() -> bool:
 
     configured = os.getenv("AGENTICQUEUE_RELOAD") or os.getenv("RELOAD") or ""
     return configured.strip().lower() in TRUE_ENV_VALUES
+
+
+def get_mcp_transports() -> tuple[str, ...]:
+    """Return the enabled MCP transports in normalized order."""
+
+    configured = os.getenv("AGENTICQUEUE_MCP_TRANSPORTS")
+    if not configured:
+        return DEFAULT_MCP_TRANSPORTS
+
+    transports: list[str] = []
+    for raw_value in configured.split(","):
+        value = raw_value.strip().lower()
+        if value == "streamable-http":
+            value = "http"
+        if value not in {"stdio", "http", "sse"}:
+            continue
+        if value not in transports:
+            transports.append(value)
+    return tuple(transports or DEFAULT_MCP_TRANSPORTS)
+
+
+def get_mcp_http_port() -> int:
+    """Return the configured MCP HTTP port."""
+
+    return int(os.getenv("AGENTICQUEUE_MCP_HTTP_PORT", DEFAULT_MCP_HTTP_PORT))
+
+
+def get_mcp_stdio_enabled() -> bool:
+    """Return whether the stdio MCP entrypoint should run."""
+
+    configured = os.getenv("AGENTICQUEUE_MCP_STDIO_ENABLED")
+    if configured is not None:
+        return configured.strip().lower() in TRUE_ENV_VALUES
+    return "stdio" in get_mcp_transports()
