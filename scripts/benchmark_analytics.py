@@ -1,4 +1,5 @@
 """Benchmark the Phase 7 analytics query paths on representative 10k-row data."""
+
 # ruff: noqa: E402
 
 from __future__ import annotations
@@ -291,7 +292,9 @@ def seed_benchmark_dataset(
     for index in range(recent_task_count + historical_task_count):
         task_id = uuid.uuid4()
         is_recent = index < recent_task_count
-        age_days = index % WINDOW_DAYS if is_recent else WINDOW_DAYS + 30 + (index % 180)
+        age_days = (
+            index % WINDOW_DAYS if is_recent else WINDOW_DAYS + 30 + (index % 180)
+        )
         created_at = ts(now, days=age_days, hours=index % 24, minutes=index % 50)
         updated_at = created_at + dt.timedelta(minutes=15 + (index % 300))
 
