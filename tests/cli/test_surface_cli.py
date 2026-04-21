@@ -44,7 +44,9 @@ class FakeClient:
         }
 
 
-def build_state(client: FakeClient, *, output: OutputFormat = OutputFormat.JSON) -> CliState:
+def build_state(
+    client: FakeClient, *, output: OutputFormat = OutputFormat.JSON
+) -> CliState:
     return CliState(
         server="http://testserver",
         token="test-token",
@@ -78,14 +80,38 @@ def test_representative_group_commands_issue_expected_requests() -> None:
         (("actor", "list"), "GET", "/v1/actors"),
         (("project", "create", "--body", '{"name":"Demo"}'), "POST", "/v1/workspaces"),
         (("pipeline", "get", "pipe-123"), "GET", "/v1/projects/pipe-123"),
-        (("job", "comment", "job-123", "--body", '{"body":"note"}'), "POST", "/v1/tasks/job-123/comments"),
+        (
+            ("job", "comment", "job-123", "--body", '{"body":"note"}'),
+            "POST",
+            "/v1/tasks/job-123/comments",
+        ),
         (("task-type", "list"), "GET", "/v1/task-types"),
-        (("decision", "link", "dec-123", "--body", '{"job_id":"job-1"}'), "POST", "/v1/decisions/dec-123/link"),
-        (("learning", "search", "--filters", '{"q":"alpha"}'), "GET", "/v1/learnings/search"),
-        (("graph", "neighborhood", "node-123", "--filters", '{"hops":2}'), "GET", "/v1/graph/neighborhood/node-123"),
-        (("policy", "attach", "pipe-123", "--body", '{"policy_id":"pol-1"}'), "PATCH", "/v1/projects/pipe-123"),
+        (
+            ("decision", "link", "dec-123", "--body", '{"job_id":"job-1"}'),
+            "POST",
+            "/v1/decisions/dec-123/link",
+        ),
+        (
+            ("learning", "search", "--filters", '{"q":"alpha"}'),
+            "GET",
+            "/v1/learnings/search",
+        ),
+        (
+            ("graph", "neighborhood", "node-123", "--filters", '{"hops":2}'),
+            "GET",
+            "/v1/graph/neighborhood/node-123",
+        ),
+        (
+            ("policy", "attach", "pipe-123", "--body", '{"policy_id":"pol-1"}'),
+            "PATCH",
+            "/v1/projects/pipe-123",
+        ),
         (("run", "list"), "GET", "/v1/runs"),
-        (("artifact", "attach", "--body", '{"job_id":"job-123"}'), "POST", "/v1/artifacts"),
+        (
+            ("artifact", "attach", "--body", '{"job_id":"job-123"}'),
+            "POST",
+            "/v1/artifacts",
+        ),
         (("admin", "stats"), "GET", "/stats"),
     )
 

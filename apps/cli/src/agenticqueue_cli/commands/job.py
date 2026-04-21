@@ -105,4 +105,3 @@ SPECS = (
 
 def build_job_app():
     return build_group("Job commands.", SPECS)
-

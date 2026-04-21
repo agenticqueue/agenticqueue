@@ -51,4 +51,3 @@ SPECS = (
 
 def build_project_app():
     return build_group("Project commands.", SPECS)
-

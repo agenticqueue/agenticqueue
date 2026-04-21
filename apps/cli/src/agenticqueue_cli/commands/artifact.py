@@ -34,4 +34,3 @@ SPECS = (
 
 def build_artifact_app():
     return build_group("Artifact commands.", SPECS)
-

@@ -151,9 +151,14 @@ class AgenticQueueClient:
                     ok_statuses=ok_statuses,
                 )
             except CliError as error:
-                if error.exit_code == 1 and getattr(error.payload, "get", lambda *_: None)(
+                status_code = getattr(error.payload, "get", lambda *_: None)(
                     "status_code"
-                ) == 404 and candidate != paths[-1]:
+                )
+                if (
+                    error.exit_code == 1
+                    and status_code == 404
+                    and candidate != paths[-1]
+                ):
                     last_error = error
                     continue
                 raise
@@ -204,7 +209,12 @@ class AgenticQueueClient:
         if response.status_code in ok_statuses:
             return payload
 
-        exit_code = 3 if response.status_code >= 500 else 2 if response.status_code in (401, 403) else 1
+        if response.status_code >= 500:
+            exit_code = 3
+        elif response.status_code in (401, 403):
+            exit_code = 2
+        else:
+            exit_code = 1
         message = _error_message(payload, fallback=f"HTTP {response.status_code}")
         raise CliError(
             message,
@@ -279,7 +289,9 @@ def _format_table(payload: Any) -> str:
         if all(not isinstance(value, (dict, list)) for value in payload.values()):
             return "\n".join(f"{key}: {value}" for key, value in payload.items())
         return yaml.safe_dump(payload, sort_keys=False).rstrip()
-    if isinstance(payload, list) and payload and all(isinstance(item, dict) for item in payload):
+    if isinstance(payload, list) and payload:
+        if not all(isinstance(item, dict) for item in payload):
+            return yaml.safe_dump(payload, sort_keys=False).rstrip()
         keys: list[str] = []
         for item in payload:
             for key in item:

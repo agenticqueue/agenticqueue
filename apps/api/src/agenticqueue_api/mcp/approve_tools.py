@@ -253,7 +253,10 @@ def register_approve_tools(
                 actor_id=authenticated.actor.id,
                 task_id=task.id,
                 action="JOB_COMMENTED",
-                after={"body": body, "commented_at": dt.datetime.now(dt.UTC).isoformat()},
+                after={
+                    "body": body,
+                    "commented_at": dt.datetime.now(dt.UTC).isoformat(),
+                },
             )
             return {"job_id": str(task.id), "commented": True}
 

@@ -52,4 +52,3 @@ SPECS = (
 
 def build_decision_app():
     return build_group("Decision commands.", SPECS)
-

@@ -40,7 +40,9 @@ def register_health_tools(
 
     registered: set[str] = set()
 
-    @mcp.tool(name="health_check", annotations={"readOnlyHint": True, "openWorldHint": False})
+    @mcp.tool(
+        name="health_check", annotations={"readOnlyHint": True, "openWorldHint": False}
+    )
     def health_check() -> dict[str, Any]:
         database_status = "ok"
         detail: str | None = None
@@ -65,7 +67,9 @@ def register_health_tools(
 
     registered.add("health_check")
 
-    @mcp.tool(name="get_stats", annotations={"readOnlyHint": True, "openWorldHint": False})
+    @mcp.tool(
+        name="get_stats", annotations={"readOnlyHint": True, "openWorldHint": False}
+    )
     def get_stats(token: str | None = None) -> dict[str, Any]:
         def _callback(session: Session, authenticated) -> dict[str, Any]:
             del authenticated

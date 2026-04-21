@@ -43,4 +43,3 @@ SPECS = (
 
 def build_graph_app():
     return build_group("Graph commands.", SPECS)
-

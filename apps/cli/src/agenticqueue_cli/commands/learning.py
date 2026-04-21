@@ -77,4 +77,3 @@ SPECS = (
 
 def build_learning_app():
     return build_group("Learning commands.", SPECS)
-

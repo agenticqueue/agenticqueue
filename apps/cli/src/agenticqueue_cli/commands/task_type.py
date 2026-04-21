@@ -43,4 +43,3 @@ SPECS = (
 
 def build_task_type_app():
     return build_group("Task-type commands.", SPECS)
-

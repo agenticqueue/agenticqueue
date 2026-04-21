@@ -20,7 +20,7 @@ from agenticqueue_api.mcp.common import (
     serialize_model,
     surface_error,
 )
-from agenticqueue_api.policy import load_policy_pack
+from agenticqueue_api.policy import load_policy_pack as read_policy_pack
 from agenticqueue_api.repo import ancestors, claim_next, descendants, neighbors
 from agenticqueue_api.task_type_registry import TaskTypeRegistry
 
@@ -230,7 +230,9 @@ def register_submit_tools(
             )
         )
 
-    @mcp.tool(name="get_self", annotations={"readOnlyHint": True, "openWorldHint": False})
+    @mcp.tool(
+        name="get_self", annotations={"readOnlyHint": True, "openWorldHint": False}
+    )
     def get_self(token: str | None = None) -> dict[str, Any]:
         def _callback(session: Session, authenticated) -> dict[str, Any]:
             return {
@@ -407,7 +409,10 @@ def register_submit_tools(
                 raise surface_error(
                     404,
                     "No matching job found",
-                    details={"labels": labels or [], "claim_states": claim_states or []},
+                    details={
+                        "labels": labels or [],
+                        "claim_states": claim_states or [],
+                    },
                 )
             return task.model_dump(mode="json")
 
@@ -435,9 +440,11 @@ def register_submit_tools(
             released = release_claim(
                 session,
                 task_id=job_id,
-                expected_actor_id=None
-                if authenticated.actor.actor_type == "admin"
-                else authenticated.actor.id,
+                expected_actor_id=(
+                    None
+                    if authenticated.actor.actor_type == "admin"
+                    else authenticated.actor.id
+                ),
             )
             if released is None:
                 raise surface_error(404, "Job not found or not releasable")
@@ -530,8 +537,10 @@ def register_submit_tools(
         workspace_id: uuid.UUID | None = None,
     ) -> dict[str, Any]:
         policy_path = Path(path)
-        loaded = load_policy_pack(policy_path)
-        policy_name = policy_path.name.removesuffix(".policy.yaml").removesuffix(".yaml")
+        loaded = read_policy_pack(policy_path)
+        policy_name = policy_path.name.removesuffix(".policy.yaml").removesuffix(
+            ".yaml"
+        )
         return call_internal_api(
             app,
             method="POST",
@@ -670,12 +679,12 @@ def register_submit_tools(
         limit: int = 25,
     ) -> dict[str, Any]:
         def _callback(session: Session, authenticated) -> dict[str, Any]:
-            del session, authenticated, limit
+            del session, authenticated
             raise surface_error(
                 501,
                 "search_surface is not implemented yet on the MCP surface",
                 error_code="not_implemented",
-                details={"tag": tag},
+                details={"tag": tag, "limit": limit},
             )
 
         return run_session_tool(

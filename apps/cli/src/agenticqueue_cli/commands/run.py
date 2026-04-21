@@ -33,4 +33,3 @@ SPECS = (
 
 def build_run_app():
     return build_group("Run / audit commands.", SPECS)
-

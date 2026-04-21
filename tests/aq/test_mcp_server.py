@@ -115,7 +115,7 @@ def test_unified_mcp_compile_packet_round_trips_over_http_and_sse(
         handle="unified-mcp-transport",
         grant_query_graph=True,
     )
-    arguments = {"task_id": str(task_id), "token": token}
+    arguments: dict[str, object] = {"task_id": str(task_id), "token": token}
 
     in_memory_response = _in_memory_mcp_call(
         app.state.mcp_server,
@@ -173,7 +173,10 @@ def test_submit_payload_returns_not_implemented_error_shape(session_factory) -> 
     )
 
     assert response["error_code"] == "not_implemented"
-    assert response["message"] == "submit_payload is not implemented yet on the MCP surface"
+    assert (
+        response["message"]
+        == "submit_payload is not implemented yet on the MCP surface"
+    )
     assert response["details"] == {
         "job_id": str(task_id),
         "payload_keys": [

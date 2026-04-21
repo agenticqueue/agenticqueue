@@ -52,4 +52,3 @@ SPECS = (
 
 def build_actor_app():
     return build_group("Actor / identity commands.", SPECS)
-

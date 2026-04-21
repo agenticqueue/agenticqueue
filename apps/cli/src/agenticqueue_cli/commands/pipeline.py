@@ -51,4 +51,3 @@ SPECS = (
 
 def build_pipeline_app():
     return build_group("Pipeline commands.", SPECS)
-

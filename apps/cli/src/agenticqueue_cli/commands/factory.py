@@ -208,4 +208,3 @@ def _register_empty(app: typer.Typer, spec: CommandSpec) -> None:
         _invoke_spec(ctx, spec)
 
     command.__doc__ = spec.help
-

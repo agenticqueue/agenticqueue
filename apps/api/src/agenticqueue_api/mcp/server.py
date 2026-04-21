@@ -11,7 +11,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from agenticqueue_api.config import get_reload_enabled, get_task_types_dir
 from agenticqueue_api.mcp.approve_tools import register_approve_tools
 from agenticqueue_api.mcp.audit_tools import register_audit_tools
-from agenticqueue_api.mcp.common import canonical_surface_tool_names, default_session_factory
+from agenticqueue_api.mcp.common import (
+    canonical_surface_tool_names,
+    default_session_factory,
+)
 from agenticqueue_api.mcp.health_tools import register_health_tools
 from agenticqueue_api.mcp.learnings_tools import build_learnings_mcp
 from agenticqueue_api.mcp.memory_tools import build_memory_mcp

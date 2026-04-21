@@ -82,4 +82,3 @@ VISIBLE_GROUPS: tuple[str, ...] = (
     "artifact",
     "admin",
 )
-

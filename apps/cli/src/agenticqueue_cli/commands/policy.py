@@ -43,4 +43,3 @@ SPECS = (
 
 def build_policy_app():
     return build_group("Policy commands.", SPECS)
-

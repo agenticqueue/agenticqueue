@@ -30,4 +30,3 @@ SPECS = (
 
 def build_admin_app():
     return build_group("Admin / system commands.", SPECS)
-
