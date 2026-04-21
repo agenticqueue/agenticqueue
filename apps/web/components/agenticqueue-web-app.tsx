@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { LearningsView } from "@/components/learnings-view";
 import { PipelinesView } from "@/components/pipelines-view";
+import { WorkView } from "@/components/work-view";
 
 type ViewKey =
   | "pipelines"
@@ -387,6 +388,8 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
       <section className="aq-content">
         {view === "pipelines" && authToken ? (
           <PipelinesView authToken={authToken} />
+        ) : view === "work" && authToken ? (
+          <WorkView authToken={authToken} />
         ) : view === "learnings" && authToken ? (
           <LearningsView authToken={authToken} />
         ) : (

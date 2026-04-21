@@ -39,6 +39,12 @@ const EMPTY_LEARNINGS_PAYLOAD = {
   items: [],
 };
 
+const EMPTY_WORK_PAYLOAD = {
+  generated_at: "2026-04-21T14:05:00.000Z",
+  count: 0,
+  items: [],
+};
+
 export async function seedAuthenticatedSession(
   page: Page,
   options: {
@@ -101,11 +107,36 @@ export async function mockShellReadApis(page: Page) {
       status: 200,
     });
   });
+
+  await page.route("**/api/v1/work**", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      json: EMPTY_WORK_PAYLOAD,
+      status: 200,
+    });
+  });
 }
 
-export async function openAuthedView(page: Page, path: string) {
+export async function openAuthedView(
+  page: Page,
+  path: string,
+  options: {
+    workPayload?: unknown;
+  } = {},
+) {
   await seedAuthenticatedSession(page);
   await mockShellReadApis(page);
+
+  if (options.workPayload !== undefined) {
+    await page.route("**/api/v1/work**", async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        json: options.workPayload,
+        status: 200,
+      });
+    });
+  }
+
   await page.goto(path);
 }
 
