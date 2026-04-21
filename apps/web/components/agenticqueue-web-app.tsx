@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
+import { LearningsView } from "@/components/learnings-view";
 import { PipelinesView } from "@/components/pipelines-view";
 
 type ViewKey =
@@ -386,6 +387,8 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
       <section className="aq-content">
         {view === "pipelines" && authToken ? (
           <PipelinesView authToken={authToken} />
+        ) : view === "learnings" && authToken ? (
+          <LearningsView authToken={authToken} />
         ) : (
           <>
             <div className="aq-content-head">

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 from fastmcp import FastMCP
@@ -54,7 +53,7 @@ def build_agenticqueue_mcp(
     memory_server = build_memory_mcp(session_factory=resolved_session_factory)
     for child in (packet_server, learnings_server, memory_server):
         mcp.mount(child)
-        registered.update(asyncio.run(child.get_tools()).keys())
+        registered.update(_mounted_tool_names(child))
 
     registered.update(
         register_submit_tools(
@@ -93,3 +92,13 @@ def build_agenticqueue_mcp(
 
     setattr(mcp, "agenticqueue_registered_tools", frozenset(registered))
     return mcp
+
+
+def _mounted_tool_names(server: FastMCP) -> set[str]:
+    """Read already-registered child tools without starting a nested event loop."""
+
+    tool_manager = getattr(server, "_tool_manager", None)
+    tools = getattr(tool_manager, "_tools", None)
+    if not isinstance(tools, dict):
+        return set()
+    return set(tools.keys())

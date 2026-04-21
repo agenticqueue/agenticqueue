@@ -110,6 +110,17 @@ def test_build_agenticqueue_mcp_registers_every_canonical_tool(session_factory) 
     assert set(canonical_tools).issubset(server_tools)
 
 
+def test_create_app_succeeds_inside_running_event_loop(session_factory) -> None:
+    async def _build() -> frozenset[str]:
+        app = create_app(session_factory=session_factory)
+        return app.state.mcp_server.agenticqueue_registered_tools
+
+    registered_tools = asyncio.run(_build())
+
+    assert "compile_packet" in registered_tools
+    assert "search_learnings" in registered_tools
+
+
 def test_create_app_mounts_http_and_sse_mcp_surfaces(session_factory) -> None:
     app = create_app(session_factory=session_factory)
 
