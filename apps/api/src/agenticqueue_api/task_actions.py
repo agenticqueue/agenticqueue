@@ -334,6 +334,7 @@ def submit_task(
     policy = load_transition_policy(task_record.task_type, task_type_registry)
     next_action = "await_human_approval" if policy.hitl_required else "ready_for_done"
     transitions = [submitted, validated]
+    dod_report_view = _dod_report_view(validation)
 
     run_record = RunRecord(
         task_id=task_record.id,
@@ -352,8 +353,8 @@ def submit_task(
             ),
             "dod_report": (
                 None
-                if validation.dod_report is None
-                else _dod_report_view(validation).model_dump(mode="json")
+                if dod_report_view is None
+                else dod_report_view.model_dump(mode="json")
             ),
             "attempts": [
                 {
@@ -431,7 +432,7 @@ def submit_task(
         run=RunModel.model_validate(run_record),
         artifacts=artifacts,
         learning_drafts=learning_drafts,
-        dod_report=_dod_report_view(validation),
+        dod_report=dod_report_view,
         transitions=[_transition_view(result) for result in transitions],
         next_action=next_action,
     )

@@ -65,7 +65,7 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _example_contract() -> dict[str, object]:
+def _example_contract() -> dict[str, Any]:
     path = _repo_root() / "examples" / "tasks" / "coding" / "01-add-endpoint.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -155,7 +155,7 @@ def _seed_task_with_token(
     grant_capabilities: tuple[CapabilityKey, ...] = (),
     task_state: str = "queued",
     claimed_by_seed_actor: bool = False,
-    contract: dict[str, object] | None = None,
+    contract: dict[str, Any] | None = None,
     description: str = "Render one packet from the MCP surface.",
 ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID, str]:
     resolved_contract = contract or _example_contract()

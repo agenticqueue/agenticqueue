@@ -4,6 +4,7 @@ import copy
 import json
 from pathlib import Path
 import uuid
+from typing import Any
 
 from fastapi.testclient import TestClient
 import sqlalchemy as sa
@@ -40,7 +41,7 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _example_contract() -> dict[str, object]:
+def _example_contract() -> dict[str, Any]:
     path = _repo_root() / "examples" / "tasks" / "coding" / "01-add-endpoint.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -61,7 +62,7 @@ def _write_submission_artifacts(artifact_root: Path) -> None:
     )
 
 
-def _valid_submission() -> dict[str, object]:
+def _valid_submission() -> dict[str, Any]:
     contract = _example_contract()
     return {
         "output": copy.deepcopy(contract["output"]),

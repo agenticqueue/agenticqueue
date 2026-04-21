@@ -87,7 +87,7 @@ def _write_submission_artifacts(artifact_root: Path) -> None:
     )
 
 
-def _valid_submission_payload() -> dict[str, object]:
+def _valid_submission_payload() -> dict[str, Any]:
     contract = _example_contract()
     return {
         "output": copy.deepcopy(contract["output"]),
