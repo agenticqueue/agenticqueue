@@ -11,7 +11,7 @@ from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any
 
 import anyio
 from fastapi import FastAPI
@@ -47,7 +47,6 @@ from agenticqueue_api.repo import (
 
 TransportName = str
 TransportCallback = Callable[[ClientSession], Awaitable[Any]]
-T = TypeVar("T")
 
 TRUNCATE_TABLES = [
     "api_token",
@@ -243,7 +242,7 @@ async def _run_transport_async(
     callback: TransportCallback,
     *,
     auth_token: str | None = None,
-) -> T:
+) -> Any:
     if transport == "stdio":
         env = os.environ.copy()
         env["PYTHONPATH"] = _pythonpath()
@@ -290,8 +289,8 @@ def run_transport(
     callback: TransportCallback,
     *,
     auth_token: str | None = None,
-) -> T:
-    async def _runner() -> T:
+) -> Any:
+    async def _runner() -> Any:
         return await _run_transport_async(
             transport,
             app,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from jsonschema import Draft202012Validator, validate
+from jsonschema import Draft202012Validator, validate  # type: ignore[import-untyped]
 import pytest
 
 from agenticqueue_api.mcp.common import canonical_surface_tool_names
@@ -18,7 +18,7 @@ def test_tool_listing_matches_canonical_surface(
     mcp_app,
     seeded_task: SeededTask,
 ) -> None:
-    result = run_transport(
+    result: Any = run_transport(
         transport,
         mcp_app,
         _list_tools,
@@ -36,7 +36,7 @@ def test_tool_schemas_are_valid_json_schema(
     mcp_app,
     seeded_task: SeededTask,
 ) -> None:
-    result = run_transport(
+    result: Any = run_transport(
         transport,
         mcp_app,
         _list_tools,
@@ -73,7 +73,7 @@ def test_tool_invocation_succeeds_across_supported_transports(
         )
         return await session.call_tool(tool_name, arguments)
 
-    result = run_transport(
+    result: Any = run_transport(
         transport,
         mcp_app,
         _call_tool,
@@ -100,7 +100,7 @@ def test_error_shape_matches_surface_contract_across_transports(
             {"task_id": str(seeded_task.task_id)},
         )
 
-    result = run_transport(
+    result: Any = run_transport(
         transport,
         mcp_app,
         _call_tool_without_token,
