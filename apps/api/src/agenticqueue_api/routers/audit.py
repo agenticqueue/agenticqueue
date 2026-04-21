@@ -15,7 +15,12 @@ from sqlalchemy.orm import Session
 from agenticqueue_api.audit import set_session_audit_context
 from agenticqueue_api.auth import AuthenticatedRequest, authenticate_api_token
 from agenticqueue_api.errors import error_payload, raise_api_error
-from agenticqueue_api.models import ActorModel, ApiTokenModel, AuditLogModel, AuditLogRecord
+from agenticqueue_api.models import (
+    ActorModel,
+    ApiTokenModel,
+    AuditLogModel,
+    AuditLogRecord,
+)
 from agenticqueue_api.models.shared import SchemaModel
 from agenticqueue_api.pagination import (
     DEFAULT_LIST_LIMIT,

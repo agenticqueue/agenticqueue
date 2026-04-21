@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import typer
 
-from agenticqueue_cli.client import CliError, emit_payload, get_state, parse_json_mapping
+from agenticqueue_cli.client import (
+    CliError,
+    emit_payload,
+    get_state,
+    parse_json_mapping,
+)
 
 
 def register_audit_command(app: typer.Typer) -> None:

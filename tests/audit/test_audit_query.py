@@ -18,7 +18,12 @@ from typer.testing import CliRunner
 from agenticqueue_api.app import create_app
 from agenticqueue_api.auth import issue_api_token
 from agenticqueue_api.config import get_sqlalchemy_sync_database_url
-from agenticqueue_api.models import ActorModel, AuditLogRecord, CapabilityKey, CapabilityRecord
+from agenticqueue_api.models import (
+    ActorModel,
+    AuditLogRecord,
+    CapabilityKey,
+    CapabilityRecord,
+)
 from agenticqueue_api.repo import create_actor
 from agenticqueue_cli.client import CliState, OutputFormat
 from agenticqueue_cli.main import app as cli_app
@@ -174,8 +179,12 @@ def _seed_audit_rows(
     session_factory: sessionmaker[Session],
 ) -> tuple[ActorModel, ActorModel, ActorModel]:
     admin = _seed_actor(session_factory, handle="audit-admin", actor_type="admin")
-    actor_one = _seed_actor(session_factory, handle="audit-agent-one", actor_type="agent")
-    actor_two = _seed_actor(session_factory, handle="audit-agent-two", actor_type="agent")
+    actor_one = _seed_actor(
+        session_factory, handle="audit-agent-one", actor_type="agent"
+    )
+    actor_two = _seed_actor(
+        session_factory, handle="audit-agent-two", actor_type="agent"
+    )
 
     with session_factory() as session:
         _insert_audit_row(
