@@ -22,6 +22,12 @@ If GitHub security advisories are unavailable, use the maintainer profile above 
 - We will validate the report, assess impact, and work on a fix.
 - Please avoid public disclosure until a fix or mitigation is available.
 
+## Threat Model
+
+See [docs/security/threat-model.md](docs/security/threat-model.md) for the
+living STRIDE threat model, trust boundaries, shipped mitigations, and known
+gaps that still need hardening before public launch.
+
 ## Scope
 
 This policy applies to this repository and the official AgenticQueue project-maintained infrastructure.
