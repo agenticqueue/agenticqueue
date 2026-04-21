@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
+import { DecisionsView } from "@/components/decisions-view";
 import { LearningsView } from "@/components/learnings-view";
 import { PipelinesView } from "@/components/pipelines-view";
 import { WorkView } from "@/components/work-view";
@@ -390,6 +391,8 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
           <PipelinesView authToken={authToken} />
         ) : view === "work" && authToken ? (
           <WorkView authToken={authToken} />
+        ) : view === "decisions" && authToken ? (
+          <DecisionsView authToken={authToken} />
         ) : view === "learnings" && authToken ? (
           <LearningsView authToken={authToken} />
         ) : (

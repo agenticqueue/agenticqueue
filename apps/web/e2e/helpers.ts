@@ -45,6 +45,12 @@ const EMPTY_WORK_PAYLOAD = {
   items: [],
 };
 
+const EMPTY_DECISIONS_PAYLOAD = {
+  generated_at: "2026-04-21T14:05:00.000Z",
+  count: 0,
+  items: [],
+};
+
 export async function seedAuthenticatedSession(
   page: Page,
   options: {
@@ -87,7 +93,13 @@ export async function seedAuthenticatedSession(
   });
 }
 
-export async function mockShellReadApis(page: Page) {
+export async function mockShellReadApis(
+  page: Page,
+  options: {
+    decisionsPayload?: unknown;
+    decisionLineageById?: Record<string, unknown>;
+  } = {},
+) {
   await page.route("**/api/v1/pipelines**", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -115,6 +127,33 @@ export async function mockShellReadApis(page: Page) {
       status: 200,
     });
   });
+
+  await page.route("**/api/v1/decisions**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    const lineageMatch = pathname.match(/\/api\/v1\/decisions\/([^/]+)\/lineage$/);
+
+    if (lineageMatch) {
+      const decisionId = decodeURIComponent(lineageMatch[1] ?? "");
+      await route.fulfill({
+        contentType: "application/json",
+        json:
+          options.decisionLineageById?.[decisionId] ?? {
+            generated_at: "2026-04-21T14:05:00.000Z",
+            decision_id: decisionId,
+            nodes: [],
+            edges: [],
+          },
+        status: 200,
+      });
+      return;
+    }
+
+    await route.fulfill({
+      contentType: "application/json",
+      json: options.decisionsPayload ?? EMPTY_DECISIONS_PAYLOAD,
+      status: 200,
+    });
+  });
 }
 
 export async function openAuthedView(
@@ -122,10 +161,15 @@ export async function openAuthedView(
   path: string,
   options: {
     workPayload?: unknown;
+    decisionsPayload?: unknown;
+    decisionLineageById?: Record<string, unknown>;
   } = {},
 ) {
   await seedAuthenticatedSession(page);
-  await mockShellReadApis(page);
+  await mockShellReadApis(page, {
+    decisionsPayload: options.decisionsPayload,
+    decisionLineageById: options.decisionLineageById,
+  });
 
   if (options.workPayload !== undefined) {
     await page.route("**/api/v1/work**", async (route) => {

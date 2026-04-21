@@ -1105,6 +1105,10 @@ input {
   align-items: start;
 }
 
+.aq-decision-shell {
+  align-items: stretch;
+}
+
 .aq-table-work {
   display: grid;
   border: 1px solid var(--border);
@@ -1132,6 +1136,18 @@ input {
   padding: 0.8rem 1rem;
   border-bottom: 1px solid var(--border-subtle);
   background: rgba(17, 24, 39, 0.92);
+}
+
+.aq-decision-head,
+.aq-decision-row {
+  grid-template-columns:
+    minmax(7rem, 0.9fr)
+    minmax(0, 2.5fr)
+    minmax(7rem, 0.8fr)
+    minmax(8rem, 0.9fr)
+    minmax(8rem, 0.9fr)
+    minmax(8rem, 0.9fr)
+    minmax(7rem, 0.8fr);
 }
 
 .aq-table-row {
@@ -1293,6 +1309,60 @@ input {
   gap: 0.7rem;
 }
 
+.aq-lineage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.aq-lineage-column {
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+}
+
+.aq-lineage-column-title {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.aq-lineage-node {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.8rem 0.85rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.95rem;
+  background: rgba(9, 14, 20, 0.72);
+  color: var(--ink);
+  text-align: left;
+}
+
+.aq-lineage-node:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.aq-lineage-node-ref {
+  color: var(--ink-faint);
+}
+
+.aq-lineage-node-meta {
+  overflow-wrap: anywhere;
+}
+
+.aq-linked-jobs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.aq-linked-job {
+  text-decoration: none;
+}
+
 .aq-shortcut-row {
   display: grid;
   grid-template-columns: minmax(12rem, 0.9fr) minmax(0, 1.4fr);
@@ -1423,10 +1493,12 @@ input {
 
   .aq-detail-props,
   .aq-work-shell,
+  .aq-lineage-grid,
   .aq-learnings-shell,
   .aq-learnings-head,
   .aq-learning-row,
   .aq-work-head,
+  .aq-decision-head,
   .aq-table-row,
   .aq-shortcut-row {
     grid-template-columns: 1fr;
