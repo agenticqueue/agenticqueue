@@ -38,8 +38,8 @@ ENTITY_TABLES = {
 PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
 PRE_IDEMPOTENCY_TABLES = ENTITY_TABLES - {"idempotency_key"}
-PRE_LATEST_ENTITY_TABLES = ENTITY_TABLES - {"actor_role_assignment", "role"}
-PRE_LATEST_REVISION = "20260420_18"
+PRE_LATEST_ENTITY_TABLES = ENTITY_TABLES
+PRE_LATEST_REVISION = "20260420_19"
 LEARNING_COLUMNS = {
     "action_rule",
     "applies_when",
@@ -448,8 +448,32 @@ def test_latest_migration_is_reversible() -> None:
             "expires_at",
             "granted_by_actor_id",
             "id",
+            "role_assignment_id",
             "revoked_at",
             "scope",
+            "updated_at",
+        }
+    )
+    assert_role_columns(
+        {
+            "capabilities",
+            "created_at",
+            "description",
+            "id",
+            "name",
+            "scope",
+            "updated_at",
+        }
+    )
+    assert_actor_role_assignment_columns(
+        {
+            "actor_id",
+            "created_at",
+            "expires_at",
+            "granted_by_actor_id",
+            "id",
+            "revoked_at",
+            "role_id",
             "updated_at",
         }
     )

@@ -412,8 +412,10 @@ def test_retry_after_validator_rejection_keeps_lineage_intact_on_success(
         with session_factory() as session:
             mid_retry_task = session.get(TaskRecord, task_id)
             assert mid_retry_task is not None
-            assert mid_retry_task.state == "in_progress"
-            assert mid_retry_task.claimed_by_actor_id == actor_id
+            assert mid_retry_task.state == "queued"
+            assert mid_retry_task.claimed_by_actor_id is None
+            assert mid_retry_task.attempt_count == 1
+            assert mid_retry_task.last_failure is not None
             assert (
                 session.scalar(
                     sa.select(sa.func.count())
@@ -422,6 +424,7 @@ def test_retry_after_validator_rejection_keeps_lineage_intact_on_success(
                 )
                 == 0
             )
+        _claim_task_in_progress(session_factory, actor_id=actor_id, task_id=task_id)
         success_response = client.post(
             f"/v1/tasks/{task_id}/submit",
             headers=_post_headers(token),

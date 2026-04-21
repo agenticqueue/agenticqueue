@@ -54,7 +54,7 @@
     "Should packet invalidation flush downstream prefetched packets?",
     "Who owns packet TTL defaults?"
   ],
-  "packet_version_id": "751f0597-02dc-51df-bf7f-3ac3c5e155d1",
+  "packet_version_id": "889f7712-74d9-5a07-af3a-b37e8ce184a3",
   "permissions": {
     "autonomy_tier": 3,
     "capabilities": [
@@ -129,6 +129,7 @@
     "metadata"
   ],
   "task": {
+    "attempt_count": 0,
     "claimed_at": null,
     "claimed_by_actor_id": null,
     "contract": {
@@ -219,9 +220,12 @@
     "description": "## Goal\nCompile the graph-first packet core.\n\n## Open Questions\n- Should packet invalidation flush downstream prefetched packets?\n- Who owns packet TTL defaults?\n",
     "id": "00000000-0000-0000-0000-000000001106",
     "labels": [],
+    "last_failure": null,
+    "max_attempts": 3,
     "policy_id": null,
     "priority": 0,
     "project_id": "00000000-0000-0000-0000-000000001102",
+    "remaining_attempts": 3,
     "sequence": 2,
     "state": "queued",
     "task_type": "coding-task",
