@@ -157,6 +157,7 @@ def _seed_task_with_token(
     claimed_by_seed_actor: bool = False,
     contract: dict[str, Any] | None = None,
     description: str = "Render one packet from the MCP surface.",
+    token_scopes: tuple[str, ...] = (),
 ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID, str]:
     resolved_contract = contract or _example_contract()
     with session_factory() as session:
@@ -254,7 +255,7 @@ def _seed_task_with_token(
         _, token = issue_api_token(
             session,
             actor_id=actor.id,
-            scopes=[],
+            scopes=list(token_scopes),
             expires_at=None,
         )
         session.commit()

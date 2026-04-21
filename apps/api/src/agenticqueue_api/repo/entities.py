@@ -44,13 +44,27 @@ SchemaT = TypeVar("SchemaT", bound=SchemaModel)
 RecordT = TypeVar("RecordT")
 
 
+def _persistable_payload(
+    record_type: type[RecordT],
+    payload: SchemaT,
+) -> dict[str, Any]:
+    """Drop schema-only fields before constructing a SQLAlchemy record."""
+
+    column_names = set(record_type.__table__.columns.keys())
+    return {
+        field_name: value
+        for field_name, value in payload.model_dump(exclude_none=True).items()
+        if field_name in column_names
+    }
+
+
 def _create_entity(
     session: Session,
     record_type: type[RecordT],
     schema_type: type[SchemaT],
     payload: SchemaT,
 ) -> SchemaT:
-    record = record_type(**payload.model_dump(exclude_none=True))  # type: ignore[call-arg]
+    record = record_type(**_persistable_payload(record_type, payload))  # type: ignore[call-arg]
     session.add(record)
     session.flush()
     session.refresh(record)

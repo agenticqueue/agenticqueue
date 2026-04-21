@@ -2615,6 +2615,12 @@
       "TaskModel": {
         "description": "Pydantic schema for a task.",
         "properties": {
+          "attempt_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Attempt Count",
+            "type": "integer"
+          },
           "claimed_at": {
             "anyOf": [
               {
@@ -2679,6 +2685,24 @@
             "title": "Labels",
             "type": "array"
           },
+          "last_failure": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Failure"
+          },
+          "max_attempts": {
+            "default": 3,
+            "minimum": 1.0,
+            "title": "Max Attempts",
+            "type": "integer"
+          },
           "policy_id": {
             "anyOf": [
               {
@@ -2700,6 +2724,12 @@
             "format": "uuid",
             "title": "Project Id",
             "type": "string"
+          },
+          "remaining_attempts": {
+            "default": 3,
+            "minimum": 0.0,
+            "title": "Remaining Attempts",
+            "type": "integer"
           },
           "sequence": {
             "anyOf": [
@@ -6685,6 +6715,46 @@
           }
         },
         "summary": "Approve Task Endpoint"
+      }
+    },
+    "/v1/tasks/{task_id}/claim": {
+      "post": {
+        "operationId": "claim_task_endpoint_v1_tasks__task_id__claim_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Claim Task Endpoint"
       }
     },
     "/v1/tasks/{task_id}/escrow-unlock": {

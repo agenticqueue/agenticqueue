@@ -68,13 +68,16 @@ def _register_list_tool(
             params["limit"] = limit
         if cursor is not None:
             params["cursor"] = cursor
-        return call_internal_api(
+        payload = call_internal_api(
             app,
             method="GET",
             path=path,
             token=token,
             params=params or None,
         )
+        if isinstance(payload, list):
+            return {"items": payload}
+        return payload
 
     return name
 

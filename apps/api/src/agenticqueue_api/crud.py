@@ -56,11 +56,15 @@ from agenticqueue_api.pagination import (
 )
 from agenticqueue_api.repo.graph import ensure_dependency_edge_is_acyclic
 from agenticqueue_api.schemas.learning import LearningStatus
+from agenticqueue_api.task_retry import with_retry_fields
 from agenticqueue_api.task_type_registry import SchemaLoadError, TaskTypeRegistry
 
 IMMUTABLE_FIELDS = frozenset({"id", "created_at", "updated_at"})
 SYSTEM_MANAGED_FIELDS_BY_RESOURCE = {
     "learnings": frozenset({"promotion_eligible"}),
+    "tasks": frozenset(
+        {"attempt_count", "last_failure", "max_attempts", "remaining_attempts"}
+    ),
 }
 
 
@@ -368,7 +372,14 @@ def _get_record_or_404(
     return record
 
 
-def _serialize_record(config: CrudEntityConfig, record: Any) -> SchemaModel:
+def _serialize_record(
+    config: CrudEntityConfig,
+    record: Any,
+    *,
+    session: Session | None = None,
+) -> SchemaModel:
+    if config.resource_name == "tasks" and session is not None:
+        return with_retry_fields(session, record)
     return config.schema_type.model_validate(record)
 
 
@@ -392,8 +403,12 @@ def _apply_schema_to_record(
     *,
     exclude_none: bool = False,
 ) -> None:
+    valid_record_attrs = set(config.record_type.__table__.columns.keys())
     for field_name, value in payload.model_dump(exclude_none=exclude_none).items():
-        setattr(record, _record_attr_name(config, field_name), value)
+        record_attr = _record_attr_name(config, field_name)
+        if record_attr not in valid_record_attrs:
+            continue
+        setattr(record, record_attr, value)
 
 
 def _validate_payload(
@@ -629,7 +644,7 @@ def _register_entity_routes(
                     },
                 )
             session.refresh(record)
-            return _serialize_record(config, record)
+            return _serialize_record(config, record, session=session)
 
     def get_entity(
         entity_id: uuid.UUID,
@@ -638,7 +653,7 @@ def _register_entity_routes(
     ) -> SchemaModel:
         _require_scope(request, config.read_scope)
         record = _get_record_or_404(session, config, entity_id)
-        return _serialize_record(config, record)
+        return _serialize_record(config, record, session=session)
 
     def list_entities(
         request: Request,
@@ -670,7 +685,7 @@ def _register_entity_routes(
                 _record_cursor_values(page_records[-1], order_columns)
             )
         return [
-            _serialize_record(config, record).model_dump(mode="json")
+            _serialize_record(config, record, session=session).model_dump(mode="json")
             for record in page_records
         ]
 
@@ -698,7 +713,7 @@ def _register_entity_routes(
                 )
             validated = _validate_patch(
                 config,
-                _serialize_record(config, record),
+                _serialize_record(config, record, session=session),
                 payload,
             )
             _validate_task_contract(request, config, validated)
@@ -715,7 +730,7 @@ def _register_entity_routes(
                     },
                 )
             session.refresh(record)
-            return _serialize_record(config, record)
+            return _serialize_record(config, record, session=session)
 
     def delete_entity(
         entity_id: uuid.UUID,

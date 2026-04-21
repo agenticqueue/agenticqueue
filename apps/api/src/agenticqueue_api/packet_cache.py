@@ -25,7 +25,7 @@ from agenticqueue_api.config import (
 from agenticqueue_api.models.task import TaskRecord
 
 PACKET_INVALIDATION_CHANNEL = "packet_invalidate"
-_FINISHED_STATES = ("done", "cancelled")
+_FINISHED_STATES = ("done", "cancelled", "dlq")
 
 
 @dataclass(slots=True)

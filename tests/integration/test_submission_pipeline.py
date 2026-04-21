@@ -93,7 +93,7 @@ def _count_rows(
     return int(session.scalar(statement) or 0)
 
 
-def test_submit_route_rejects_invalid_payload_without_side_effects(
+def test_submit_route_requeues_invalid_payload_with_attempt_tracking(
     tmp_path: Path,
     session_factory: sessionmaker[Session],
 ) -> None:
@@ -124,13 +124,28 @@ def test_submit_route_rejects_invalid_payload_without_side_effects(
 
     assert response.status_code == 422
     assert response.json()["message"] == "Task submission failed validation"
+    assert response.json()["details"]["attempt_count"] == 1
+    assert response.json()["details"]["max_attempts"] == 3
+    assert response.json()["details"]["remaining_attempts"] == 2
+    assert response.json()["details"]["task_state"] == "queued"
 
     with session_factory() as session:
         task = session.get(TaskRecord, task_id)
+        audit_rows = session.scalars(
+            sa.select(AuditLogRecord)
+            .where(
+                AuditLogRecord.entity_type == "task",
+                AuditLogRecord.entity_id == task_id,
+                AuditLogRecord.action == "JOB_FAILED",
+            )
+            .order_by(AuditLogRecord.created_at.asc(), AuditLogRecord.id.asc())
+        ).all()
 
         assert task is not None
-        assert task.state == "in_progress"
-        assert task.claimed_by_actor_id is not None
+        assert task.state == "queued"
+        assert task.claimed_by_actor_id is None
+        assert task.attempt_count == 1
+        assert task.last_failure is not None
         assert _count_rows(session, RunRecord) == 0
         assert _count_rows(session, ArtifactRecord) == 0
         assert _count_rows(session, EdgeRecord) == 0
@@ -144,6 +159,11 @@ def test_submit_route_rejects_invalid_payload_without_side_effects(
             )
             == 0
         )
+        assert len(audit_rows) == 1
+        assert audit_rows[0].after["state"] == "queued"
+        assert audit_rows[0].after["attempt_count"] == 1
+        assert audit_rows[0].after["max_attempts"] == 3
+        assert audit_rows[0].after["remaining_attempts"] == 2
 
 
 def test_submit_route_persists_artifacts_and_replays_idempotently(

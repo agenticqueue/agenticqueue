@@ -8,6 +8,7 @@ from typing import Any
 
 import sqlalchemy as sa
 from pydantic import Field
+from pydantic import model_validator
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -40,6 +41,15 @@ class TaskModel(TimestampedSchema):
     description: str | None = None
     contract: dict[str, Any] = Field(default_factory=dict)
     definition_of_done: list[str] = Field(default_factory=list)
+    attempt_count: int = Field(default=0, ge=0)
+    last_failure: dict[str, Any] | None = None
+    max_attempts: int = Field(default=3, ge=1)
+    remaining_attempts: int = Field(default=3, ge=0)
+
+    @model_validator(mode="after")
+    def normalize_retry_fields(self) -> "TaskModel":
+        self.remaining_attempts = max(self.max_attempts - self.attempt_count, 0)
+        return self
 
 
 class TaskRecord(IdentifiedTable, TimestampedTable, Base):
@@ -91,3 +101,13 @@ class TaskRecord(IdentifiedTable, TimestampedTable, Base):
     description: Mapped[str | None] = mapped_column(sa.Text(), nullable=True)
     contract: Mapped[dict[str, Any]] = jsonb_dict_column()
     definition_of_done: Mapped[list[str]] = jsonb_list_column()
+    attempt_count: Mapped[int] = mapped_column(
+        sa.Integer(),
+        nullable=False,
+        default=0,
+        server_default=sa.text("0"),
+    )
+    last_failure: Mapped[dict[str, Any] | None] = mapped_column(
+        postgresql.JSONB,
+        nullable=True,
+    )

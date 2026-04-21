@@ -44,6 +44,7 @@ from agenticqueue_api.repo.graph import (
 )
 from agenticqueue_api.repo.queue import (
     claim_next,
+    claim_task,
     claim_next_timed,
     reclaim_claim,
     release_claim,
@@ -57,6 +58,7 @@ __all__ = [
     "ancestors",
     "claim_next",
     "claim_next_timed",
+    "claim_task",
     "create_actor",
     "create_artifact",
     "create_audit_log",

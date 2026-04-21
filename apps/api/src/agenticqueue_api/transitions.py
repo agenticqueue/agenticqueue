@@ -27,6 +27,7 @@ class TaskState(StrEnum):
     VALIDATED = "validated"
     DONE = "done"
     REJECTED = "rejected"
+    DLQ = "dlq"
     BLOCKED = "blocked"
     PARKED = "parked"
     NEEDS_GHOST_TRIAGE = "needs_ghost_triage"

@@ -45,6 +45,11 @@ from agenticqueue_api.schemas.submit import (
     TaskCompletionSubmission,
     validate_task_completion_submission,
 )
+from agenticqueue_api.task_retry import (
+    increment_attempt_metric,
+    resolve_max_attempts,
+    with_retry_fields,
+)
 from agenticqueue_api.task_type_registry import TaskTypeRegistry
 from agenticqueue_api.transitions import (
     TaskState,
@@ -276,6 +281,95 @@ def _effective_transition_policy(
         hitl_required=resolved_policy.hitl_required,
         autonomy_tier=resolved_policy.autonomy_tier,
         capabilities=tuple(resolved_policy.capabilities),
+        max_retries=resolve_max_attempts(
+            task_type=task_record.task_type,
+            policy_body=resolved_policy.body,
+            default=base_policy.max_retries,
+        ),
+    )
+
+
+def _failure_payload(
+    *,
+    error_code: str,
+    message: str,
+    details: dict[str, Any],
+    occurred_at: dt.datetime,
+) -> dict[str, Any]:
+    return {
+        "error_code": error_code,
+        "message": message,
+        "details": details,
+        "occurred_at": occurred_at.isoformat(),
+    }
+
+
+def _record_task_failure(
+    session: Session,
+    *,
+    task_record: TaskRecord,
+    actor: ActorModel,
+    max_attempts: int,
+    error_code: str,
+    message: str,
+    details: dict[str, Any],
+    task_type_registry: TaskTypeRegistry,
+    transition_policy: TransitionPolicy | None = None,
+) -> TaskModel:
+    now = dt.datetime.now(dt.UTC)
+    next_attempt_count = task_record.attempt_count + 1
+    task_record.attempt_count = next_attempt_count
+    task_record.last_failure = _failure_payload(
+        error_code=error_code,
+        message=message,
+        details=details,
+        occurred_at=now,
+    )
+    task_record.state = (
+        TaskState.DLQ.value
+        if next_attempt_count >= max_attempts
+        else TaskState.QUEUED.value
+    )
+    task_record.claimed_by_actor_id = None
+    task_record.claimed_at = None
+    session.flush()
+    session.refresh(task_record)
+
+    remaining = max(max_attempts - next_attempt_count, 0)
+    _audit(
+        session,
+        actor_id=actor.id,
+        task_id=task_record.id,
+        action="JOB_FAILED",
+        after={
+            "state": task_record.state,
+            "attempt_count": next_attempt_count,
+            "max_attempts": max_attempts,
+            "remaining_attempts": remaining,
+            "last_failure": task_record.last_failure,
+        },
+    )
+    if task_record.state == TaskState.DLQ.value:
+        _audit(
+            session,
+            actor_id=actor.id,
+            task_id=task_record.id,
+            action="JOB_DLQ_ENTERED",
+            after={
+                "state": task_record.state,
+                "attempt_count": next_attempt_count,
+                "max_attempts": max_attempts,
+                "remaining_attempts": 0,
+                "last_failure": task_record.last_failure,
+            },
+        )
+        increment_attempt_metric("dlq")
+
+    return with_retry_fields(
+        session,
+        task_record,
+        task_type_registry=task_type_registry,
+        transition_policy=transition_policy,
     )
 
 
@@ -479,19 +573,45 @@ def submit_task(
         entity_id=task_record.id,
     )
 
+    policy = _effective_transition_policy(
+        session,
+        task_record=task_record,
+        task_type_registry=task_type_registry,
+    )
+
     validator = SubmissionValidator(task_type_registry, artifact_root=artifact_root)
     validation = validator.validate_submission(
         task_model,
         submission,
     )
     if not validation.is_valid:
+        failure_details = {
+            "task_id": str(task_id),
+            "state": task_record.state,
+            "errors": [asdict(error) for error in validation.errors],
+        }
+        failed_task = _record_task_failure(
+            session,
+            task_record=task_record,
+            actor=actor,
+            max_attempts=policy.max_retries,
+            error_code="validation_failed",
+            message="Task submission failed validation",
+            details=failure_details,
+            task_type_registry=task_type_registry,
+            transition_policy=policy,
+        )
+        # Persist retry accounting even though the endpoint surfaces a 422.
+        session.commit()
         raise_api_error(
             422,
             "Task submission failed validation",
-            details={
-                "task_id": str(task_id),
-                "state": task_record.state,
-                "errors": [asdict(error) for error in validation.errors],
+            details=failure_details
+            | {
+                "attempt_count": failed_task.attempt_count,
+                "max_attempts": failed_task.max_attempts,
+                "remaining_attempts": failed_task.remaining_attempts,
+                "task_state": failed_task.state,
             },
         )
 
@@ -505,12 +625,6 @@ def submit_task(
             packet_cache=packet_cache,
         )
         packet_version = get_current_packet_version(session, task_record.id)
-
-    policy = _effective_transition_policy(
-        session,
-        task_record=task_record,
-        task_type_registry=task_type_registry,
-    )
 
     submitted = apply_transition(
         task_model,
@@ -667,7 +781,12 @@ def submit_task(
         )
 
     return SubmitTaskResponse(
-        task=TaskModel.model_validate(task_record),
+        task=with_retry_fields(
+            session,
+            task_record,
+            task_type_registry=task_type_registry,
+            transition_policy=policy,
+        ),
         run=RunModel.model_validate(run_record),
         artifacts=artifacts,
         learning_drafts=learning_drafts,
@@ -744,7 +863,12 @@ def approve_task(
         action="JOB_APPROVED",
         after={"state": task_record.state, "mode": "human", "reason": reason},
     )
-    return TaskModel.model_validate(task_record)
+    return with_retry_fields(
+        session,
+        task_record,
+        task_type_registry=task_type_registry,
+        transition_policy=policy,
+    )
 
 
 def reject_task(
@@ -793,7 +917,7 @@ def reject_task(
         TaskState.QUEUED,
         task_type_registry,
         actor_capabilities=[CapabilityKey.UPDATE_TASK],
-        attempt_count=rejected.attempt_count,
+        attempt_count=task_record.attempt_count,
         policy=policy,
     )
     _transition_or_conflict(
@@ -801,7 +925,18 @@ def reject_task(
         default_message="Rejected task cannot return to the queue",
     )
 
-    task_record.state = requeued.state
+    task_record.attempt_count = requeued.attempt_count
+    task_record.last_failure = _failure_payload(
+        error_code="rejected",
+        message="Task was rejected during review",
+        details={"reason": reason},
+        occurred_at=dt.datetime.now(dt.UTC),
+    )
+    task_record.state = (
+        TaskState.DLQ.value
+        if requeued.escalation == "max_retries_exceeded"
+        else requeued.state
+    )
     task_record.claimed_by_actor_id = None
     task_record.claimed_at = None
     session.flush()
@@ -819,7 +954,27 @@ def reject_task(
             "reason": reason,
         },
     )
-    return TaskModel.model_validate(task_record)
+    if task_record.state == TaskState.DLQ.value:
+        _audit(
+            session,
+            actor_id=actor.id,
+            task_id=task_record.id,
+            action="JOB_DLQ_ENTERED",
+            after={
+                "state": task_record.state,
+                "attempt_count": task_record.attempt_count,
+                "max_attempts": policy.max_retries,
+                "remaining_attempts": 0,
+                "last_failure": task_record.last_failure,
+            },
+        )
+        increment_attempt_metric("dlq")
+    return with_retry_fields(
+        session,
+        task_record,
+        task_type_registry=task_type_registry,
+        transition_policy=policy,
+    )
 
 
 def unlock_task_escrow(
@@ -842,4 +997,4 @@ def unlock_task_escrow(
         action="ESCROW_FORCE_UNLOCKED",
         after={"state": released.state, "reason": reason},
     )
-    return released
+    return with_retry_fields(session, released)

@@ -139,6 +139,44 @@ def claim_next_timed(
     return TaskModel.model_validate(payload), latency_ms
 
 
+def claim_task(
+    session: Session,
+    *,
+    task_id: uuid.UUID,
+    actor_id: uuid.UUID,
+    claim_states: Sequence[str] | None = None,
+    claimed_state: str = "claimed",
+    claimed_at: dt.datetime | None = None,
+) -> TaskModel | None:
+    """Atomically claim one specific task when it is still claimable."""
+
+    locked_task = (
+        sa.select(TaskRecord.id)
+        .where(
+            TaskRecord.id == task_id,
+            TaskRecord.state.in_(
+                _normalized_values(claim_states, fallback=DEFAULT_CLAIM_STATES)
+            ),
+        )
+        .limit(1)
+        .with_for_update(skip_locked=True)
+        .cte("locked_task")
+    )
+
+    statement = (
+        sa.update(TaskRecord)
+        .where(TaskRecord.id == locked_task.c.id)
+        .values(
+            state=claimed_state,
+            claimed_by_actor_id=actor_id,
+            claimed_at=claimed_at or dt.datetime.now(dt.UTC),
+        )
+        .returning(*TaskRecord.__table__.columns)
+    )
+    row = session.execute(statement).mappings().one_or_none()
+    return None if row is None else _task_from_row(row)
+
+
 def release_claim(
     session: Session,
     *,

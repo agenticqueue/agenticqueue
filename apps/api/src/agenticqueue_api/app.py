@@ -94,6 +94,7 @@ from agenticqueue_api.routers import (
     build_memory_router,
     build_packets_router,
 )
+from agenticqueue_api.repo import claim_task
 from agenticqueue_api.roles import (
     assign_role,
     list_role_assignments_for_actor,
@@ -110,6 +111,8 @@ from agenticqueue_api.task_actions import (
     submit_task,
     unlock_task_escrow,
 )
+from agenticqueue_api.task_retry import with_retry_fields
+from agenticqueue_api.transitions import TaskState
 
 
 class ActorSummary(SchemaModel):
@@ -1043,6 +1046,52 @@ def create_app(
                     str(error),
                     details={"draft_id": str(draft_id), "actor_id": str(actor.id)},
                 )
+
+    @app.post(
+        "/tasks/{task_id}/claim",
+        include_in_schema=False,
+        response_model=TaskModel,
+    )
+    @app.post(
+        "/v1/tasks/{task_id}/claim",
+        response_model=TaskModel,
+    )
+    def claim_task_endpoint(
+        task_id: uuid.UUID,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> TaskModel:
+        with write_timeout(session, endpoint="v1.tasks.claim"):
+            actor = _require_actor(request)
+            task = session.get(TaskRecord, task_id)
+            if task is None:
+                raise_api_error(status.HTTP_404_NOT_FOUND, "Task not found")
+            if task.state == TaskState.DLQ.value:
+                raise_api_error(
+                    status.HTTP_409_CONFLICT,
+                    "Task is in the dead letter queue",
+                    error_code="in_dlq",
+                    details={"task_id": str(task_id), "state": task.state},
+                )
+            claimed = claim_task(
+                session,
+                task_id=task_id,
+                actor_id=actor.id,
+            )
+            if claimed is None:
+                raise_api_error(
+                    status.HTTP_409_CONFLICT,
+                    "Task is not claimable",
+                    error_code="not_claimable",
+                    details={"task_id": str(task_id), "state": task.state},
+                )
+            refreshed = session.get(TaskRecord, task_id)
+            assert refreshed is not None
+            return with_retry_fields(
+                session,
+                refreshed,
+                task_type_registry=get_task_type_registry(request),
+            )
 
     @app.post(
         "/tasks/{task_id}/submit",

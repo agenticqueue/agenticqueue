@@ -10,10 +10,11 @@ from fastmcp import FastMCP
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
-from agenticqueue_api.models import AuditLogRecord, TaskModel, TaskRecord
+from agenticqueue_api.models import AuditLogRecord, TaskRecord
 from agenticqueue_api.mcp.common import run_session_tool, surface_error
 from agenticqueue_api.repo import release_claim
 from agenticqueue_api.task_type_registry import TaskTypeRegistry
+from agenticqueue_api.task_retry import with_retry_fields
 from agenticqueue_api.task_actions import approve_task, reject_task
 from agenticqueue_api.transitions import TaskState
 
@@ -137,7 +138,12 @@ def register_approve_tools(
                 action="ESCROW_FORCE_UNLOCKED",
                 after={"state": released.state, "reason": reason},
             )
-            return released.model_dump(mode="json")
+            task = _task_or_error(session, released.id)
+            return with_retry_fields(
+                session,
+                task,
+                task_type_registry=task_type_registry,
+            ).model_dump(mode="json")
 
         return run_session_tool(
             session_factory,
@@ -162,6 +168,8 @@ def register_approve_tools(
                 raise surface_error(403, "Admin actor required")
             task = _task_or_error(session, job_id)
             task.state = TaskState.QUEUED.value
+            task.attempt_count = 0
+            task.last_failure = None
             task.claimed_by_actor_id = None
             task.claimed_at = None
             _audit(
@@ -169,11 +177,19 @@ def register_approve_tools(
                 actor_id=authenticated.actor.id,
                 task_id=task.id,
                 action="JOB_RESET",
-                after={"state": task.state},
+                after={
+                    "state": task.state,
+                    "attempt_count": task.attempt_count,
+                    "last_failure": task.last_failure,
+                },
             )
             session.flush()
             session.refresh(task)
-            return TaskModel.model_validate(task).model_dump(mode="json")
+            return with_retry_fields(
+                session,
+                task,
+                task_type_registry=task_type_registry,
+            ).model_dump(mode="json")
 
         return run_session_tool(
             session_factory,

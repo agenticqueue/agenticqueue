@@ -135,6 +135,20 @@ class SeedResult(SchemaModel):
     api_token: str
 
 
+def _persistable_payload(
+    record_type: type[RecordT],
+    payload: SchemaT,
+) -> dict[str, object]:
+    """Drop schema-only fields before touching SQLAlchemy records."""
+
+    column_names = set(record_type.__table__.columns.keys())
+    return {
+        field_name: value
+        for field_name, value in payload.model_dump(exclude_none=True).items()
+        if field_name in column_names
+    }
+
+
 def load_seed_fixture(seed_path: Path = DEFAULT_SEED_PATH) -> SeedFixture:
     """Load the canonical deterministic seed fixture."""
 
@@ -152,13 +166,12 @@ def _upsert_entity(
 ) -> SchemaT:
     record = session.get(record_type, payload.id)
     if record is None:
-        record = record_type(**payload.model_dump(exclude_none=True))  # type: ignore[call-arg]
+        record = record_type(**_persistable_payload(record_type, payload))  # type: ignore[call-arg]
         session.add(record)
     else:
-        for field_name, value in payload.model_dump(
-            exclude={"id", "created_at", "updated_at"},
-            exclude_none=True,
-        ).items():
+        for field_name, value in _persistable_payload(record_type, payload).items():
+            if field_name in {"id", "created_at", "updated_at"}:
+                continue
             setattr(record, field_name, value)
 
     session.flush()
