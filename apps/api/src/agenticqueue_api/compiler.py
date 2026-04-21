@@ -235,6 +235,25 @@ def _resolved_policy(
     )
 
 
+def resolve_task_policy(
+    session: Session,
+    task: TaskRecord,
+    *,
+    task_type_registry: TaskTypeRegistry,
+    policy_registry: PolicyRegistry | None = None,
+) -> ResolvedPolicy:
+    """Resolve the effective policy for one task, including attachments."""
+
+    task_definition = _load_task(task_type_registry, task.task_type)
+    policies = policy_registry or _cached_policy_registry()
+    return _resolved_policy(
+        session=session,
+        task=task,
+        task_definition=task_definition,
+        policy_registry=policies,
+    )
+
+
 def _attached_policy(
     session: Session,
     policy_id: uuid.UUID | None,

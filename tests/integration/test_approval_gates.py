@@ -6,11 +6,9 @@ import uuid
 from fastapi.testclient import TestClient
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
-import yaml
 
 from agenticqueue_api.app import create_app
-from agenticqueue_api.models import AuditLogRecord, CapabilityKey, TaskRecord
-from agenticqueue_api.task_type_registry import TaskTypeRegistry
+from agenticqueue_api.models import AuditLogRecord, CapabilityKey, PolicyRecord, TaskRecord
 from tests.aq.test_packet_mcp import (
     _seed_task_with_token,
     clean_database,
@@ -36,27 +34,29 @@ def _headers(token: str) -> dict[str, str]:
     }
 
 
-def _registry_with_hitl(tmp_path: Path, *, hitl_required: bool) -> TaskTypeRegistry:
-    source_dir = _repo_root() / "task_types"
-    target_dir = tmp_path / f"task-types-{'hitl-on' if hitl_required else 'hitl-off'}"
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    schema_path = source_dir / "coding-task.schema.json"
-    policy_path = source_dir / "coding-task.policy.yaml"
-    (target_dir / schema_path.name).write_text(
-        schema_path.read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
-    policy = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
-    policy["hitl_required"] = hitl_required
-    (target_dir / policy_path.name).write_text(
-        yaml.safe_dump(policy, sort_keys=False),
-        encoding="utf-8",
-    )
-
-    registry = TaskTypeRegistry(target_dir)
-    registry.load()
-    return registry
+def _attach_task_policy(
+    session_factory: sessionmaker[Session],
+    task_id: uuid.UUID,
+    *,
+    name: str,
+    hitl_required: bool,
+) -> None:
+    with session_factory() as session:
+        task = session.get(TaskRecord, task_id)
+        assert task is not None
+        policy = PolicyRecord(
+            workspace_id=None,
+            name=name,
+            version="1.0.0",
+            hitl_required=hitl_required,
+            autonomy_tier=3,
+            capabilities=[],
+            body={},
+        )
+        session.add(policy)
+        session.flush()
+        task.policy_id = policy.id
+        session.commit()
 
 
 def test_hitl_on_task_blocks_until_approved(
@@ -181,12 +181,7 @@ def test_hitl_off_auto_approves_inline_without_followup_endpoint(
     session_factory: sessionmaker[Session],
 ) -> None:
     _write_submission_artifacts(tmp_path)
-    registry = _registry_with_hitl(tmp_path, hitl_required=False)
-    app = create_app(
-        session_factory=session_factory,
-        task_type_registry=registry,
-        artifact_root=tmp_path,
-    )
+    app = create_app(session_factory=session_factory, artifact_root=tmp_path)
     _, _, task_id, token = _seed_task_with_token(
         session_factory,
         handle="approval-hitl-off",
@@ -197,6 +192,12 @@ def test_hitl_off_auto_approves_inline_without_followup_endpoint(
         ),
         task_state="in_progress",
         claimed_by_seed_actor=True,
+    )
+    _attach_task_policy(
+        session_factory,
+        task_id,
+        name="approval-hitl-off-task-policy",
+        hitl_required=False,
     )
 
     with TestClient(app) as client:
@@ -237,13 +238,7 @@ def test_switching_policy_packs_changes_behavior_without_code_change(
     session_factory: sessionmaker[Session],
 ) -> None:
     _write_submission_artifacts(tmp_path)
-    on_app = create_app(session_factory=session_factory, artifact_root=tmp_path)
-    off_registry = _registry_with_hitl(tmp_path, hitl_required=False)
-    off_app = create_app(
-        session_factory=session_factory,
-        task_type_registry=off_registry,
-        artifact_root=tmp_path,
-    )
+    app = create_app(session_factory=session_factory, artifact_root=tmp_path)
 
     _, _, on_task_id, on_token = _seed_task_with_token(
         session_factory,
@@ -267,16 +262,20 @@ def test_switching_policy_packs_changes_behavior_without_code_change(
         task_state="in_progress",
         claimed_by_seed_actor=True,
     )
+    _attach_task_policy(
+        session_factory,
+        off_task_id,
+        name="approval-policy-pack-off-task-policy",
+        hitl_required=False,
+    )
 
-    with TestClient(on_app) as on_client:
+    with TestClient(app) as on_client:
         on_response = on_client.post(
             f"/v1/tasks/{on_task_id}/submit",
             headers=_headers(on_token),
             json=_valid_submission(),
         )
-
-    with TestClient(off_app) as off_client:
-        off_response = off_client.post(
+        off_response = on_client.post(
             f"/v1/tasks/{off_task_id}/submit",
             headers=_headers(off_token),
             json=_valid_submission(),

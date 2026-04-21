@@ -188,10 +188,11 @@ def apply_transition(
     blocked_at: dt.datetime | None = None,
     now: dt.datetime | None = None,
     human_approved: bool = False,
+    policy: TransitionPolicy | None = None,
 ) -> TransitionResult:
     """Evaluate one requested state transition against task policy and guards."""
 
-    policy = load_transition_policy(task.task_type, registry)
+    policy = policy or load_transition_policy(task.task_type, registry)
     from_state = TaskState(task.state)
     requested_state = (
         target_state if isinstance(target_state, TaskState) else TaskState(target_state)

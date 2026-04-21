@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 import uuid
 from typing import Any
@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from agenticqueue_api.audit import AUDIT_REDACTION_KEY, AUDIT_TRACE_ID_KEY
 from agenticqueue_api.capabilities import ensure_actor_has_capability
 from agenticqueue_api.capability_keys import CapabilityKey
-from agenticqueue_api.compiler import compile_packet
+from agenticqueue_api.compiler import compile_packet, resolve_task_policy
 from agenticqueue_api.dod import DodChecklistResult, DodReport
 from agenticqueue_api.dod_checks.common import DodItemState
 from agenticqueue_api.errors import raise_api_error
@@ -47,6 +47,7 @@ from agenticqueue_api.schemas.submit import (
 from agenticqueue_api.task_type_registry import TaskTypeRegistry
 from agenticqueue_api.transitions import (
     TaskState,
+    TransitionPolicy,
     TransitionResult,
     apply_transition,
     load_transition_policy,
@@ -255,6 +256,26 @@ def _latest_dod_report(session: Session, *, task_id: uuid.UUID) -> DodReport | N
     return _dod_report_from_payload(raw_report if isinstance(raw_report, dict) else None)
 
 
+def _effective_transition_policy(
+    session: Session,
+    *,
+    task_record: TaskRecord,
+    task_type_registry: TaskTypeRegistry,
+) -> TransitionPolicy:
+    base_policy = load_transition_policy(task_record.task_type, task_type_registry)
+    resolved_policy = resolve_task_policy(
+        session,
+        task_record,
+        task_type_registry=task_type_registry,
+    )
+    return replace(
+        base_policy,
+        hitl_required=resolved_policy.hitl_required,
+        autonomy_tier=resolved_policy.autonomy_tier,
+        capabilities=tuple(resolved_policy.capabilities),
+    )
+
+
 def _submission_artifacts(
     submission: TaskCompletionSubmission,
 ) -> list[SubmitArtifactModel]:
@@ -401,11 +422,18 @@ def submit_task(
         )
         packet_version = get_current_packet_version(session, task_record.id)
 
+    policy = _effective_transition_policy(
+        session,
+        task_record=task_record,
+        task_type_registry=task_type_registry,
+    )
+
     submitted = apply_transition(
         task_model,
         TaskState.SUBMITTED,
         task_type_registry,
         actor_capabilities=[CapabilityKey.RUN_TESTS],
+        policy=policy,
     )
     _transition_or_conflict(
         submitted,
@@ -419,6 +447,7 @@ def submit_task(
         task_type_registry,
         actor_capabilities=[CapabilityKey.UPDATE_TASK],
         dod_report=validation.dod_report,
+        policy=policy,
     )
     _transition_or_conflict(
         validated,
@@ -426,7 +455,6 @@ def submit_task(
     )
 
     now = dt.datetime.now(dt.UTC)
-    policy = load_transition_policy(task_record.task_type, task_type_registry)
     transitions = [submitted, validated]
     task_state = validated.state
     run_summary = "Task submission accepted and validated."
@@ -439,6 +467,7 @@ def submit_task(
             task_type_registry,
             actor_capabilities=[CapabilityKey.UPDATE_TASK],
             dod_report=validation.dod_report,
+            policy=policy,
         )
         _transition_or_conflict(
             approved,
@@ -587,6 +616,12 @@ def approve_task(
             details={"task_id": str(task_id)},
         )
 
+    policy = _effective_transition_policy(
+        session,
+        task_record=task_record,
+        task_type_registry=task_type_registry,
+    )
+
     approved = apply_transition(
         TaskModel.model_validate(task_record),
         TaskState.DONE,
@@ -594,6 +629,7 @@ def approve_task(
         actor_capabilities=[CapabilityKey.UPDATE_TASK],
         dod_report=dod_report,
         human_approved=True,
+        policy=policy,
     )
     _transition_or_conflict(
         approved,
@@ -637,12 +673,18 @@ def reject_task(
         )
 
     _require_update_task_capability(session, actor=actor, task_record=task_record)
+    policy = _effective_transition_policy(
+        session,
+        task_record=task_record,
+        task_type_registry=task_type_registry,
+    )
 
     rejected = apply_transition(
         TaskModel.model_validate(task_record),
         TaskState.REJECTED,
         task_type_registry,
         actor_capabilities=[CapabilityKey.UPDATE_TASK],
+        policy=policy,
     )
     _transition_or_conflict(
         rejected,
@@ -655,6 +697,7 @@ def reject_task(
         task_type_registry,
         actor_capabilities=[CapabilityKey.UPDATE_TASK],
         attempt_count=rejected.attempt_count,
+        policy=policy,
     )
     _transition_or_conflict(
         requeued,
