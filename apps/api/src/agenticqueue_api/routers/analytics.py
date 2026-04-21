@@ -257,7 +257,6 @@ def _blocked_heatmap(
         return []
 
     blocked_ids = [task.id for task in blocked_tasks]
-    task_by_id = {task.id: task for task in blocked_tasks}
     edges = session.scalars(
         sa.select(EdgeRecord)
         .where(

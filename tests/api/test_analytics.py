@@ -127,7 +127,7 @@ def test_analytics_metrics_roll_up_cycle_time_blockers_retrieval_and_review_load
                 },
             ),
         )
-        review_task = create_task(
+        create_task(
             session,
             entity_helpers.model_from(
                 TaskModel,
@@ -148,7 +148,7 @@ def test_analytics_metrics_roll_up_cycle_time_blockers_retrieval_and_review_load
                 },
             ),
         )
-        human_review_task = create_task(
+        create_task(
             session,
             entity_helpers.model_from(
                 TaskModel,
