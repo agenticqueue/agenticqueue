@@ -1,0 +1,19 @@
+# Block security regressions at the PR gate and surface strong copyleft
+# additions before they land on main.
+fail-on-severity: high
+fail-on-scopes:
+  - runtime
+  - development
+  - unknown
+license-check: true
+deny-licenses:
+  - GPL-1.0-only
+  - GPL-1.0-or-later
+  - GPL-2.0-only
+  - GPL-2.0-or-later
+  - GPL-3.0-only
+  - GPL-3.0-or-later
+  - AGPL-1.0-only
+  - AGPL-1.0-or-later
+  - AGPL-3.0-only
+  - AGPL-3.0-or-later
