@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
+import { PipelinesView } from "@/components/pipelines-view";
+
 type ViewKey =
   | "pipelines"
   | "work"
@@ -49,7 +51,7 @@ const SESSION_TOKEN_KEY = "aq:web:api-token";
 const PERSIST_TOKEN_KEY = "aq:web:remember-token";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Pipelines", count: "12", view: "pipelines" },
+  { href: "/pipelines", label: "Pipelines", count: "12", view: "pipelines" },
   { href: "/work", label: "Work", count: "41", view: "work" },
   { href: "/graph", label: "Graph", count: "9", view: "graph" },
   { href: "/decisions", label: "Decisions", count: "18", view: "decisions" },
@@ -233,6 +235,7 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
     "booting",
   );
   const [actor, setActor] = useState<AuthActor | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const [apiBaseUrl, setApiBaseUrl] = useState("http://127.0.0.1:8010");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -242,6 +245,7 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
     if (!token) {
       setStatus("ready");
       setActor(null);
+      setAuthToken(null);
       return;
     }
 
@@ -257,6 +261,7 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
         }
 
         setActor(session.actor);
+        setAuthToken(token);
         setApiBaseUrl(session.apiBaseUrl);
         setStatus("ready");
       })
@@ -267,6 +272,7 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
 
         clearStoredToken();
         setActor(null);
+        setAuthToken(null);
         setStatus("ready");
         setErrorMessage(errorMessageFrom(error));
       });
@@ -285,10 +291,12 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
 
       storeToken(token, remember);
       setActor(session.actor);
+      setAuthToken(token);
       setApiBaseUrl(session.apiBaseUrl);
       setStatus("ready");
     } catch (error: unknown) {
       setActor(null);
+      setAuthToken(null);
       setStatus("ready");
       setErrorMessage(errorMessageFrom(error));
     }
@@ -297,6 +305,7 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
   function handleLogout() {
     clearStoredToken();
     setActor(null);
+    setAuthToken(null);
     setErrorMessage(null);
   }
 
@@ -359,9 +368,7 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
       <nav className="aq-nav" aria-label="Primary">
         {NAV_ITEMS.map((item) => {
           const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           return (
             <Link
@@ -377,39 +384,45 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
       </nav>
 
       <section className="aq-content">
-        <div className="aq-content-head">
-          <div>
-            <p className="aq-content-eyebrow">{content.eyebrow}</p>
-            <h1 className="aq-content-title">{content.title}</h1>
-          </div>
-          <p className="aq-content-summary">{content.summary}</p>
-        </div>
-
-        <div className="aq-card-grid">
-          {content.cards.map((card) => (
-            <article key={card.label} className="aq-stat-card">
-              <p className="aq-stat-label">{card.label}</p>
-              <div className="aq-stat-line">
-                <strong className="aq-stat-value">{card.value}</strong>
-                <span className={`aq-tone aq-tone-${card.tone}`}>
-                  {toneLabel(card.tone)}
-                </span>
-              </div>
-            </article>
-          ))}
-        </div>
-
-        <div className="aq-surface-list">
-          {content.rows.map((row) => (
-            <article key={row.title} className="aq-surface-row">
+        {view === "pipelines" && authToken ? (
+          <PipelinesView authToken={authToken} />
+        ) : (
+          <>
+            <div className="aq-content-head">
               <div>
-                <h2 className="aq-row-title">{row.title}</h2>
-                <p className="aq-row-body">{row.body}</p>
+                <p className="aq-content-eyebrow">{content.eyebrow}</p>
+                <h1 className="aq-content-title">{content.title}</h1>
               </div>
-              <p className="aq-row-meta">{row.meta}</p>
-            </article>
-          ))}
-        </div>
+              <p className="aq-content-summary">{content.summary}</p>
+            </div>
+
+            <div className="aq-card-grid">
+              {content.cards.map((card) => (
+                <article key={card.label} className="aq-stat-card">
+                  <p className="aq-stat-label">{card.label}</p>
+                  <div className="aq-stat-line">
+                    <strong className="aq-stat-value">{card.value}</strong>
+                    <span className={`aq-tone aq-tone-${card.tone}`}>
+                      {toneLabel(card.tone)}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="aq-surface-list">
+              {content.rows.map((row) => (
+                <article key={row.title} className="aq-surface-row">
+                  <div>
+                    <h2 className="aq-row-title">{row.title}</h2>
+                    <p className="aq-row-body">{row.body}</p>
+                  </div>
+                  <p className="aq-row-meta">{row.meta}</p>
+                </article>
+              ))}
+            </div>
+          </>
+        )}
       </section>
 
       <footer className="aq-footer">
