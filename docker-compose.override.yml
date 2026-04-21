@@ -3,6 +3,10 @@ services:
     ports:
       - "${AGENTICQUEUE_DB_PORT:-5432}:5432"
 
+  pgbouncer:
+    ports:
+      - "${AGENTICQUEUE_PGBOUNCER_PORT:-64329}:6432"
+
   api:
     build:
       context: .

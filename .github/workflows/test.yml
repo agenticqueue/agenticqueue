@@ -13,7 +13,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:5432/agenticqueue
+      AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:64329/agenticqueue
+      AGENTICQUEUE_PGBOUNCER_PORT: "64329"
     strategy:
       fail-fast: false
       matrix:
@@ -123,7 +124,8 @@ jobs:
   firewall-fuzz:
     runs-on: ubuntu-latest
     env:
-      AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:5432/agenticqueue
+      AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:64329/agenticqueue
+      AGENTICQUEUE_PGBOUNCER_PORT: "64329"
     steps:
       - name: Check out code
         uses: actions/checkout@v4
