@@ -10,6 +10,7 @@ DEFAULT_DATABASE_URL = (
     "postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:64329/agenticqueue"
 )
 DEFAULT_TOKEN_SIGNING_SECRET = "agenticqueue-dev-token-signing-secret"
+DEFAULT_AUTO_SETUP_ENABLED = False
 DEFAULT_EMBEDDING_DIMENSION = 768
 DEFAULT_VECTOR_IVFFLAT_LISTS = 100
 DEFAULT_ROLE_STATEMENT_TIMEOUT_MS = 5000
@@ -18,6 +19,7 @@ DEFAULT_WRITE_STATEMENT_TIMEOUT_MS = 10000
 DEFAULT_TASK_TYPES_DIR = Path(__file__).resolve().parents[4] / "task_types"
 DEFAULT_POLICIES_DIR = Path(__file__).resolve().parents[4] / "policies"
 DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[4]
+DEFAULT_ALEMBIC_CONFIG_PATH = Path(__file__).resolve().parents[2] / "alembic.ini"
 DEFAULT_PACKET_SCOPE_MAX_FILES = 200
 DEFAULT_PACKET_CACHE_MAX_ENTRIES = 200
 DEFAULT_PACKET_CACHE_TTL_SECONDS = 300
@@ -114,6 +116,33 @@ def get_direct_sync_database_url() -> str:
     return urlunsplit(parts._replace(netloc=netloc))
 
 
+def get_direct_database_url() -> str:
+    """Return a direct async database URL that bypasses PgBouncer."""
+
+    parts = urlsplit(get_database_url())
+    hostname = parts.hostname
+    port = parts.port
+    direct_hostname = "db" if hostname == "pgbouncer" else hostname
+    configured_direct_port = os.getenv("AGENTICQUEUE_DB_PORT") or os.getenv("DB_PORT")
+    direct_port: int | None
+    if configured_direct_port:
+        direct_port = int(configured_direct_port)
+    else:
+        direct_port = 5432 if port == 6432 else 54329 if port == 64329 else port
+
+    netloc = ""
+    if parts.username:
+        netloc += parts.username
+        if parts.password:
+            netloc += f":{parts.password}"
+        netloc += "@"
+    if direct_hostname:
+        netloc += direct_hostname
+    if direct_port is not None:
+        netloc += f":{direct_port}"
+    return urlunsplit(parts._replace(netloc=netloc))
+
+
 def get_psycopg_connect_args() -> dict[str, int | None]:
     """Disable prepared statements for transaction-pooled PgBouncer connections."""
 
@@ -127,6 +156,15 @@ def get_token_signing_secret() -> str:
         or os.getenv("TOKEN_SIGNING_SECRET")
         or DEFAULT_TOKEN_SIGNING_SECRET
     )
+
+
+def get_auto_setup_enabled() -> bool:
+    """Return whether the API should auto-run first-boot setup during startup."""
+
+    configured = os.getenv("AGENTICQUEUE_AUTO_SETUP") or os.getenv("AUTO_SETUP") or ""
+    if not configured.strip():
+        return DEFAULT_AUTO_SETUP_ENABLED
+    return configured.strip().lower() in TRUE_ENV_VALUES
 
 
 def get_embedding_dimension() -> int:
@@ -219,6 +257,15 @@ def get_repo_root() -> Path:
     if configured:
         return Path(configured)
     return DEFAULT_REPO_ROOT
+
+
+def get_alembic_config_path() -> Path:
+    """Return the Alembic config path used for first-run migrations."""
+
+    configured = os.getenv("AGENTICQUEUE_ALEMBIC_CONFIG") or os.getenv("ALEMBIC_CONFIG")
+    if configured:
+        return Path(configured)
+    return DEFAULT_ALEMBIC_CONFIG_PATH
 
 
 def get_packet_scope_max_files() -> int:

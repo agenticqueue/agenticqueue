@@ -33,6 +33,7 @@ from agenticqueue_api.capabilities import (
     revoke_capability_grant,
 )
 from agenticqueue_api.config import (
+    get_auto_setup_enabled,
     get_max_body_bytes,
     get_mcp_transports,
     get_policies_dir,
@@ -50,6 +51,14 @@ from agenticqueue_api.errors import (
     HTTP_422_STATUS,
     install_exception_handlers,
     raise_api_error,
+)
+from agenticqueue_api.init_wizard import (
+    BOOT_TRACE_ID,
+    SETUP_ROUTE_TRACE_ID,
+    InitWizardResult,
+    apply_database_migrations,
+    emit_bootstrap_message,
+    run_first_run_setup,
 )
 from agenticqueue_api.middleware import (
     ActorRateLimitMiddleware,
@@ -540,6 +549,24 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        if get_auto_setup_enabled():
+            apply_database_migrations()
+            setup_session = resolved_session_factory()
+            try:
+                set_session_audit_context(
+                    setup_session,
+                    actor_id=None,
+                    trace_id=BOOT_TRACE_ID,
+                )
+                bootstrap = run_first_run_setup(setup_session)
+                setup_session.commit()
+                emit_bootstrap_message(bootstrap)
+            except Exception:
+                setup_session.rollback()
+                raise
+            finally:
+                setup_session.close()
+
         del app
         packet_cache.start()
         async with AsyncExitStack() as stack:
@@ -600,6 +627,38 @@ def create_app(
             "status": "ok",
             "version": app.version,
         }
+
+    @app.post(
+        "/setup",
+        include_in_schema=False,
+        response_model=InitWizardResult,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def setup(request: Request) -> InitWizardResult:
+        apply_database_migrations()
+        session = request.app.state.session_factory()
+        trace_id = getattr(request.state, "request_id", None) or SETUP_ROUTE_TRACE_ID
+        try:
+            set_session_audit_context(
+                session,
+                actor_id=None,
+                trace_id=trace_id,
+            )
+            result = run_first_run_setup(session)
+            if result.status == "noop":
+                session.rollback()
+                raise_api_error(
+                    status.HTTP_409_CONFLICT,
+                    "First-run setup already completed",
+                    details={"workspace_id": str(result.workspace_id)},
+                )
+            session.commit()
+            return result
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
     @app.get(
         "/audit/verify",

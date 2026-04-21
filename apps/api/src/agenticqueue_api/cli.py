@@ -18,6 +18,11 @@ from agenticqueue_api.config import (
     get_psycopg_connect_args,
     get_sqlalchemy_sync_database_url,
 )
+from agenticqueue_api.init_wizard import (
+    CLI_TRACE_ID,
+    apply_database_migrations,
+    run_first_run_setup,
+)
 from agenticqueue_api.learnings import LearningPromotionService
 from agenticqueue_api.middleware.idempotency import (
     cleanup_expired_idempotency_keys,
@@ -59,6 +64,24 @@ def seed_command() -> None:
             trace_id="aq-seed-cli",
         )
         result = seed_example_data(session, fixture)
+        session.commit()
+
+    typer.echo(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+
+
+@app.command("init")
+def init_command() -> None:
+    """Run the first-time database migrate + seed + admin-token bootstrap."""
+
+    apply_database_migrations()
+    session_factory = _default_session_factory()
+    with session_factory() as session:
+        set_session_audit_context(
+            session,
+            actor_id=None,
+            trace_id=CLI_TRACE_ID,
+        )
+        result = run_first_run_setup(session)
         session.commit()
 
     typer.echo(json.dumps(result.model_dump(mode="json"), sort_keys=True))

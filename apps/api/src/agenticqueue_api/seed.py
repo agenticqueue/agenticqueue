@@ -136,6 +136,15 @@ class SeedResult(SchemaModel):
     api_token: str
 
 
+class SeedState(SchemaModel):
+    """Stable identifiers for seeded core entities without token issuance."""
+
+    workspace_id: uuid.UUID
+    project_id: uuid.UUID
+    actor_id: uuid.UUID
+    task_id: uuid.UUID
+
+
 def _persistable_payload(
     record_type: type[RecordT],
     payload: SchemaT,
@@ -182,8 +191,8 @@ def _upsert_entity(
     return schema_type.model_validate(record)
 
 
-def seed_example_data(session: Session, fixture: SeedFixture) -> SeedResult:
-    """Create or update the deterministic local example dataset."""
+def seed_core_entities(session: Session, fixture: SeedFixture) -> SeedState:
+    """Create or update the deterministic workspace/project/actor/task slice."""
 
     workspace = _upsert_entity(
         session,
@@ -203,12 +212,6 @@ def seed_example_data(session: Session, fixture: SeedFixture) -> SeedResult:
         schema_type=ActorModel,
         payload=fixture.actor.to_model(),
     )
-    _upsert_entity(
-        session,
-        record_type=ApiTokenRecord,
-        schema_type=ApiTokenModel,
-        payload=fixture.token.to_model(actor_id=actor.id),
-    )
     task = _upsert_entity(
         session,
         record_type=TaskRecord,
@@ -216,10 +219,29 @@ def seed_example_data(session: Session, fixture: SeedFixture) -> SeedResult:
         payload=fixture.task.to_model(project_id=project.id),
     )
 
-    return SeedResult(
+    return SeedState(
         workspace_id=workspace.id,
         project_id=project.id,
         actor_id=actor.id,
         task_id=task.id,
+    )
+
+
+def seed_example_data(session: Session, fixture: SeedFixture) -> SeedResult:
+    """Create or update the deterministic local example dataset."""
+
+    state = seed_core_entities(session, fixture)
+    _upsert_entity(
+        session,
+        record_type=ApiTokenRecord,
+        schema_type=ApiTokenModel,
+        payload=fixture.token.to_model(actor_id=state.actor_id),
+    )
+
+    return SeedResult(
+        workspace_id=state.workspace_id,
+        project_id=state.project_id,
+        actor_id=state.actor_id,
+        task_id=state.task_id,
         api_token=fixture.token.render_raw_token(),
     )

@@ -55,6 +55,7 @@ services:
       pgbouncer:
         condition: service_healthy
     environment:
+      AGENTICQUEUE_AUTO_SETUP: ${AGENTICQUEUE_AUTO_SETUP:-1}
       AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agenticqueue}:${POSTGRES_PASSWORD:-agenticqueue}@pgbouncer:6432/${POSTGRES_DB:-agenticqueue}?prepared_statement_cache_size=0
       AGENTICQUEUE_TOKEN_SIGNING_SECRET: ${AGENTICQUEUE_TOKEN_SIGNING_SECRET:-agenticqueue-dev-token-signing-secret}
     healthcheck:

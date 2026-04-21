@@ -31,6 +31,7 @@ TOKEN_SEPARATOR = "_"
 WWW_AUTHENTICATE_HEADER = {"WWW-Authenticate": "Bearer"}
 ANONYMOUS_PATHS = {
     "/health",
+    "/setup",
     "/v1/health",
 }
 
