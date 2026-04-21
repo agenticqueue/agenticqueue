@@ -82,9 +82,7 @@ def _write_submission_artifacts(artifact_root: Path) -> None:
     test_path = artifact_root / "artifacts" / "tests" / "aq-52-pytest.txt"
     test_path.parent.mkdir(parents=True, exist_ok=True)
     test_path.write_text(
-        "test_get_task_returns_200\n"
-        "test_missing_task_returns_404\n"
-        "4 passed in 0.15s\n",
+        "test_get_task_returns_200\ntest_missing_task_returns_404\n4 passed in 0.15s\n",
         encoding="utf-8",
     )
 
@@ -94,8 +92,7 @@ def _valid_submission_payload() -> dict[str, object]:
     return {
         "output": copy.deepcopy(contract["output"]),
         "dod_results": [
-            {"item": item, "checked": True}
-            for item in contract["dod_checklist"]
+            {"item": item, "checked": True} for item in contract["dod_checklist"]
         ],
         "had_failure": False,
         "had_block": False,

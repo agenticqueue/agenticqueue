@@ -332,9 +332,7 @@ def submit_task(
 
     now = dt.datetime.now(dt.UTC)
     policy = load_transition_policy(task_record.task_type, task_type_registry)
-    next_action = (
-        "await_human_approval" if policy.hitl_required else "ready_for_done"
-    )
+    next_action = "await_human_approval" if policy.hitl_required else "ready_for_done"
     transitions = [submitted, validated]
 
     run_record = RunRecord(

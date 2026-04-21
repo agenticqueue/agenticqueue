@@ -57,9 +57,7 @@ def _write_submission_artifacts(artifact_root: Path) -> None:
     )
     _write(
         artifact_root / "artifacts" / "tests" / "aq-52-pytest.txt",
-        "test_get_task_returns_200\n"
-        "test_missing_task_returns_404\n"
-        "4 passed in 0.15s\n",
+        "test_get_task_returns_200\ntest_missing_task_returns_404\n4 passed in 0.15s\n",
     )
 
 
@@ -68,8 +66,7 @@ def _valid_submission() -> dict[str, object]:
     return {
         "output": copy.deepcopy(contract["output"]),
         "dod_results": [
-            {"item": item, "checked": True}
-            for item in contract["dod_checklist"]
+            {"item": item, "checked": True} for item in contract["dod_checklist"]
         ],
         "had_failure": False,
         "had_block": False,
@@ -138,11 +135,14 @@ def test_submit_route_rejects_invalid_payload_without_side_effects(
         assert _count_rows(session, EdgeRecord) == 0
         assert _count_rows(session, DraftLearningRecord) == 0
         assert _count_rows(session, PacketVersionRecord) == 0
-        assert _count_rows(
-            session,
-            AuditLogRecord,
-            AuditLogRecord.action == "JOB_SUBMITTED",
-        ) == 0
+        assert (
+            _count_rows(
+                session,
+                AuditLogRecord,
+                AuditLogRecord.action == "JOB_SUBMITTED",
+            )
+            == 0
+        )
 
 
 def test_submit_route_persists_artifacts_and_replays_idempotently(

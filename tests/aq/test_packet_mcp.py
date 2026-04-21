@@ -204,9 +204,7 @@ def _seed_task_with_token(
                         str(actor.id) if claimed_by_seed_actor else None
                     ),
                     "claimed_at": (
-                        "2026-04-20T00:00:00+00:00"
-                        if claimed_by_seed_actor
-                        else None
+                        "2026-04-20T00:00:00+00:00" if claimed_by_seed_actor else None
                     ),
                     "description": description,
                     "contract": resolved_contract,
