@@ -17,17 +17,17 @@ jobs:
       TAG_NAME: ${{ github.event.release.tag_name }}
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.release.tag_name }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
 
@@ -97,7 +97,7 @@ jobs:
           echo "generated=true" >> "$GITHUB_OUTPUT"
 
       - name: Download Grype
-        uses: anchore/scan-action/download-grype@v3
+        uses: anchore/scan-action/download-grype@v7
         id: grype
 
       - name: Update Grype database
