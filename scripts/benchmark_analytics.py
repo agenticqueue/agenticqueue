@@ -402,12 +402,13 @@ def seed_benchmark_dataset(
         )
 
     connection.execute(sa.insert(PacketVersionRecord), packet_rows)
-    connection.execute(sa.text("""
-            ANALYZE agenticqueue.task;
-            ANALYZE agenticqueue.run;
-            ANALYZE agenticqueue.edge;
-            ANALYZE agenticqueue.packet_version;
-            """))
+    analyze_sql = sa.text("""
+        ANALYZE agenticqueue.task;
+        ANALYZE agenticqueue.run;
+        ANALYZE agenticqueue.edge;
+        ANALYZE agenticqueue.packet_version;
+        """)
+    connection.execute(analyze_sql)
 
     blocked_ids = [
         row[0]
