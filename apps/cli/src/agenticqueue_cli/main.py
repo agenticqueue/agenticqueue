@@ -7,6 +7,7 @@ import typer
 from agenticqueue_cli.client import OutputFormat, configure_state
 from agenticqueue_cli.commands.actor import build_actor_app
 from agenticqueue_cli.commands.admin import build_admin_app
+from agenticqueue_cli.commands.audit import register_audit_command
 from agenticqueue_cli.commands.artifact import build_artifact_app
 from agenticqueue_cli.commands.decision import build_decision_app
 from agenticqueue_cli.commands.factory import CommandSpec, build_group, register_spec
@@ -186,7 +187,10 @@ def main(
 
 
 for spec in ROOT_SPECS:
+    if spec.name == "audit":
+        continue
     register_spec(app, spec)
+register_audit_command(app)
 
 app.add_typer(KEY_APP, name="key")
 app.add_typer(build_actor_app(), name="actor")

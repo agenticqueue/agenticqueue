@@ -12,14 +12,25 @@ from starlette.requests import Request
 
 from agenticqueue_api.db import StatementTimeoutError
 
+HTTP_413_STATUS = getattr(
+    status,
+    "HTTP_413_CONTENT_TOO_LARGE",
+    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+)
+HTTP_422_STATUS = getattr(
+    status,
+    "HTTP_422_UNPROCESSABLE_CONTENT",
+    status.HTTP_422_UNPROCESSABLE_ENTITY,
+)
+
 ERROR_CODE_BY_STATUS = {
     status.HTTP_400_BAD_REQUEST: "validation_failed",
     status.HTTP_401_UNAUTHORIZED: "auth_failed",
     status.HTTP_403_FORBIDDEN: "forbidden",
     status.HTTP_404_NOT_FOUND: "not_found",
     status.HTTP_409_CONFLICT: "conflict",
-    status.HTTP_413_CONTENT_TOO_LARGE: "validation_failed",
-    status.HTTP_422_UNPROCESSABLE_CONTENT: "validation_failed",
+    HTTP_413_STATUS: "validation_failed",
+    HTTP_422_STATUS: "validation_failed",
     status.HTTP_429_TOO_MANY_REQUESTS: "rate_limited",
     status.HTTP_504_GATEWAY_TIMEOUT: "server_error",
     status.HTTP_500_INTERNAL_SERVER_ERROR: "server_error",
@@ -122,9 +133,9 @@ async def handle_validation_exception(request: Request, exc: Exception) -> JSONR
     del request
     validation_exc = cast(RequestValidationError, exc)
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        status_code=HTTP_422_STATUS,
         content=error_payload(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=HTTP_422_STATUS,
             message="Request validation failed",
             details=validation_exc.errors(),
         ),

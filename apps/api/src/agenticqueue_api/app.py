@@ -46,7 +46,11 @@ from agenticqueue_api.config import (
 )
 from agenticqueue_api.crud import build_crud_router
 from agenticqueue_api.db import write_timeout
-from agenticqueue_api.errors import install_exception_handlers, raise_api_error
+from agenticqueue_api.errors import (
+    HTTP_422_STATUS,
+    install_exception_handlers,
+    raise_api_error,
+)
 from agenticqueue_api.middleware import (
     ActorRateLimitMiddleware,
     ContentSizeLimitMiddleware,
@@ -91,6 +95,7 @@ from agenticqueue_api.pagination import (
 )
 from agenticqueue_api.routers import (
     build_analytics_router,
+    build_audit_router,
     build_learnings_router,
     build_memory_router,
     build_packets_router,
@@ -582,6 +587,7 @@ def create_app(
     app.add_middleware(RequestIdMiddleware)
     install_exception_handlers(app)
     app.include_router(build_analytics_router(get_db_session))
+    app.include_router(build_audit_router(get_db_session))
     app.include_router(build_learnings_router(get_db_session))
     app.include_router(build_memory_router(get_db_session))
     app.include_router(build_packets_router(get_db_session))
@@ -919,7 +925,7 @@ def create_app(
             draft = store.get(draft_id)
         except ValidationError as error:
             raise_api_error(
-                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                HTTP_422_STATUS,
                 "Learning draft payload is invalid",
                 details=error.errors(),
             )
@@ -955,7 +961,7 @@ def create_app(
                 return store.edit(draft_id, payload)
             except ValidationError as error:
                 raise_api_error(
-                    status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    HTTP_422_STATUS,
                     "Learning draft payload is invalid",
                     details=error.errors(),
                 )
@@ -1041,7 +1047,7 @@ def create_app(
                 )
             except ValidationError as error:
                 raise_api_error(
-                    status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    HTTP_422_STATUS,
                     "Learning draft payload is invalid",
                     details=error.errors(),
                 )

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from agenticqueue_api.capabilities import require_capability
 from agenticqueue_api.db import write_timeout
-from agenticqueue_api.errors import raise_api_error
+from agenticqueue_api.errors import HTTP_422_STATUS, raise_api_error
 from agenticqueue_api.models import (
     ActorModel,
     ActorRecord,
@@ -428,7 +428,7 @@ def _validate_payload(
         return config.schema_type.model_validate(payload)
     except pydantic.ValidationError as error:
         raise_api_error(
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            HTTP_422_STATUS,
             "Request validation failed",
             details=error.errors(),
         )
@@ -453,13 +453,13 @@ def _validate_task_contract(
         registry.validate_contract(payload.task_type, payload.contract)
     except SchemaLoadError as error:
         raise_api_error(
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            HTTP_422_STATUS,
             "Task contract validation failed",
             details={"task_type": payload.task_type, "reason": str(error)},
         )
     except JsonSchemaValidationError as error:
         raise_api_error(
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            HTTP_422_STATUS,
             "Task contract validation failed",
             details={
                 "task_type": payload.task_type,

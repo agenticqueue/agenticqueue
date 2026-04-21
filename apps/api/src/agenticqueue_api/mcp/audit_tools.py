@@ -3,14 +3,45 @@
 from __future__ import annotations
 
 import datetime as dt
+from typing import Any
 import uuid
 
-import sqlalchemy as sa
 from fastmcp import FastMCP
 from sqlalchemy.orm import Session, sessionmaker
 
-from agenticqueue_api.models import AuditLogRecord
-from agenticqueue_api.mcp.common import run_session_tool, serialize_model, surface_error
+from agenticqueue_api.routers.audit import (
+    AuditQueryRequest,
+    AuditSurfaceError,
+    authenticate_surface_token,
+    invoke_query_audit_log,
+)
+
+
+def _run_read_tool(
+    session_factory: sessionmaker[Session],
+    *,
+    token: str | None,
+    trace_name: str,
+    callback,
+) -> dict[str, Any]:
+    with session_factory() as session:
+        try:
+            authenticated = authenticate_surface_token(
+                session,
+                token=token,
+                trace_id=f"aq-mcp-{trace_name}-{uuid.uuid4()}",
+            )
+            payload = callback(session, authenticated)
+            session.commit()
+            return payload.model_dump(mode="json")
+        except AuditSurfaceError as error:
+            if session.in_transaction():
+                session.rollback()
+            return error.payload
+        except Exception:
+            if session.in_transaction():
+                session.rollback()
+            raise
 
 
 def register_audit_tools(
@@ -31,33 +62,28 @@ def register_audit_tools(
         entity_id: uuid.UUID | None = None,
         action: str | None = None,
         since: dt.datetime | None = None,
+        until: dt.datetime | None = None,
         limit: int = 50,
+        cursor: str | None = None,
     ) -> dict[str, object]:
-        def _callback(session: Session, authenticated) -> dict[str, object]:
-            if authenticated.actor.actor_type != "admin":
-                raise surface_error(403, "Admin actor required")
-            statement = sa.select(AuditLogRecord).order_by(
-                AuditLogRecord.created_at.desc(),
-                AuditLogRecord.id.desc(),
-            )
-            if actor_id is not None:
-                statement = statement.where(AuditLogRecord.actor_id == actor_id)
-            if entity_type is not None:
-                statement = statement.where(AuditLogRecord.entity_type == entity_type)
-            if entity_id is not None:
-                statement = statement.where(AuditLogRecord.entity_id == entity_id)
-            if action is not None:
-                statement = statement.where(AuditLogRecord.action == action)
-            if since is not None:
-                statement = statement.where(AuditLogRecord.created_at >= since)
-            rows = session.scalars(statement.limit(limit)).all()
-            return {"items": serialize_model(rows)}
-
-        return run_session_tool(
+        return _run_read_tool(
             session_factory,
             token=token,
             trace_name="query-audit-log",
-            callback=_callback,
+            callback=lambda session, authenticated: invoke_query_audit_log(
+                session,
+                authenticated=authenticated,
+                payload=AuditQueryRequest(
+                    actor_id=actor_id,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    action=action,
+                    since=since,
+                    until=until,
+                    limit=limit,
+                    cursor=cursor,
+                ),
+            ),
         )
 
     return {"query_audit_log"}
