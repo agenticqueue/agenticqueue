@@ -380,9 +380,9 @@ def test_graph_and_decision_helper_routes_work(
         params={"entity_type": "task", "hops": 1},
     )
     assert neighborhood_response.status_code == 200
-    assert {
-        item["entity_id"] for item in neighborhood_response.json()["items"]
-    } == {str(sibling_task.id)}
+    assert {item["entity_id"] for item in neighborhood_response.json()["items"]} == {
+        str(sibling_task.id)
+    }
 
     traverse_response = client.get(
         f"/v1/graph/traverse/{task_id}",
@@ -391,9 +391,9 @@ def test_graph_and_decision_helper_routes_work(
     )
     assert traverse_response.status_code == 200
     assert traverse_response.json()["direction"] == "descendants"
-    assert {
-        item["entity_id"] for item in traverse_response.json()["items"]
-    } == {str(sibling_task.id)}
+    assert {item["entity_id"] for item in traverse_response.json()["items"]} == {
+        str(sibling_task.id)
+    }
 
     surface_response = client.get(
         "/v1/graph/surface",

@@ -183,7 +183,9 @@ def build_graph_router(get_db_session: Any) -> APIRouter:
 
         items: list[GraphSurfaceHit] = []
         for task in rows:
-            matches = _matching_surface_tags(cast(dict[str, Any], task.contract or {}), tag)
+            matches = _matching_surface_tags(
+                cast(dict[str, Any], task.contract or {}), tag
+            )
             if not matches:
                 continue
             items.append(

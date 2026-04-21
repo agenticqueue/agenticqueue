@@ -1594,9 +1594,7 @@ def create_app(
             released = release_claim(
                 session,
                 task_id=task_id,
-                expected_actor_id=(
-                    None if actor.actor_type == "admin" else actor.id
-                ),
+                expected_actor_id=(None if actor.actor_type == "admin" else actor.id),
             )
             if released is None:
                 raise_api_error(
