@@ -95,6 +95,7 @@ def get_direct_sync_database_url() -> str:
     port = parts.port
     direct_hostname = "db" if hostname == "pgbouncer" else hostname
     configured_direct_port = os.getenv("AGENTICQUEUE_DB_PORT") or os.getenv("DB_PORT")
+    direct_port: int | None
     if configured_direct_port:
         direct_port = int(configured_direct_port)
     else:
