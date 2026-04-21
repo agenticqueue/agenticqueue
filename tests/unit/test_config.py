@@ -47,7 +47,9 @@ def test_direct_sync_database_url_honors_configured_direct_port(monkeypatch) -> 
     )
     monkeypatch.setenv("AGENTICQUEUE_DB_PORT", "5432")
 
-    assert config.get_direct_sync_database_url() == "postgresql://aq:aq@127.0.0.1:5432/aq"
+    assert (
+        config.get_direct_sync_database_url() == "postgresql://aq:aq@127.0.0.1:5432/aq"
+    )
 
 
 def test_get_psycopg_connect_args_disables_prepared_statements() -> None:
