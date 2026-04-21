@@ -5,10 +5,7 @@ on:
     types:
       - published
 
-permissions:
-  actions: read
-  contents: write
-  id-token: write
+permissions: read-all
 
 jobs:
   release-assets:
@@ -294,6 +291,8 @@ jobs:
       - provenance
       - verify-provenance
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       GH_TOKEN: ${{ github.token }}
       TAG_NAME: ${{ github.event.release.tag_name }}
