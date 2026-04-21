@@ -137,7 +137,7 @@ def build_timeout_probe_app(
 ) -> FastAPI:
     app = create_app(session_factory=session_factory)
 
-    @app.get("/v1/tests/graph-timeout", include_in_schema=False)
+    @app.get("/tests/graph-timeout", include_in_schema=False)
     def graph_timeout_probe(
         session: Session = Depends(get_db_session),
     ) -> dict[str, int]:
@@ -156,7 +156,7 @@ def build_timeout_probe_app(
             ).scalar_one()
         return {"count": int(count)}
 
-    @app.get("/v1/tests/db-health", include_in_schema=False)
+    @app.get("/tests/db-health", include_in_schema=False)
     def db_health(session: Session = Depends(get_db_session)) -> dict[str, int]:
         ok = session.execute(sa.text("SELECT 1")).scalar_one()
         return {"ok": int(ok)}

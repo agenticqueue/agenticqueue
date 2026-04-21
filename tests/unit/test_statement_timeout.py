@@ -71,11 +71,11 @@ def test_recursive_cte_timeout_returns_504_and_logs_fingerprint(
         with TestClient(app) as client:
             before_connections = count_backend_connections()
             response = client.get(
-                "/v1/tests/graph-timeout",
+                "/tests/graph-timeout",
                 headers=auth_headers(token),
             )
             health_response = client.get(
-                "/v1/tests/db-health",
+                "/tests/db-health",
                 headers=auth_headers(token),
             )
             after_connections = count_backend_connections()

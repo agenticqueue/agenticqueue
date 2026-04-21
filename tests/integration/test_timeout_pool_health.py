@@ -33,7 +33,7 @@ def _run_concurrent_requests(
 
         async def _request(client: httpx.AsyncClient) -> int:
             async with semaphore:
-                response = await client.get("/v1/tests/graph-timeout", headers=headers)
+                response = await client.get("/tests/graph-timeout", headers=headers)
             return response.status_code
 
         async with httpx.AsyncClient(

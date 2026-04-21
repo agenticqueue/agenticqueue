@@ -97,6 +97,7 @@ def test_requires_rate_limit_matches_agenticqueue_routes() -> None:
     assert _requires_rate_limit("/v1/tasks")
     assert _requires_rate_limit("/task-types")
     assert _requires_rate_limit("/openapi.json")
+    assert not _requires_rate_limit("/tests/graph-timeout")
     assert not _requires_rate_limit("/docs")
     assert not _requires_rate_limit("/healthz")
 
