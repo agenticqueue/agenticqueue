@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import re
+import threading
 import uuid
 from typing import Any, Callable
 
@@ -137,15 +138,16 @@ def call_internal_api(
     method: str,
     path: str,
     token: str | None = None,
+    headers: dict[str, str] | None = None,
     params: dict[str, Any] | None = None,
     json_body: Any = None,
 ) -> dict[str, Any]:
     """Call the in-process FastAPI app and normalize JSON responses."""
 
     async def _call() -> dict[str, Any]:
-        headers = {}
+        resolved_headers = {} if headers is None else dict(headers)
         if token is not None and token.strip():
-            headers["Authorization"] = f"Bearer {token.strip()}"
+            resolved_headers["Authorization"] = f"Bearer {token.strip()}"
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),
             base_url="http://agenticqueue.local",
@@ -153,7 +155,7 @@ def call_internal_api(
             response = await client.request(
                 method=method,
                 url=path,
-                headers=headers,
+                headers=resolved_headers,
                 params=params,
                 json=json_body,
             )
@@ -172,7 +174,27 @@ def call_internal_api(
             details=payload,
         )
 
-    return asyncio.run(_call())
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(_call())
+
+    result: dict[str, dict[str, Any]] = {}
+    error: dict[str, BaseException] = {}
+
+    def _runner() -> None:
+        try:
+            result["value"] = asyncio.run(_call())
+        except BaseException as exc:  # pragma: no cover - exercised via caller paths
+            error["value"] = exc
+
+    thread = threading.Thread(target=_runner, daemon=True)
+    thread.start()
+    thread.join()
+
+    if "value" in error:
+        raise error["value"]
+    return result["value"]
 
 
 def surface_plan_path() -> Path:

@@ -36,6 +36,7 @@ from agenticqueue_api.config import (
     get_max_body_bytes,
     get_mcp_transports,
     get_policies_dir,
+    get_repo_root,
     get_psycopg_connect_args,
     get_rate_limit_burst,
     get_rate_limit_rps,
@@ -74,6 +75,7 @@ from agenticqueue_api.models import (
     RoleAssignmentModel,
     RoleModel,
     RoleName,
+    TaskModel,
     TaskRecord,
 )
 from agenticqueue_api.models.shared import SchemaModel
@@ -99,6 +101,12 @@ from agenticqueue_api.roles import (
     revoke_role_assignment,
 )
 from agenticqueue_api.task_type_registry import TaskTypeDefinition, TaskTypeRegistry
+from agenticqueue_api.task_actions import (
+    EscrowUnlockRequest,
+    SubmitTaskResponse,
+    submit_task,
+    unlock_task_escrow,
+)
 
 
 class ActorSummary(SchemaModel):
@@ -511,6 +519,7 @@ def create_app(
     session_factory: sessionmaker[Session] | None = None,
     task_type_registry: TaskTypeRegistry | None = None,
     policies_dir: Path | None = None,
+    artifact_root: Path | None = None,
 ) -> FastAPI:
     """Create the FastAPI app with auth, CRUD, and task type routes."""
     resolved_session_factory = session_factory or _default_session_factory()
@@ -547,6 +556,7 @@ def create_app(
     app.state.session_factory = resolved_session_factory
     app.state.packet_cache = packet_cache
     app.state.task_type_registry = task_type_registry or _default_task_type_registry()
+    app.state.artifact_root = artifact_root or get_repo_root()
     app.add_middleware(IdempotencyKeyMiddleware)
     app.add_middleware(
         SecretRedactionMiddleware,
@@ -1030,6 +1040,57 @@ def create_app(
                     str(error),
                     details={"draft_id": str(draft_id), "actor_id": str(actor.id)},
                 )
+
+    @app.post(
+        "/tasks/{task_id}/submit",
+        include_in_schema=False,
+        response_model=SubmitTaskResponse,
+    )
+    @app.post(
+        "/v1/tasks/{task_id}/submit",
+        response_model=SubmitTaskResponse,
+    )
+    def submit_task_endpoint(
+        task_id: uuid.UUID,
+        payload: dict[str, Any],
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> SubmitTaskResponse:
+        with write_timeout(session, endpoint="v1.tasks.submit"):
+            actor = _require_actor(request)
+            return submit_task(
+                session,
+                task_id=task_id,
+                actor=actor,
+                submission=payload,
+                task_type_registry=get_task_type_registry(request),
+                artifact_root=cast(Path, request.app.state.artifact_root),
+                packet_cache=request.app.state.packet_cache,
+            )
+
+    @app.post(
+        "/tasks/{task_id}/escrow-unlock",
+        include_in_schema=False,
+        response_model=TaskModel,
+    )
+    @app.post(
+        "/v1/tasks/{task_id}/escrow-unlock",
+        response_model=TaskModel,
+    )
+    def force_unlock_task_escrow(
+        task_id: uuid.UUID,
+        request: Request,
+        payload: EscrowUnlockRequest | None = Body(default=None),
+        session: Session = Depends(get_db_session),
+    ) -> TaskModel:
+        with write_timeout(session, endpoint="v1.tasks.escrow_unlock"):
+            actor = _require_admin_actor(request)
+            return unlock_task_escrow(
+                session,
+                task_id=task_id,
+                actor=actor,
+                reason=None if payload is None else payload.reason,
+            )
 
     from agenticqueue_api.mcp.server import build_agenticqueue_mcp
 

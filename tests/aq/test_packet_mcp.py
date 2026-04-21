@@ -152,8 +152,13 @@ def _seed_task_with_token(
     grant_read_repo: bool = False,
     wrong_scope: bool = False,
     extra_capability: CapabilityKey | None = None,
+    grant_capabilities: tuple[CapabilityKey, ...] = (),
+    task_state: str = "queued",
+    claimed_by_seed_actor: bool = False,
+    contract: dict[str, object] | None = None,
+    description: str = "Render one packet from the MCP surface.",
 ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID, str]:
-    contract = _example_contract()
+    resolved_contract = contract or _example_contract()
     with session_factory() as session:
         actor = create_actor(
             session,
@@ -194,10 +199,18 @@ def _seed_task_with_token(
                     "project_id": str(project.id),
                     "task_type": "coding-task",
                     "title": "Compile packet over MCP",
-                    "state": "queued",
-                    "description": "Render one packet from the MCP surface.",
-                    "contract": contract,
-                    "definition_of_done": contract["dod_checklist"],
+                    "state": task_state,
+                    "claimed_by_actor_id": (
+                        str(actor.id) if claimed_by_seed_actor else None
+                    ),
+                    "claimed_at": (
+                        "2026-04-20T00:00:00+00:00"
+                        if claimed_by_seed_actor
+                        else None
+                    ),
+                    "description": description,
+                    "contract": resolved_contract,
+                    "definition_of_done": resolved_contract["dod_checklist"],
                     "created_at": "2026-04-20T00:00:00+00:00",
                     "updated_at": "2026-04-20T00:00:00+00:00",
                 }
@@ -229,6 +242,14 @@ def _seed_task_with_token(
                 session,
                 actor_id=actor.id,
                 capability=extra_capability,
+                scope={"project_id": str(project.id)},
+                granted_by_actor_id=actor.id,
+            )
+        for capability in grant_capabilities:
+            grant_capability(
+                session,
+                actor_id=actor.id,
+                capability=capability,
                 scope={"project_id": str(project.id)},
                 granted_by_actor_id=actor.id,
             )

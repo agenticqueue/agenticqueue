@@ -631,6 +631,66 @@
         "title": "DedupeSuggestion",
         "type": "object"
       },
+      "DodChecklistResultView": {
+        "description": "Serializable DoD checklist item view.",
+        "properties": {
+          "item": {
+            "title": "Item",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item",
+          "state",
+          "note"
+        ],
+        "title": "DodChecklistResultView",
+        "type": "object"
+      },
+      "DodReportView": {
+        "description": "Serializable DoD report returned from the submit pipeline.",
+        "properties": {
+          "checked_count": {
+            "title": "Checked Count",
+            "type": "integer"
+          },
+          "checklist": {
+            "items": {
+              "$ref": "#/components/schemas/DodChecklistResultView"
+            },
+            "title": "Checklist",
+            "type": "array"
+          },
+          "partial_count": {
+            "title": "Partial Count",
+            "type": "integer"
+          },
+          "unchecked_blocked_count": {
+            "title": "Unchecked Blocked Count",
+            "type": "integer"
+          },
+          "unchecked_unmet_count": {
+            "title": "Unchecked Unmet Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "checked_count",
+          "partial_count",
+          "unchecked_blocked_count",
+          "unchecked_unmet_count"
+        ],
+        "title": "DodReportView",
+        "type": "object"
+      },
       "DraftLearning": {
         "additionalProperties": false,
         "description": "One deterministic learning draft ready for review/edit.",
@@ -1078,6 +1138,24 @@
         ],
         "title": "EdgeRelation",
         "type": "string"
+      },
+      "EscrowUnlockRequest": {
+        "description": "Payload for a forced escrow unlock.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "EscrowUnlockRequest",
+        "type": "object"
       },
       "GrantCapabilityRequest": {
         "description": "Payload for granting a capability.",
@@ -2365,6 +2443,59 @@
         "title": "SubmitTaskLearningRequest",
         "type": "object"
       },
+      "SubmitTaskResponse": {
+        "description": "Response payload for one accepted task submission.",
+        "properties": {
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactModel"
+            },
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "dod_report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DodReportView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "learning_drafts": {
+            "items": {
+              "$ref": "#/components/schemas/DraftLearningView"
+            },
+            "title": "Learning Drafts",
+            "type": "array"
+          },
+          "next_action": {
+            "title": "Next Action",
+            "type": "string"
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunModel"
+          },
+          "task": {
+            "$ref": "#/components/schemas/TaskModel"
+          },
+          "transitions": {
+            "items": {
+              "$ref": "#/components/schemas/TransitionResultView"
+            },
+            "title": "Transitions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "task",
+          "run",
+          "next_action"
+        ],
+        "title": "SubmitTaskResponse",
+        "type": "object"
+      },
       "SupersedeLearningRequest": {
         "description": "Input for `supersede_learning`.",
         "properties": {
@@ -2627,6 +2758,75 @@
           "policy_path"
         ],
         "title": "TaskTypeView",
+        "type": "object"
+      },
+      "TransitionResultView": {
+        "description": "Serializable transition-evaluation result.",
+        "properties": {
+          "allowed_transitions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Transitions",
+            "type": "array"
+          },
+          "attempt_count": {
+            "title": "Attempt Count",
+            "type": "integer"
+          },
+          "escalation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escalation"
+          },
+          "from_state": {
+            "title": "From State",
+            "type": "string"
+          },
+          "guard_blocked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guard Blocked"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "requested_state": {
+            "title": "Requested State",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_state",
+          "requested_state",
+          "state",
+          "attempt_count"
+        ],
+        "title": "TransitionResultView",
         "type": "object"
       },
       "ValidationError": {
@@ -6412,6 +6612,63 @@
         "summary": "Update Tasks"
       }
     },
+    "/v1/tasks/{task_id}/escrow-unlock": {
+      "post": {
+        "operationId": "force_unlock_task_escrow_v1_tasks__task_id__escrow_unlock_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/EscrowUnlockRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Force Unlock Task Escrow"
+      }
+    },
     "/v1/tasks/{task_id}/packet": {
       "get": {
         "operationId": "get_task_packet_endpoint_v1_tasks__task_id__packet_get",
@@ -6450,6 +6707,58 @@
           }
         },
         "summary": "Get Task Packet Endpoint"
+      }
+    },
+    "/v1/tasks/{task_id}/submit": {
+      "post": {
+        "operationId": "submit_task_endpoint_v1_tasks__task_id__submit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Payload",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitTaskResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Task Endpoint"
       }
     },
     "/v1/workspaces": {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 from pathlib import Path
 import uuid
 from typing import Any
@@ -469,20 +470,23 @@ def register_submit_tools(
         payload: dict[str, Any],
         token: str | None = None,
     ) -> dict[str, Any]:
-        def _callback(session: Session, authenticated) -> dict[str, Any]:
-            del session, authenticated
-            raise surface_error(
-                501,
-                "submit_payload is not implemented yet on the MCP surface",
-                error_code="not_implemented",
-                details={"job_id": str(job_id), "payload_keys": sorted(payload.keys())},
+        idempotency_key = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                json.dumps(
+                    {"job_id": str(job_id), "payload": payload},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
             )
-
-        return run_session_tool(
-            session_factory,
+        )
+        return call_internal_api(
+            app,
+            method="POST",
+            path=f"/v1/tasks/{job_id}/submit",
             token=token,
-            trace_name="submit-payload",
-            callback=_callback,
+            headers={"Idempotency-Key": idempotency_key},
+            json_body=payload,
         )
 
     registered.add("submit_payload")
