@@ -6,17 +6,24 @@ on:
       - published
 
 permissions:
+  actions: read
   contents: write
   id-token: write
 
 jobs:
-  release:
+  release-assets:
     runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
     env:
       TAG_NAME: ${{ github.event.release.tag_name }}
+    outputs:
+      tarball_name: ${{ steps.bundle.outputs.name }}
+      provenance_name: ${{ steps.bundle.outputs.provenance_name }}
+      subjects_b64: ${{ steps.bundle.outputs.subjects_b64 }}
+      node_sbom_generated: ${{ steps.node_sbom.outputs.generated }}
+      vuln_summary: ${{ steps.vuln.outputs.summary }}
     steps:
       - name: Check out release tag
         uses: actions/checkout@v4
@@ -61,7 +68,15 @@ jobs:
             --prefix="agenticqueue-${version}/" \
             --output="dist/${tarball}" \
             HEAD
-          echo "path=dist/${tarball}" >> "$GITHUB_OUTPUT"
+          pushd dist >/dev/null
+          subjects_b64="$(sha256sum "$tarball" | base64 -w 0)"
+          popd >/dev/null
+          {
+            echo "path=dist/${tarball}"
+            echo "name=${tarball}"
+            echo "provenance_name=${tarball}.intoto.jsonl"
+            echo "subjects_b64=${subjects_b64}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Generate Python SBOM
         shell: bash
@@ -213,17 +228,93 @@ jobs:
           fi
           gh release upload "$TAG_NAME" "${assets[@]}" --clobber
 
-      - name: Update release notes with supply-chain summary
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VULN_SUMMARY: ${{ steps.vuln.outputs.summary }}
+      - name: Upload tarball for provenance verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-tarball
+          path: ${{ steps.bundle.outputs.path }}
+          if-no-files-found: error
+          retention-days: 5
+
+  provenance:
+    needs: release-assets
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: ${{ needs.release-assets.outputs.subjects_b64 }}
+      provenance-name: ${{ needs.release-assets.outputs.provenance_name }}
+      upload-assets: true
+      upload-tag-name: ${{ github.event.release.tag_name }}
+
+  verify-provenance:
+    needs:
+      - release-assets
+      - provenance
+    runs-on: ubuntu-latest
+    env:
+      TAG_NAME: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Download release tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: release-tarball
+          path: dist
+
+      - name: Download provenance bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.release-assets.outputs.provenance_name }}
+          path: dist
+
+      - name: Install slsa-verifier
         shell: bash
         run: |
           set -euo pipefail
+          curl -sSLo /usr/local/bin/slsa-verifier \
+            https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-linux-amd64
+          chmod +x /usr/local/bin/slsa-verifier
+
+      - name: Verify release provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          slsa-verifier verify-artifact \
+            "dist/${{ needs.release-assets.outputs.tarball_name }}" \
+            --provenance-path "dist/${{ needs.release-assets.outputs.provenance_name }}" \
+            --source-uri github.com/agenticqueue/agenticqueue \
+            --source-tag "$TAG_NAME" \
+            --builder-id "https://github.com/slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@refs/tags/v2.1.0"
+
+  update-release-notes:
+    needs:
+      - release-assets
+      - provenance
+      - verify-provenance
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG_NAME: ${{ github.event.release.tag_name }}
+      VULN_SUMMARY: ${{ needs.release-assets.outputs.vuln_summary }}
+      PROVENANCE_NAME: ${{ needs.release-assets.outputs.provenance_name }}
+      NODE_SBOM_GENERATED: ${{ needs.release-assets.outputs.node_sbom_generated }}
+    steps:
+      - name: Update release notes with supply-chain summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VULN_SUMMARY: ${{ needs.release-assets.outputs.vuln_summary }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
           gh release view "$TAG_NAME" --json body --jq '.body // ""' > dist/release-body.txt
 
-          asset_summary="$(basename "${{ steps.bundle.outputs.path }}"), $(basename "${{ steps.bundle.outputs.path }}").sigstore.json, sbom.cdx.json, sbom.cdx.json.sigstore.json, grype-report.json, grype-report.json.sigstore.json"
-          if [ "${{ steps.node_sbom.outputs.generated }}" = "true" ]; then
+          version="${TAG_NAME#v}"
+          tarball="agenticqueue-${version}.tar.gz"
+          asset_summary="${tarball}, ${PROVENANCE_NAME}, ${tarball}.sigstore.json, sbom.cdx.json, sbom.cdx.json.sigstore.json, grype-report.json, grype-report.json.sigstore.json"
+          if [ "$NODE_SBOM_GENERATED" = "true" ]; then
             asset_summary="${asset_summary}, sbom.node.cdx.json, sbom.node.cdx.json.sigstore.json"
           fi
           export ASSET_SUMMARY="$asset_summary"
