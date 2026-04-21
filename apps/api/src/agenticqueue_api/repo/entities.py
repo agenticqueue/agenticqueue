@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -50,7 +50,8 @@ def _persistable_payload(
 ) -> dict[str, Any]:
     """Drop schema-only fields before constructing a SQLAlchemy record."""
 
-    column_names = set(sa.inspect(record_type).columns.keys())
+    mapper = sa.inspect(cast(Any, record_type))
+    column_names = set(mapper.columns.keys())
     return {
         field_name: value
         for field_name, value in payload.model_dump(exclude_none=True).items()

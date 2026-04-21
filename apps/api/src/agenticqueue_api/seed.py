@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from pathlib import Path
-from typing import TypeVar
+from typing import Any, TypeVar, cast
 
 import sqlalchemy as sa
 import yaml  # type: ignore[import-untyped]
@@ -142,7 +142,8 @@ def _persistable_payload(
 ) -> dict[str, object]:
     """Drop schema-only fields before touching SQLAlchemy records."""
 
-    column_names = set(sa.inspect(record_type).columns.keys())
+    mapper = sa.inspect(cast(Any, record_type))
+    column_names = set(mapper.columns.keys())
     return {
         field_name: value
         for field_name, value in payload.model_dump(exclude_none=True).items()

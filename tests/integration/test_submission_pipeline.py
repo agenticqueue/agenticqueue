@@ -160,10 +160,12 @@ def test_submit_route_requeues_invalid_payload_with_attempt_tracking(
             == 0
         )
         assert len(audit_rows) == 1
-        assert audit_rows[0].after["state"] == "queued"
-        assert audit_rows[0].after["attempt_count"] == 1
-        assert audit_rows[0].after["max_attempts"] == 3
-        assert audit_rows[0].after["remaining_attempts"] == 2
+        after = audit_rows[0].after
+        assert after is not None
+        assert after["state"] == "queued"
+        assert after["attempt_count"] == 1
+        assert after["max_attempts"] == 3
+        assert after["remaining_attempts"] == 2
 
 
 def test_submit_route_persists_artifacts_and_replays_idempotently(
