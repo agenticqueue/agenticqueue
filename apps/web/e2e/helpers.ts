@@ -51,6 +51,28 @@ const EMPTY_DECISIONS_PAYLOAD = {
   items: [],
 };
 
+const EMPTY_ANALYTICS_PAYLOAD = {
+  generated_at: "2026-04-21T14:05:00.000Z",
+  window: {
+    key: "90d",
+    days: 90,
+    start_at: "2026-01-21T14:05:00.000Z",
+    end_at: "2026-04-21T14:05:00.000Z",
+  },
+  cycle_time: [],
+  blocked_heatmap: [],
+  handoff_latency_histogram: [],
+  handoff_latency_by_actor: [],
+  retrieval_precision: {
+    sample_size: 0,
+    precision_at_5: 0,
+    precision_at_10: 0,
+    note: "No retrieval samples yet.",
+  },
+  agent_success_rates: [],
+  review_load: [],
+};
+
 export async function seedAuthenticatedSession(
   page: Page,
   options: {
@@ -96,6 +118,7 @@ export async function seedAuthenticatedSession(
 export async function mockShellReadApis(
   page: Page,
   options: {
+    analyticsPayload?: unknown;
     decisionsPayload?: unknown;
     decisionLineageById?: Record<string, unknown>;
   } = {},
@@ -154,12 +177,21 @@ export async function mockShellReadApis(
       status: 200,
     });
   });
+
+  await page.route("**/api/v1/analytics/metrics**", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      json: options.analyticsPayload ?? EMPTY_ANALYTICS_PAYLOAD,
+      status: 200,
+    });
+  });
 }
 
 export async function openAuthedView(
   page: Page,
   path: string,
   options: {
+    analyticsPayload?: unknown;
     workPayload?: unknown;
     decisionsPayload?: unknown;
     decisionLineageById?: Record<string, unknown>;
@@ -167,6 +199,7 @@ export async function openAuthedView(
 ) {
   await seedAuthenticatedSession(page);
   await mockShellReadApis(page, {
+    analyticsPayload: options.analyticsPayload,
     decisionsPayload: options.decisionsPayload,
     decisionLineageById: options.decisionLineageById,
   });

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
+import { AnalyticsView } from "@/components/analytics-view";
 import { DecisionsView } from "@/components/decisions-view";
 import { LearningsView } from "@/components/learnings-view";
 import { PipelinesView } from "@/components/pipelines-view";
@@ -12,6 +13,7 @@ import { WorkView } from "@/components/work-view";
 type ViewKey =
   | "pipelines"
   | "work"
+  | "analytics"
   | "graph"
   | "decisions"
   | "learnings"
@@ -56,6 +58,7 @@ const PERSIST_TOKEN_KEY = "aq:web:remember-token";
 const NAV_ITEMS = [
   { href: "/pipelines", label: "Pipelines", count: "12", view: "pipelines" },
   { href: "/work", label: "Work", count: "41", view: "work" },
+  { href: "/analytics", label: "Analytics", count: "6", view: "analytics" },
   { href: "/graph", label: "Graph", count: "9", view: "graph" },
   { href: "/decisions", label: "Decisions", count: "18", view: "decisions" },
   { href: "/learnings", label: "Learnings", count: "47", view: "learnings" },
@@ -115,6 +118,34 @@ const VIEW_CONTENT: Record<ViewKey, ViewDefinition> = {
         title: "AQ-115 Playwright smoke",
         body: "Critical-path coverage for the five primary views once the shell is stable.",
         meta: "quality gate · queued",
+      },
+    ],
+  },
+  analytics: {
+    title: "Analytics",
+    eyebrow: "Operator telemetry",
+    summary:
+      "Cycle time, blocked work, handoff latency, retrieval precision, success rates, and review load stay visible from the same always-on shell.",
+    cards: [
+      { label: "Tracked windows", value: "3", tone: "info" },
+      { label: "Core panels", value: "6", tone: "ok" },
+      { label: "Write paths", value: "0", tone: "warn" },
+    ],
+    rows: [
+      {
+        title: "Read-only by design",
+        body: "Analytics is an observability surface over existing API read models, not a backdoor mutation channel.",
+        meta: "ADR-AQ-022",
+      },
+      {
+        title: "90-day window first",
+        body: "The default query shape is tuned for the operator view AQ-110 asked for, with room to widen when needed.",
+        meta: "aq-110",
+      },
+      {
+        title: "Precision is grounded in packet evidence",
+        body: "Retrieval quality comes from packet payload overlap, not synthetic scoring or dashboard-only fixtures.",
+        meta: "no synthetic data",
       },
     ],
   },
@@ -391,6 +422,8 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
           <PipelinesView authToken={authToken} />
         ) : view === "work" && authToken ? (
           <WorkView authToken={authToken} />
+        ) : view === "analytics" && authToken ? (
+          <AnalyticsView authToken={authToken} />
         ) : view === "decisions" && authToken ? (
           <DecisionsView authToken={authToken} />
         ) : view === "learnings" && authToken ? (
@@ -512,7 +545,10 @@ function LoginScreen({ errorMessage, onLogin }: LoginScreenProps) {
         </form>
 
         <div className="aq-auth-notes">
-          <p>Nav order is fixed: Pipelines, Work, Graph, Decisions, Learnings.</p>
+          <p>
+            Nav order is fixed: Pipelines, Work, Analytics, Graph, Decisions,
+            Learnings.
+          </p>
           <p>Settings lives in the footer because the shell stays edge-to-edge.</p>
         </div>
       </section>

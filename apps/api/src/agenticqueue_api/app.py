@@ -90,6 +90,7 @@ from agenticqueue_api.pagination import (
     encode_cursor,
 )
 from agenticqueue_api.routers import (
+    build_analytics_router,
     build_learnings_router,
     build_memory_router,
     build_packets_router,
@@ -580,6 +581,7 @@ def create_app(
     )
     app.add_middleware(RequestIdMiddleware)
     install_exception_handlers(app)
+    app.include_router(build_analytics_router(get_db_session))
     app.include_router(build_learnings_router(get_db_session))
     app.include_router(build_memory_router(get_db_session))
     app.include_router(build_packets_router(get_db_session))

@@ -22,6 +22,35 @@
         "title": "ActorCapabilityListResponse",
         "type": "object"
       },
+      "ActorLatencyView": {
+        "description": "Per-actor latency rollup.",
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "median_minutes": {
+            "title": "Median Minutes",
+            "type": "number"
+          },
+          "p95_minutes": {
+            "title": "P95 Minutes",
+            "type": "number"
+          }
+        },
+        "required": [
+          "actor",
+          "count",
+          "median_minutes",
+          "p95_minutes"
+        ],
+        "title": "ActorLatencyView",
+        "type": "object"
+      },
       "ActorModel": {
         "description": "Pydantic schema for an actor.",
         "properties": {
@@ -129,6 +158,147 @@
           "display_name"
         ],
         "title": "ActorSummary",
+        "type": "object"
+      },
+      "AgentSuccessMetricView": {
+        "description": "Per-actor run outcome rollup.",
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "complete_count": {
+            "title": "Complete Count",
+            "type": "integer"
+          },
+          "error_count": {
+            "title": "Error Count",
+            "type": "integer"
+          },
+          "parked_count": {
+            "title": "Parked Count",
+            "type": "integer"
+          },
+          "success_rate": {
+            "title": "Success Rate",
+            "type": "number"
+          },
+          "total_count": {
+            "title": "Total Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "actor",
+          "complete_count",
+          "parked_count",
+          "error_count",
+          "total_count",
+          "success_rate"
+        ],
+        "title": "AgentSuccessMetricView",
+        "type": "object"
+      },
+      "AnalyticsMetricsResponse": {
+        "description": "Phase 7 analytics response shape.",
+        "properties": {
+          "agent_success_rates": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSuccessMetricView"
+            },
+            "title": "Agent Success Rates",
+            "type": "array"
+          },
+          "blocked_heatmap": {
+            "items": {
+              "$ref": "#/components/schemas/BlockedHeatmapCellView"
+            },
+            "title": "Blocked Heatmap",
+            "type": "array"
+          },
+          "cycle_time": {
+            "items": {
+              "$ref": "#/components/schemas/CycleTimeMetricView"
+            },
+            "title": "Cycle Time",
+            "type": "array"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "handoff_latency_by_actor": {
+            "items": {
+              "$ref": "#/components/schemas/ActorLatencyView"
+            },
+            "title": "Handoff Latency By Actor",
+            "type": "array"
+          },
+          "handoff_latency_histogram": {
+            "items": {
+              "$ref": "#/components/schemas/HistogramBucketView"
+            },
+            "title": "Handoff Latency Histogram",
+            "type": "array"
+          },
+          "retrieval_precision": {
+            "$ref": "#/components/schemas/RetrievalPrecisionMetricView"
+          },
+          "review_load": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewLoadPointView"
+            },
+            "title": "Review Load",
+            "type": "array"
+          },
+          "window": {
+            "$ref": "#/components/schemas/AnalyticsWindowView"
+          }
+        },
+        "required": [
+          "generated_at",
+          "window",
+          "cycle_time",
+          "blocked_heatmap",
+          "handoff_latency_histogram",
+          "handoff_latency_by_actor",
+          "retrieval_precision",
+          "agent_success_rates",
+          "review_load"
+        ],
+        "title": "AnalyticsMetricsResponse",
+        "type": "object"
+      },
+      "AnalyticsWindowView": {
+        "description": "Time window metadata for one analytics response.",
+        "properties": {
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "end_at": {
+            "format": "date-time",
+            "title": "End At",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "days",
+          "start_at",
+          "end_at"
+        ],
+        "title": "AnalyticsWindowView",
         "type": "object"
       },
       "ApiTokenListResponse": {
@@ -358,6 +528,48 @@
         "title": "AuditVerifyResponse",
         "type": "object"
       },
+      "BlockedHeatmapCellView": {
+        "description": "Aggregated blocked-work stats for one blocker.",
+        "properties": {
+          "blocker_ref": {
+            "title": "Blocker Ref",
+            "type": "string"
+          },
+          "blocker_title": {
+            "title": "Blocker Title",
+            "type": "string"
+          },
+          "p95_blocked_hours": {
+            "title": "P95 Blocked Hours",
+            "type": "number"
+          },
+          "sample_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sample Refs",
+            "type": "array"
+          },
+          "task_count": {
+            "title": "Task Count",
+            "type": "integer"
+          },
+          "total_blocked_hours": {
+            "title": "Total Blocked Hours",
+            "type": "number"
+          }
+        },
+        "required": [
+          "blocker_ref",
+          "blocker_title",
+          "task_count",
+          "total_blocked_hours",
+          "p95_blocked_hours",
+          "sample_refs"
+        ],
+        "title": "BlockedHeatmapCellView",
+        "type": "object"
+      },
       "CapabilityGrantView": {
         "description": "Capability grant returned from the API.",
         "properties": {
@@ -505,6 +717,35 @@
           "learning"
         ],
         "title": "ConfirmedDraftLearningView",
+        "type": "object"
+      },
+      "CycleTimeMetricView": {
+        "description": "Cycle time statistics for one task type.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "median_hours": {
+            "title": "Median Hours",
+            "type": "number"
+          },
+          "p95_hours": {
+            "title": "P95 Hours",
+            "type": "number"
+          },
+          "task_type": {
+            "title": "Task Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_type",
+          "count",
+          "median_hours",
+          "p95_hours"
+        ],
+        "title": "CycleTimeMetricView",
         "type": "object"
       },
       "DecisionModel": {
@@ -1204,6 +1445,41 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HistogramBucketView": {
+        "description": "One histogram bucket for handoff latency.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "max_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Minutes"
+          },
+          "min_minutes": {
+            "title": "Min Minutes",
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "min_minutes",
+          "count"
+        ],
+        "title": "HistogramBucketView",
         "type": "object"
       },
       "LearningConfidence": {
@@ -2103,6 +2379,55 @@
           "items"
         ],
         "title": "RelevantLearningsResponse",
+        "type": "object"
+      },
+      "RetrievalPrecisionMetricView": {
+        "description": "Packet retrieval precision rollup.",
+        "properties": {
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "precision_at_10": {
+            "title": "Precision At 10",
+            "type": "number"
+          },
+          "precision_at_5": {
+            "title": "Precision At 5",
+            "type": "number"
+          },
+          "sample_size": {
+            "title": "Sample Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sample_size",
+          "precision_at_5",
+          "precision_at_10",
+          "note"
+        ],
+        "title": "RetrievalPrecisionMetricView",
+        "type": "object"
+      },
+      "ReviewLoadPointView": {
+        "description": "Daily review-queue point.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "count"
+        ],
+        "title": "ReviewLoadPointView",
         "type": "object"
       },
       "RevokeCapabilityRequest": {
@@ -3394,6 +3719,46 @@
           }
         },
         "summary": "Update Actors"
+      }
+    },
+    "/v1/analytics/metrics": {
+      "get": {
+        "operationId": "analytics_metrics_endpoint_v1_analytics_metrics_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "window",
+            "required": false,
+            "schema": {
+              "default": "90d",
+              "title": "Window",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsMetricsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analytics Metrics Endpoint"
       }
     },
     "/v1/artifacts": {
