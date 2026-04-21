@@ -1,4 +1,5 @@
 """Benchmark the Phase 7 analytics query paths on representative 10k-row data."""
+# ruff: noqa: E402
 
 from __future__ import annotations
 
@@ -36,8 +37,6 @@ from agenticqueue_api.routers.analytics import _blocked_heatmap
 from agenticqueue_api.routers.analytics import _cycle_time_metrics
 from agenticqueue_api.routers.analytics import _handoff_latency_by_actor
 from agenticqueue_api.routers.analytics import _handoff_latency_histogram
-from agenticqueue_api.routers.analytics import _retrieval_precision
-from agenticqueue_api.routers.analytics import _review_load
 from agenticqueue_api.routers.analytics import _run_durations
 
 WINDOW_DAYS = 90
@@ -172,7 +171,9 @@ def time_path(
     return summarize_latencies(latencies)
 
 
-def ts(now: dt.datetime, *, days: int = 0, hours: int = 0, minutes: int = 0) -> dt.datetime:
+def ts(
+    now: dt.datetime, *, days: int = 0, hours: int = 0, minutes: int = 0
+) -> dt.datetime:
     return now - dt.timedelta(days=days, hours=hours, minutes=minutes)
 
 
@@ -290,11 +291,7 @@ def seed_benchmark_dataset(
     for index in range(recent_task_count + historical_task_count):
         task_id = uuid.uuid4()
         is_recent = index < recent_task_count
-        age_days = (
-            index % WINDOW_DAYS
-            if is_recent
-            else WINDOW_DAYS + 30 + (index % 180)
-        )
+        age_days = index % WINDOW_DAYS if is_recent else WINDOW_DAYS + 30 + (index % 180)
         created_at = ts(now, days=age_days, hours=index % 24, minutes=index % 50)
         updated_at = created_at + dt.timedelta(minutes=15 + (index % 300))
 
@@ -398,28 +395,22 @@ def seed_benchmark_dataset(
         )
 
     connection.execute(sa.insert(PacketVersionRecord), packet_rows)
-    connection.execute(
-        sa.text(
-            """
+    connection.execute(sa.text("""
             ANALYZE agenticqueue.task;
             ANALYZE agenticqueue.run;
             ANALYZE agenticqueue.edge;
             ANALYZE agenticqueue.packet_version;
-            """
-        )
-    )
+            """))
 
     blocked_ids = [
         row[0]
         for row in connection.execute(
-            sa.text(
-                """
+            sa.text("""
                 SELECT id
                 FROM agenticqueue.task
                 WHERE project_id = :project_id
                   AND state = 'blocked'
-                """
-            ),
+                """),
             {"project_id": project_id},
         ).fetchall()
     ]
@@ -548,6 +539,7 @@ def build_report(
     }
 
     with TestClient(app) as client:
+
         def fetch_analytics() -> object:
             response = client.get("/v1/analytics/metrics?window=90d", headers=headers)
             if response.status_code != 200:
