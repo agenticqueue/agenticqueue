@@ -65,8 +65,7 @@ def test_direct_database_urls_map_nonstandard_pgbouncer_ports(monkeypatch) -> No
         == "postgresql+asyncpg://aq:aq@127.0.0.1:54331/aq?prepared_statement_cache_size=0"
     )
     assert (
-        config.get_direct_sync_database_url()
-        == "postgresql://aq:aq@127.0.0.1:54331/aq"
+        config.get_direct_sync_database_url() == "postgresql://aq:aq@127.0.0.1:54331/aq"
     )
 
 
