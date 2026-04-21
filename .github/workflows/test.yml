@@ -12,6 +12,8 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:5432/agenticqueue
     strategy:
       fail-fast: false
       matrix:
@@ -55,7 +57,7 @@ jobs:
 
       - name: Start Postgres + PgBouncer
         shell: bash
-        run: docker compose up -d db pgbouncer
+        run: docker compose -f docker-compose.yml -f docker-compose.override.yml up -d db pgbouncer
 
       - name: Wait for Postgres
         shell: bash
@@ -120,6 +122,8 @@ jobs:
 
   firewall-fuzz:
     runs-on: ubuntu-latest
+    env:
+      AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:5432/agenticqueue
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -142,7 +146,7 @@ jobs:
 
       - name: Start Postgres + PgBouncer
         shell: bash
-        run: docker compose up -d db pgbouncer
+        run: docker compose -f docker-compose.yml -f docker-compose.override.yml up -d db pgbouncer
 
       - name: Wait for Postgres
         shell: bash
@@ -159,12 +163,12 @@ jobs:
       - name: Stop Postgres
         if: ${{ always() }}
         shell: bash
-        run: docker compose down
+        run: docker compose -f docker-compose.yml -f docker-compose.override.yml down
 
       - name: Stop Postgres
         if: ${{ always() }}
         shell: bash
-        run: docker compose down
+        run: docker compose -f docker-compose.yml -f docker-compose.override.yml down
 
       - name: Install Node dependencies
         shell: bash
