@@ -6,7 +6,9 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
+import sysconfig
 import threading
 from typing import Any, Generator
 from urllib.parse import parse_qs, urlparse
@@ -323,10 +325,23 @@ def repo_root() -> Path:
 
 @pytest.fixture(scope="session")
 def aq_executable(repo_root: Path) -> Path:
-    executable = repo_root / ".venv" / "Scripts" / "aq.exe"
-    if not executable.exists():
-        raise AssertionError(f"Expected aq CLI at {executable}")
-    return executable
+    executable_name = "aq.exe" if os.name == "nt" else "aq"
+    venv_scripts_dir = "Scripts" if os.name == "nt" else "bin"
+    candidates = [
+        Path(sysconfig.get_path("scripts")) / executable_name,
+        repo_root / ".venv" / venv_scripts_dir / executable_name,
+    ]
+    resolved_from_path = shutil.which("aq")
+    if resolved_from_path is not None:
+        candidates.insert(0, Path(resolved_from_path))
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    raise AssertionError(
+        "Expected aq CLI on PATH or in the platform-specific virtualenv scripts dir"
+    )
 
 
 @pytest.fixture(scope="session")
