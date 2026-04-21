@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import AsyncExitStack, asynccontextmanager
 import datetime as dt
 import uuid
@@ -547,25 +548,28 @@ def create_app(
     packet_cache = PacketCache(session_factory=resolved_session_factory)
     mcp_lifespan_apps: list[Any] = []
 
+    def run_auto_setup() -> None:
+        apply_database_migrations()
+        setup_session = resolved_session_factory()
+        try:
+            set_session_audit_context(
+                setup_session,
+                actor_id=None,
+                trace_id=BOOT_TRACE_ID,
+            )
+            bootstrap = run_first_run_setup(setup_session)
+            setup_session.commit()
+            emit_bootstrap_message(bootstrap)
+        except Exception:
+            setup_session.rollback()
+            raise
+        finally:
+            setup_session.close()
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if get_auto_setup_enabled():
-            apply_database_migrations()
-            setup_session = resolved_session_factory()
-            try:
-                set_session_audit_context(
-                    setup_session,
-                    actor_id=None,
-                    trace_id=BOOT_TRACE_ID,
-                )
-                bootstrap = run_first_run_setup(setup_session)
-                setup_session.commit()
-                emit_bootstrap_message(bootstrap)
-            except Exception:
-                setup_session.rollback()
-                raise
-            finally:
-                setup_session.close()
+            await asyncio.to_thread(run_auto_setup)
 
         del app
         packet_cache.start()

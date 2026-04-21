@@ -13,6 +13,7 @@ from pydantic import Field
 from sqlalchemy.orm import Session
 
 from agenticqueue_api.auth import _hash_token_secret, token_display_prefix
+from agenticqueue_api.config import get_repo_root
 from agenticqueue_api.models import (
     ActorModel,
     ActorRecord,
@@ -27,7 +28,7 @@ from agenticqueue_api.models import (
 )
 from agenticqueue_api.models.shared import SchemaModel, TimestampedSchema
 
-DEFAULT_SEED_PATH = Path("examples") / "seed.yaml"
+DEFAULT_SEED_PATH = get_repo_root() / "examples" / "seed.yaml"
 
 SchemaT = TypeVar("SchemaT", bound=TimestampedSchema)
 RecordT = TypeVar("RecordT")

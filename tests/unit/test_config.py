@@ -52,5 +52,23 @@ def test_direct_sync_database_url_honors_configured_direct_port(monkeypatch) -> 
     )
 
 
+def test_direct_database_urls_map_nonstandard_pgbouncer_ports(monkeypatch) -> None:
+    monkeypatch.delenv("AGENTICQUEUE_DB_PORT", raising=False)
+    monkeypatch.delenv("DB_PORT", raising=False)
+    monkeypatch.setenv(
+        "AGENTICQUEUE_DATABASE_URL",
+        "postgresql+asyncpg://aq:aq@127.0.0.1:64331/aq?prepared_statement_cache_size=0",
+    )
+
+    assert (
+        config.get_direct_database_url()
+        == "postgresql+asyncpg://aq:aq@127.0.0.1:54331/aq?prepared_statement_cache_size=0"
+    )
+    assert (
+        config.get_direct_sync_database_url()
+        == "postgresql://aq:aq@127.0.0.1:54331/aq"
+    )
+
+
 def test_get_psycopg_connect_args_disables_prepared_statements() -> None:
     assert config.get_psycopg_connect_args() == {"prepare_threshold": None}

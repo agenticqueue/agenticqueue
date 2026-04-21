@@ -164,3 +164,16 @@ def test_seed_uses_fixture_ids_from_examples_yaml(
     assert actor is not None
     assert token is not None
     assert task is not None
+
+
+def test_seed_fixture_loads_independent_of_current_working_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    fixture = load_seed_fixture()
+
+    assert fixture.workspace.slug
+    assert fixture.project.slug
+    assert fixture.actor.handle

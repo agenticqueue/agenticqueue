@@ -15,6 +15,7 @@ COPY apps/api ./apps/api
 COPY apps/cli ./apps/cli
 COPY config ./config
 COPY docs/surface-1.0.md ./docs/surface-1.0.md
+COPY examples ./examples
 COPY policies ./policies
 COPY schemas ./schemas
 COPY task_types ./task_types
@@ -56,6 +57,7 @@ COPY --from=builder --chown=app:app /workspace/apps/api ./apps/api
 COPY --from=builder --chown=app:app /workspace/apps/cli ./apps/cli
 COPY --from=builder --chown=app:app /workspace/config ./config
 COPY --from=builder --chown=app:app /workspace/docs/surface-1.0.md ./docs/surface-1.0.md
+COPY --from=builder --chown=app:app /workspace/examples ./examples
 COPY --from=builder --chown=app:app /workspace/policies ./policies
 COPY --from=builder --chown=app:app /workspace/schemas ./schemas
 COPY --from=builder --chown=app:app /workspace/task_types ./task_types

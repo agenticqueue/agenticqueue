@@ -35,6 +35,19 @@ PSYCOPG_PREFIX = "postgresql://"
 TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 
 
+def _derive_direct_port(port: int | None) -> int | None:
+    configured_direct_port = os.getenv("AGENTICQUEUE_DB_PORT") or os.getenv("DB_PORT")
+    if configured_direct_port:
+        return int(configured_direct_port)
+    if port == 6432:
+        return 5432
+    if port is not None:
+        port_text = str(port)
+        if len(port_text) == 5 and port_text.startswith("643"):
+            return int(f"543{port_text[3:]}")
+    return port
+
+
 def _with_query_defaults(url: str, defaults: dict[str, str]) -> str:
     parts = urlsplit(url)
     query = dict(parse_qsl(parts.query, keep_blank_values=True))
@@ -96,12 +109,7 @@ def get_direct_sync_database_url() -> str:
     hostname = parts.hostname
     port = parts.port
     direct_hostname = "db" if hostname == "pgbouncer" else hostname
-    configured_direct_port = os.getenv("AGENTICQUEUE_DB_PORT") or os.getenv("DB_PORT")
-    direct_port: int | None
-    if configured_direct_port:
-        direct_port = int(configured_direct_port)
-    else:
-        direct_port = 5432 if port == 6432 else 54329 if port == 64329 else port
+    direct_port = _derive_direct_port(port)
 
     netloc = ""
     if parts.username:
@@ -123,12 +131,7 @@ def get_direct_database_url() -> str:
     hostname = parts.hostname
     port = parts.port
     direct_hostname = "db" if hostname == "pgbouncer" else hostname
-    configured_direct_port = os.getenv("AGENTICQUEUE_DB_PORT") or os.getenv("DB_PORT")
-    direct_port: int | None
-    if configured_direct_port:
-        direct_port = int(configured_direct_port)
-    else:
-        direct_port = 5432 if port == 6432 else 54329 if port == 64329 else port
+    direct_port = _derive_direct_port(port)
 
     netloc = ""
     if parts.username:
