@@ -36,6 +36,7 @@ from agenticqueue_api.models import (
     TaskRecord,
 )
 from agenticqueue_api.models.edge import EdgeRecord, EdgeRelation
+from agenticqueue_api.models.edge import edge_metadata_marks_superseded
 from agenticqueue_api.models.shared import SchemaModel
 from agenticqueue_api.packet_versions import get_current_packet_version
 from agenticqueue_api.repo import release_claim
@@ -331,6 +332,87 @@ def _persist_learning_drafts(
     return created
 
 
+def _active_dependency_target_ids(
+    session: Session,
+    *,
+    task_id: uuid.UUID,
+) -> list[uuid.UUID]:
+    edges = session.scalars(
+        sa.select(EdgeRecord)
+        .where(
+            EdgeRecord.src_entity_type == "task",
+            EdgeRecord.src_id == task_id,
+            EdgeRecord.dst_entity_type == "task",
+            EdgeRecord.relation == EdgeRelation.DEPENDS_ON,
+        )
+        .order_by(EdgeRecord.created_at.asc(), EdgeRecord.id.asc())
+    ).all()
+    return [
+        edge.dst_id
+        for edge in edges
+        if not edge_metadata_marks_superseded(edge.edge_metadata)
+    ]
+
+
+def _unblock_ready_dependents(
+    session: Session,
+    *,
+    completed_task_id: uuid.UUID,
+    actor_id: uuid.UUID | None,
+) -> list[uuid.UUID]:
+    dependent_ids = session.scalars(
+        sa.select(EdgeRecord.src_id)
+        .where(
+            EdgeRecord.src_entity_type == "task",
+            EdgeRecord.dst_entity_type == "task",
+            EdgeRecord.dst_id == completed_task_id,
+            EdgeRecord.relation == EdgeRelation.DEPENDS_ON,
+        )
+        .order_by(EdgeRecord.created_at.asc(), EdgeRecord.id.asc())
+    ).all()
+
+    unblocked: list[uuid.UUID] = []
+    for dependent_id in list(dict.fromkeys(dependent_ids)):
+        dependent = session.get(TaskRecord, dependent_id)
+        if dependent is None or dependent.state != TaskState.BLOCKED.value:
+            continue
+
+        dependency_ids = _active_dependency_target_ids(session, task_id=dependent_id)
+        if not dependency_ids:
+            continue
+
+        dependency_states = {
+            record.id: record.state
+            for record in session.scalars(
+                sa.select(TaskRecord).where(TaskRecord.id.in_(dependency_ids))
+            )
+        }
+        if any(
+            dependency_states.get(dependency_id) != TaskState.DONE.value
+            for dependency_id in dependency_ids
+        ):
+            continue
+
+        dependent.state = TaskState.QUEUED.value
+        dependent.claimed_by_actor_id = None
+        dependent.claimed_at = None
+        session.flush()
+        _audit(
+            session,
+            actor_id=actor_id,
+            task_id=dependent.id,
+            action="JOB_UNBLOCKED",
+            after={
+                "state": dependent.state,
+                "dependency_task_id": str(completed_task_id),
+                "dependency_count": len(dependency_ids),
+            },
+        )
+        unblocked.append(dependent.id)
+
+    return unblocked
+
+
 def submit_task(
     session: Session,
     *,
@@ -554,6 +636,12 @@ def submit_task(
         run_id=run_record.id,
         submission=normalized_submission,
     )
+    if task_record.state == TaskState.DONE.value:
+        _unblock_ready_dependents(
+            session,
+            completed_task_id=task_record.id,
+            actor_id=actor.id,
+        )
 
     _audit(
         session,
@@ -643,6 +731,11 @@ def approve_task(
     task_record.claimed_at = None
     session.flush()
     session.refresh(task_record)
+    _unblock_ready_dependents(
+        session,
+        completed_task_id=task_record.id,
+        actor_id=actor.id,
+    )
 
     _audit(
         session,
