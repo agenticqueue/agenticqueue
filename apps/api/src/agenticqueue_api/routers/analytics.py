@@ -239,20 +239,28 @@ def _blocked_heatmap(
     start_at: dt.datetime,
     end_at: dt.datetime,
 ) -> list[BlockedHeatmapCellView]:
-    blocked_tasks = session.scalars(
-        sa.select(TaskRecord)
+    blocked_task_rows = session.execute(
+        sa.select(
+            TaskRecord.id,
+            TaskRecord.sequence,
+            TaskRecord.updated_at,
+        )
         .where(
             TaskRecord.state.in_(("blocked", "parked")),
             TaskRecord.updated_at >= start_at,
         )
         .order_by(TaskRecord.updated_at.desc(), TaskRecord.id.desc())
     ).all()
-    if not blocked_tasks:
+    if not blocked_task_rows:
         return []
 
-    blocked_ids = [task.id for task in blocked_tasks]
-    edges = session.scalars(
-        sa.select(EdgeRecord)
+    blocked_ids = [row.id for row in blocked_task_rows]
+    edge_rows = session.execute(
+        sa.select(
+            EdgeRecord.src_id,
+            EdgeRecord.dst_id,
+            EdgeRecord.edge_metadata,
+        )
         .where(
             EdgeRecord.src_entity_type == "task",
             EdgeRecord.dst_entity_type == "task",
@@ -263,22 +271,28 @@ def _blocked_heatmap(
     ).all()
 
     active_edges = [
-        edge for edge in edges if not edge_metadata_marks_superseded(edge.edge_metadata)
+        edge
+        for edge in edge_rows
+        if not edge_metadata_marks_superseded(edge.edge_metadata)
     ]
-    edges_by_blocked_id: dict[uuid.UUID, list[EdgeRecord]] = defaultdict(list)
+    edges_by_blocked_id: dict[uuid.UUID, list[Any]] = defaultdict(list)
     for edge in active_edges:
         edges_by_blocked_id[edge.src_id].append(edge)
     dependency_ids = sorted({edge.dst_id for edge in active_edges})
     dependency_by_id = {
-        task.id: task
-        for task in session.scalars(
-            sa.select(TaskRecord).where(TaskRecord.id.in_(dependency_ids))
+        row.id: row
+        for row in session.execute(
+            sa.select(
+                TaskRecord.id,
+                TaskRecord.sequence,
+                TaskRecord.title,
+            ).where(TaskRecord.id.in_(dependency_ids))
         ).all()
     }
 
     aggregate: dict[str, dict[str, Any]] = {}
 
-    for blocked_task in blocked_tasks:
+    for blocked_task in blocked_task_rows:
         blocked_hours = max(
             (end_at - blocked_task.updated_at).total_seconds() / 3600.0,
             0.0,
@@ -363,7 +377,6 @@ def _run_durations(
             WHERE run.started_at IS NOT NULL
               AND run.ended_at IS NOT NULL
               AND run.ended_at >= :start_at
-            ORDER BY run.ended_at ASC, run.id ASC
             """),
         {"start_at": start_at},
     ).mappings()

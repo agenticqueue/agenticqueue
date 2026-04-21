@@ -1,0 +1,79 @@
+{
+  "captured_at": "2026-04-21T17:01:11.770289+00:00",
+  "dataset": {
+    "window_days": 90,
+    "recent_workload_task_count": 10000,
+    "historical_workload_task_count": 90000,
+    "blocker_task_count": 120,
+    "total_task_count": 100120,
+    "run_count": 100000,
+    "blocked_task_count": 1000,
+    "edge_count": 1000,
+    "packet_version_count": 400,
+    "review_queue_count": 1182
+  },
+  "plans": {
+    "cycle_time": {
+      "root_node": "Sort",
+      "actual_total_time_ms": 4.273,
+      "actual_rows": 3,
+      "seq_scans": []
+    },
+    "blocked_task_lookup": {
+      "root_node": "Sort",
+      "actual_total_time_ms": 0.493,
+      "actual_rows": 1000,
+      "seq_scans": []
+    },
+    "blocked_edge_lookup": {
+      "root_node": "Sort",
+      "actual_total_time_ms": 0.338,
+      "actual_rows": 1000,
+      "seq_scans": [
+        "edge"
+      ]
+    },
+    "handoff_run_scan": {
+      "root_node": "Hash Join",
+      "actual_total_time_ms": 4.453,
+      "actual_rows": 10000,
+      "seq_scans": [
+        "actor"
+      ]
+    }
+  },
+  "latencies_ms": {
+    "cycle_time": {
+      "p50_ms": 3.78,
+      "p95_ms": 6.98,
+      "max_ms": 9.62
+    },
+    "blocked_heatmap": {
+      "p50_ms": 22.78,
+      "p95_ms": 32.17,
+      "max_ms": 139.25
+    },
+    "handoff_metrics": {
+      "p50_ms": 40.51,
+      "p95_ms": 65.92,
+      "max_ms": 93.65
+    },
+    "analytics_endpoint": {
+      "p50_ms": 96.14,
+      "p95_ms": 159.09,
+      "max_ms": 241.31
+    }
+  },
+  "notes": {
+    "window": "90d",
+    "warmup_runs": 5,
+    "measured_runs": 25,
+    "approach": "Seeds representative data inside a single transaction, measures warm latency against the live analytics code paths, then rolls the entire dataset back."
+  },
+  "thresholds": {
+    "max_query_p95_ms": 100.0,
+    "max_endpoint_p95_ms": 250.0
+  },
+  "status": "pass",
+  "failures": []
+}
