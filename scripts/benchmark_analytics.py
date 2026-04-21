@@ -13,6 +13,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 from typing import Callable
+from typing import cast
 
 import sqlalchemy as sa
 from fastapi.testclient import TestClient
@@ -142,11 +143,14 @@ def explain_plan(
     sql: str,
     params: dict[str, Any],
 ) -> dict[str, Any]:
-    plan_json = connection.execute(
+    raw_plan = connection.execute(
         sa.text("EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) " + sql),
         params,
     ).scalar()
-    plan = plan_json[0]["Plan"]
+    if raw_plan is None:
+        raise RuntimeError("EXPLAIN returned no plan")
+    plan_json = cast(list[dict[str, Any]], raw_plan)
+    plan = cast(dict[str, Any], plan_json[0]["Plan"])
     return {
         "root_node": plan.get("Node Type"),
         "actual_total_time_ms": round(float(plan.get("Actual Total Time", 0.0)), 3),
