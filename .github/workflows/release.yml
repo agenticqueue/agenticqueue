@@ -7,12 +7,14 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
     env:
       TAG_NAME: ${{ github.event.release.tag_name }}
     steps:
@@ -30,6 +32,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4.1.0
+
+      - name: Check Cosign installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cosign version
 
       - name: Install Python release tooling
         shell: bash
@@ -138,9 +149,7 @@ jobs:
               handle.write(f"summary={summary}\n")
           PY
 
-      - name: Upload release assets
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Sign release blobs with Sigstore keyless
         shell: bash
         run: |
           set -euo pipefail
@@ -151,6 +160,56 @@ jobs:
           )
           if [ "${{ steps.node_sbom.outputs.generated }}" = "true" ]; then
             assets+=("dist/sbom.node.cdx.json")
+          fi
+
+          for asset in "${assets[@]}"; do
+            bundle="dist/$(basename "$asset").sigstore.json"
+            cosign sign-blob --yes --bundle "$bundle" "$asset"
+          done
+
+      - name: Verify Sigstore bundles
+        shell: bash
+        env:
+          COSIGN_CERTIFICATE_IDENTITY_REGEXP: ^https://github.com/${{ github.repository }}/\.github/workflows/release.yml@refs/tags/
+        run: |
+          set -euo pipefail
+          assets=(
+            "${{ steps.bundle.outputs.path }}"
+            "dist/sbom.cdx.json"
+            "dist/grype-report.json"
+          )
+          if [ "${{ steps.node_sbom.outputs.generated }}" = "true" ]; then
+            assets+=("dist/sbom.node.cdx.json")
+          fi
+
+          for asset in "${assets[@]}"; do
+            bundle="dist/$(basename "$asset").sigstore.json"
+            cosign verify-blob \
+              --bundle "$bundle" \
+              --certificate-identity-regexp "$COSIGN_CERTIFICATE_IDENTITY_REGEXP" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "$asset"
+          done
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets=(
+            "${{ steps.bundle.outputs.path }}"
+            "dist/$(basename "${{ steps.bundle.outputs.path }}").sigstore.json"
+            "dist/sbom.cdx.json"
+            "dist/sbom.cdx.json.sigstore.json"
+            "dist/grype-report.json"
+            "dist/grype-report.json.sigstore.json"
+          )
+          if [ "${{ steps.node_sbom.outputs.generated }}" = "true" ]; then
+            assets+=(
+              "dist/sbom.node.cdx.json"
+              "dist/sbom.node.cdx.json.sigstore.json"
+            )
           fi
           gh release upload "$TAG_NAME" "${assets[@]}" --clobber
 
@@ -163,9 +222,9 @@ jobs:
           set -euo pipefail
           gh release view "$TAG_NAME" --json body --jq '.body // ""' > dist/release-body.txt
 
-          asset_summary="$(basename "${{ steps.bundle.outputs.path }}"), sbom.cdx.json, grype-report.json"
+          asset_summary="$(basename "${{ steps.bundle.outputs.path }}"), $(basename "${{ steps.bundle.outputs.path }}").sigstore.json, sbom.cdx.json, sbom.cdx.json.sigstore.json, grype-report.json, grype-report.json.sigstore.json"
           if [ "${{ steps.node_sbom.outputs.generated }}" = "true" ]; then
-            asset_summary="${asset_summary}, sbom.node.cdx.json"
+            asset_summary="${asset_summary}, sbom.node.cdx.json, sbom.node.cdx.json.sigstore.json"
           fi
           export ASSET_SUMMARY="$asset_summary"
 
