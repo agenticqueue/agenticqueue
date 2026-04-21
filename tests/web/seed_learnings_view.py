@@ -90,7 +90,10 @@ def main() -> None:
             scope="task",
             status="active",
             confidence="confirmed",
-            evidence=["artifact://playwright-smoke", "tests/web/seed_learnings_view.py"],
+            evidence=[
+                "artifact://playwright-smoke",
+                "tests/web/seed_learnings_view.py",
+            ],
             created_at=dt.datetime(2026, 4, 20, 12, 0, tzinfo=dt.timezone.utc),
         )
         _merge_learning(
