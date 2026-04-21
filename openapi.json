@@ -878,6 +878,25 @@
         "title": "CycleTimeMetricView",
         "type": "object"
       },
+      "DecisionLinkRequest": {
+        "description": "Payload linking one decision to one job/task.",
+        "properties": {
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "relation": {
+            "$ref": "#/components/schemas/EdgeRelation",
+            "default": "informed_by"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "DecisionLinkRequest",
+        "type": "object"
+      },
       "DecisionModel": {
         "description": "Pydantic schema for a decision.",
         "properties": {
@@ -963,6 +982,21 @@
           "decided_at"
         ],
         "title": "DecisionModel",
+        "type": "object"
+      },
+      "DecisionSupersedeRequest": {
+        "description": "Payload linking a replacement decision to the superseded one.",
+        "properties": {
+          "replaced_by": {
+            "format": "uuid",
+            "title": "Replaced By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "replaced_by"
+        ],
+        "title": "DecisionSupersedeRequest",
         "type": "object"
       },
       "DedupeSuggestion": {
@@ -1564,6 +1598,104 @@
         "title": "GrantCapabilityRequest",
         "type": "object"
       },
+      "GraphHitsResponse": {
+        "description": "Traversal payload shared by the graph read endpoints.",
+        "properties": {
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GraphTraversalHit"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "GraphHitsResponse",
+        "type": "object"
+      },
+      "GraphSurfaceHit": {
+        "description": "One entity matched by a surface-area search.",
+        "properties": {
+          "entity_id": {
+            "format": "uuid",
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "matched_tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Matched Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id",
+          "matched_tags"
+        ],
+        "title": "GraphSurfaceHit",
+        "type": "object"
+      },
+      "GraphSurfaceResponse": {
+        "description": "Surface-area search payload.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GraphSurfaceHit"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "GraphSurfaceResponse",
+        "type": "object"
+      },
+      "GraphTraversalHit": {
+        "description": "Traversal result with hop distance from the root.",
+        "properties": {
+          "depth": {
+            "title": "Depth",
+            "type": "integer"
+          },
+          "entity_id": {
+            "format": "uuid",
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "title": "Entity Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id",
+          "depth"
+        ],
+        "title": "GraphTraversalHit",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1610,6 +1742,134 @@
           "count"
         ],
         "title": "HistogramBucketView",
+        "type": "object"
+      },
+      "IdempotencyStatsResponse": {
+        "description": "Current idempotency cache counters.",
+        "properties": {
+          "active_count": {
+            "title": "Active Count",
+            "type": "integer"
+          },
+          "expired_count": {
+            "title": "Expired Count",
+            "type": "integer"
+          },
+          "hit_count": {
+            "title": "Hit Count",
+            "type": "integer"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hit_count",
+          "row_count",
+          "expired_count",
+          "active_count"
+        ],
+        "title": "IdempotencyStatsResponse",
+        "type": "object"
+      },
+      "InitWizardResult": {
+        "description": "Result payload for the first-run setup flow.",
+        "properties": {
+          "actor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "api_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Token"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "policy_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Id"
+          },
+          "policy_name": {
+            "default": "default-coding",
+            "title": "Policy Name",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "status": {
+            "enum": [
+              "initialized",
+              "noop"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
+          }
+        },
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "InitWizardResult",
         "type": "object"
       },
       "LearningConfidence": {
@@ -1914,6 +2174,42 @@
         "title": "LearningType",
         "type": "string"
       },
+      "McpStatsResponse": {
+        "description": "Current MCP transport statistics.",
+        "properties": {
+          "http_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Port"
+          },
+          "tool_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Count"
+          },
+          "transports": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Transports",
+            "type": "array"
+          }
+        },
+        "title": "McpStatsResponse",
+        "type": "object"
+      },
       "MemoryLayer": {
         "description": "Storage tiers used by the retrieval system.",
         "enum": [
@@ -2099,6 +2395,82 @@
         ],
         "title": "MergeDecision",
         "type": "string"
+      },
+      "PacketCacheStatsResponse": {
+        "description": "Current compiled-packet cache counters.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hit Rate"
+          },
+          "hits": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hits"
+          },
+          "invalidations": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidations"
+          },
+          "listener_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listener Error"
+          },
+          "miss_reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Miss Reasons",
+            "type": "object"
+          },
+          "misses": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Misses"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "PacketCacheStatsResponse",
+        "type": "object"
       },
       "PacketPermissions": {
         "description": "Resolved permissions for one packet.",
@@ -2766,6 +3138,39 @@
         "title": "RoleView",
         "type": "object"
       },
+      "RotateOwnKeyRequest": {
+        "description": "Optional overrides when rotating the current actor token.",
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          }
+        },
+        "title": "RotateOwnKeyRequest",
+        "type": "object"
+      },
       "RunModel": {
         "description": "Pydantic schema for a run.",
         "properties": {
@@ -2877,6 +3282,27 @@
           "items"
         ],
         "title": "SearchLearningsResponse",
+        "type": "object"
+      },
+      "StatsResponse": {
+        "description": "System stats exposed over the REST surface.",
+        "properties": {
+          "idempotency": {
+            "$ref": "#/components/schemas/IdempotencyStatsResponse"
+          },
+          "mcp": {
+            "$ref": "#/components/schemas/McpStatsResponse"
+          },
+          "packet_cache": {
+            "$ref": "#/components/schemas/PacketCacheStatsResponse"
+          }
+        },
+        "required": [
+          "idempotency",
+          "packet_cache",
+          "mcp"
+        ],
+        "title": "StatsResponse",
         "type": "object"
       },
       "SubmitTaskLearningRequest": {
@@ -3047,6 +3473,40 @@
           "partial"
         ],
         "title": "SyncMemoryResponse",
+        "type": "object"
+      },
+      "TaskCommentRequest": {
+        "description": "Comment body attached to one task.",
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "TaskCommentRequest",
+        "type": "object"
+      },
+      "TaskCommentResponse": {
+        "description": "Acknowledgement for one posted task comment.",
+        "properties": {
+          "commented": {
+            "title": "Commented",
+            "type": "boolean"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "commented"
+        ],
+        "title": "TaskCommentResponse",
         "type": "object"
       },
       "TaskDecisionRequest": {
@@ -3332,8 +3792,35 @@
         "title": "TransitionResultView",
         "type": "object"
       },
+      "UpdateTaskTypeRequest": {
+        "description": "Payload for replacing one task type definition.",
+        "properties": {
+          "policy": {
+            "additionalProperties": true,
+            "title": "Policy",
+            "type": "object"
+          },
+          "schema": {
+            "additionalProperties": true,
+            "title": "Schema",
+            "type": "object"
+          }
+        },
+        "required": [
+          "schema"
+        ],
+        "title": "UpdateTaskTypeRequest",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
           "loc": {
             "items": {
               "anyOf": [
@@ -3435,6 +3922,64 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "health_healthz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Healthz Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/setup": {
+      "post": {
+        "operationId": "setup_setup_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitWizardResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Setup"
+      }
+    },
+    "/stats": {
+      "get": {
+        "operationId": "stats_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Stats"
+      }
+    },
     "/v1/actors": {
       "get": {
         "operationId": "list_actors_v1_actors_get",
@@ -3553,6 +4098,51 @@
           }
         },
         "summary": "Create Actors"
+      }
+    },
+    "/v1/actors/me/rotate-key": {
+      "post": {
+        "operationId": "rotate_own_key_endpoint_v1_actors_me_rotate_key_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RotateOwnKeyRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionApiTokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rotate Own Key Endpoint"
       }
     },
     "/v1/actors/{actor_id}/capabilities": {
@@ -4663,6 +5253,106 @@
         "summary": "Create Decisions"
       }
     },
+    "/v1/decisions/{decision_id}/link": {
+      "post": {
+        "operationId": "link_decision_endpoint_v1_decisions__decision_id__link_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link Decision Endpoint"
+      }
+    },
+    "/v1/decisions/{decision_id}/supersede": {
+      "post": {
+        "operationId": "supersede_decision_endpoint_v1_decisions__decision_id__supersede_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionSupersedeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EdgeModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Supersede Decision Endpoint"
+      }
+    },
     "/v1/decisions/{entity_id}": {
       "delete": {
         "operationId": "delete_decisions_v1_decisions__entity_id__delete",
@@ -5087,6 +5777,232 @@
           }
         },
         "summary": "Update Edges"
+      }
+    },
+    "/v1/graph/neighborhood/{entity_id}": {
+      "get": {
+        "operationId": "graph_neighborhood_endpoint_v1_graph_neighborhood__entity_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entity_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entity_type",
+            "required": false,
+            "schema": {
+              "default": "task",
+              "minLength": 1,
+              "title": "Entity Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hops",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 10,
+              "minimum": 1,
+              "title": "Hops",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "edge",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Edge"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphHitsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Graph Neighborhood Endpoint"
+      }
+    },
+    "/v1/graph/surface": {
+      "get": {
+        "operationId": "graph_surface_endpoint_v1_graph_surface_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tag",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Tag",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphSurfaceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Graph Surface Endpoint"
+      }
+    },
+    "/v1/graph/traverse/{entity_id}": {
+      "get": {
+        "operationId": "graph_traverse_endpoint_v1_graph_traverse__entity_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entity_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entity_type",
+            "required": false,
+            "schema": {
+              "default": "task",
+              "minLength": 1,
+              "title": "Entity Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "default": "descendants",
+              "title": "Direction",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "edge",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Edge"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_depth",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Max Depth",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphHitsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Graph Traverse Endpoint"
       }
     },
     "/v1/learnings": {
@@ -7033,6 +7949,92 @@
         "summary": "Register Task Type"
       }
     },
+    "/v1/task-types/{task_type_name}": {
+      "get": {
+        "operationId": "get_task_type_endpoint_v1_task_types__task_type_name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_type_name",
+            "required": true,
+            "schema": {
+              "title": "Task Type Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskTypeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Task Type Endpoint"
+      },
+      "patch": {
+        "operationId": "update_task_type_endpoint_v1_task_types__task_type_name__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_type_name",
+            "required": true,
+            "schema": {
+              "title": "Task Type Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskTypeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskTypeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Task Type Endpoint"
+      }
+    },
     "/v1/tasks": {
       "get": {
         "operationId": "list_tasks_v1_tasks_get",
@@ -7151,6 +8153,102 @@
           }
         },
         "summary": "Create Tasks"
+      }
+    },
+    "/v1/tasks/claim": {
+      "post": {
+        "operationId": "claim_next_task_endpoint_v1_tasks_claim_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "labels",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Labels"
+            }
+          },
+          {
+            "in": "query",
+            "name": "claim_states",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Claim States"
+            }
+          },
+          {
+            "in": "query",
+            "name": "claimed_state",
+            "required": false,
+            "schema": {
+              "default": "claimed",
+              "minLength": 1,
+              "title": "Claimed State",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Claim Next Task Endpoint"
       }
     },
     "/v1/tasks/{entity_id}": {
@@ -7403,6 +8501,56 @@
         "summary": "Claim Task Endpoint"
       }
     },
+    "/v1/tasks/{task_id}/comments": {
+      "post": {
+        "operationId": "comment_on_task_endpoint_v1_tasks__task_id__comments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCommentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCommentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Comment On Task Endpoint"
+      }
+    },
     "/v1/tasks/{task_id}/escrow-unlock": {
       "post": {
         "operationId": "force_unlock_task_escrow_v1_tasks__task_id__escrow_unlock_post",
@@ -7555,6 +8703,86 @@
           }
         },
         "summary": "Reject Task Endpoint"
+      }
+    },
+    "/v1/tasks/{task_id}/release": {
+      "post": {
+        "operationId": "release_task_endpoint_v1_tasks__task_id__release_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Release Task Endpoint"
+      }
+    },
+    "/v1/tasks/{task_id}/reset": {
+      "post": {
+        "operationId": "reset_task_endpoint_v1_tasks__task_id__reset_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Task Endpoint"
       }
     },
     "/v1/tasks/{task_id}/submit": {

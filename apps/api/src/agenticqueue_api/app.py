@@ -28,12 +28,14 @@ from agenticqueue_api.auth import (
     token_display_prefix,
 )
 from agenticqueue_api.capabilities import (
+    ensure_actor_has_capability,
     grant_capability,
     list_capabilities_for_actor,
     require_capability,
     revoke_capability_grant,
 )
 from agenticqueue_api.config import (
+    get_mcp_http_port,
     get_auto_setup_enabled,
     get_max_body_bytes,
     get_mcp_transports,
@@ -69,6 +71,7 @@ from agenticqueue_api.middleware import (
     REQUEST_ID_HEADER,
     SecretRedactionMiddleware,
 )
+from agenticqueue_api.middleware.idempotency import get_idempotency_stats
 from agenticqueue_api.learnings import (
     ConfirmLearningDraftRequest,
     ConfirmedDraftLearningView,
@@ -83,8 +86,12 @@ from agenticqueue_api.models import (
     ActorModel,
     ActorRecord,
     ApiTokenModel,
+    AuditLogRecord,
     CapabilityGrantModel,
     CapabilityKey,
+    DecisionRecord,
+    EdgeModel,
+    EdgeRelation,
     LearningRecord,
     RoleAssignmentModel,
     RoleModel,
@@ -106,11 +113,12 @@ from agenticqueue_api.pagination import (
 from agenticqueue_api.routers import (
     build_analytics_router,
     build_audit_router,
+    build_graph_router,
     build_learnings_router,
     build_memory_router,
     build_packets_router,
 )
-from agenticqueue_api.repo import claim_task
+from agenticqueue_api.repo import claim_next, claim_task, create_edge, release_claim
 from agenticqueue_api.roles import (
     assign_role,
     list_role_assignments_for_actor,
@@ -298,6 +306,85 @@ class RegisterTaskTypeRequest(SchemaModel):
     policy: dict[str, Any] = Field(default_factory=dict)
 
 
+class UpdateTaskTypeRequest(SchemaModel):
+    """Payload for replacing one task type definition."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    schema_document: dict[str, Any] = Field(alias="schema")
+    policy: dict[str, Any] = Field(default_factory=dict)
+
+
+class RotateOwnKeyRequest(SchemaModel):
+    """Optional overrides when rotating the current actor token."""
+
+    scopes: list[str] | None = None
+    expires_at: dt.datetime | None = None
+
+
+class TaskCommentRequest(SchemaModel):
+    """Comment body attached to one task."""
+
+    body: str
+
+
+class TaskCommentResponse(SchemaModel):
+    """Acknowledgement for one posted task comment."""
+
+    job_id: uuid.UUID
+    commented: bool
+
+
+class DecisionSupersedeRequest(SchemaModel):
+    """Payload linking a replacement decision to the superseded one."""
+
+    replaced_by: uuid.UUID
+
+
+class DecisionLinkRequest(SchemaModel):
+    """Payload linking one decision to one job/task."""
+
+    job_id: uuid.UUID
+    relation: EdgeRelation = EdgeRelation.INFORMED_BY
+
+
+class IdempotencyStatsResponse(SchemaModel):
+    """Current idempotency cache counters."""
+
+    hit_count: int
+    row_count: int
+    expired_count: int
+    active_count: int
+
+
+class PacketCacheStatsResponse(SchemaModel):
+    """Current compiled-packet cache counters."""
+
+    enabled: bool
+    hits: int | None = None
+    misses: int | None = None
+    hit_rate: float | None = None
+    miss_reasons: dict[str, int] = Field(default_factory=dict)
+    invalidations: int | None = None
+    listener_error: str | None = None
+
+
+class McpStatsResponse(SchemaModel):
+    """Current MCP transport statistics."""
+
+    tool_count: int | None = None
+    transports: list[str] = Field(default_factory=list)
+    http_port: int | None = None
+
+
+class StatsResponse(SchemaModel):
+    """System stats exposed over the REST surface."""
+
+    idempotency: IdempotencyStatsResponse
+    packet_cache: PacketCacheStatsResponse
+    mcp: McpStatsResponse
+
+
 def _default_session_factory() -> sessionmaker[Session]:
     engine = sa.create_engine(
         get_sqlalchemy_sync_database_url(),
@@ -392,6 +479,89 @@ def _task_type_view(definition: TaskTypeDefinition) -> TaskTypeView:
     )
 
 
+def _task_record_or_404(session: Session, task_id: uuid.UUID) -> TaskRecord:
+    task = session.get(TaskRecord, task_id)
+    if task is None:
+        raise_api_error(status.HTTP_404_NOT_FOUND, "Task not found")
+    return task
+
+
+def _decision_record_or_404(
+    session: Session,
+    decision_id: uuid.UUID,
+) -> DecisionRecord:
+    decision = session.get(DecisionRecord, decision_id)
+    if decision is None:
+        raise_api_error(status.HTTP_404_NOT_FOUND, "Decision not found")
+    return decision
+
+
+def _task_record_for_decision_or_404(
+    session: Session,
+    decision: DecisionRecord,
+) -> TaskRecord:
+    return _task_record_or_404(session, decision.task_id)
+
+
+def _require_update_task_capability_for_task(
+    session: Session,
+    *,
+    actor: ActorModel,
+    task: TaskRecord,
+) -> None:
+    ensure_actor_has_capability(
+        session,
+        actor=actor,
+        capability=CapabilityKey.UPDATE_TASK,
+        required_scope={"project_id": str(task.project_id)},
+        entity_type="task",
+        entity_id=task.id,
+    )
+
+
+def _task_audit(
+    session: Session,
+    *,
+    actor_id: uuid.UUID | None,
+    task_id: uuid.UUID,
+    action: str,
+    after: dict[str, Any],
+) -> None:
+    session.execute(
+        sa.insert(AuditLogRecord).values(
+            actor_id=actor_id,
+            entity_type="task",
+            entity_id=task_id,
+            action=action,
+            before=None,
+            after=after,
+            trace_id=session.info.get("agenticqueue_audit_trace_id"),
+            redaction=session.info.get("agenticqueue_audit_redaction"),
+        )
+    )
+
+
+def _packet_cache_stats_response(app: FastAPI) -> PacketCacheStatsResponse:
+    packet_cache = getattr(app.state, "packet_cache", None)
+    if packet_cache is None:
+        return PacketCacheStatsResponse(enabled=False)
+
+    stats = packet_cache.stats()
+    return PacketCacheStatsResponse(
+        enabled=True,
+        hits=stats.hits,
+        misses=stats.misses,
+        hit_rate=stats.hit_rate,
+        miss_reasons=stats.miss_reasons,
+        invalidations=stats.invalidations,
+        listener_error=(
+            None
+            if packet_cache.listener_error is None
+            else str(packet_cache.listener_error)
+        ),
+    )
+
+
 def _paginate_sequence(
     values: Sequence[Any],
     *,
@@ -429,6 +599,13 @@ def _require_actor(request: Request) -> ActorModel:
     if actor is None:
         raise_api_error(status.HTTP_401_UNAUTHORIZED, "Invalid bearer token")
     return cast(ActorModel, actor)
+
+
+def _require_api_token(request: Request) -> ApiTokenModel:
+    api_token = getattr(request.state, "api_token", None)
+    if not isinstance(api_token, ApiTokenModel):
+        raise_api_error(status.HTTP_401_UNAUTHORIZED, "Invalid bearer token")
+    return api_token
 
 
 def _require_admin_actor(request: Request) -> ActorModel:
@@ -619,11 +796,13 @@ def create_app(
     install_exception_handlers(app)
     app.include_router(build_analytics_router(get_db_session))
     app.include_router(build_audit_router(get_db_session))
+    app.include_router(build_graph_router(get_db_session))
     app.include_router(build_learnings_router(get_db_session))
     app.include_router(build_memory_router(get_db_session))
     app.include_router(build_packets_router(get_db_session))
     app.include_router(build_crud_router(get_db_session))
 
+    @app.get("/healthz")
     @app.get("/health", include_in_schema=False)
     @app.get("/v1/health", include_in_schema=False)
     def health() -> dict[str, str]:
@@ -632,9 +811,38 @@ def create_app(
             "version": app.version,
         }
 
+    @app.get("/stats", response_model=StatsResponse)
+    def stats(
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> StatsResponse:
+        _require_actor(request)
+        idempotency = get_idempotency_stats(session)
+        mcp_server = getattr(app.state, "mcp_server", None)
+        registered_tools = (
+            None
+            if mcp_server is None
+            else getattr(mcp_server, "agenticqueue_registered_tools", None)
+        )
+        return StatsResponse(
+            idempotency=IdempotencyStatsResponse(
+                hit_count=idempotency.hit_count,
+                row_count=idempotency.row_count,
+                expired_count=idempotency.expired_count,
+                active_count=idempotency.active_count,
+            ),
+            packet_cache=_packet_cache_stats_response(app),
+            mcp=McpStatsResponse(
+                tool_count=(
+                    None if registered_tools is None else len(registered_tools)
+                ),
+                transports=list(get_mcp_transports()),
+                http_port=get_mcp_http_port(),
+            ),
+        )
+
     @app.post(
         "/setup",
-        include_in_schema=False,
         response_model=InitWizardResult,
         status_code=status.HTTP_201_CREATED,
     )
@@ -733,6 +941,42 @@ def create_app(
             raise_api_error(status.HTTP_400_BAD_REQUEST, str(error))
         return _task_type_view(definition)
 
+    @app.get(
+        "/task-types/{task_type_name}",
+        include_in_schema=False,
+        response_model=TaskTypeView,
+    )
+    @app.get("/v1/task-types/{task_type_name}", response_model=TaskTypeView)
+    def get_task_type_endpoint(
+        task_type_name: str,
+        request: Request,
+    ) -> TaskTypeView:
+        _require_actor(request)
+        registry = get_task_type_registry(request)
+        try:
+            definition = registry.get(task_type_name)
+        except ValueError:
+            raise_api_error(status.HTTP_404_NOT_FOUND, "Task type not found")
+        return _task_type_view(definition)
+
+    @app.patch("/v1/task-types/{task_type_name}", response_model=TaskTypeView)
+    def update_task_type_endpoint(
+        task_type_name: str,
+        payload: UpdateTaskTypeRequest,
+        request: Request,
+    ) -> TaskTypeView:
+        _require_admin_actor(request)
+        registry = get_task_type_registry(request)
+        try:
+            definition = registry.register(
+                name=task_type_name,
+                schema=payload.schema_document,
+                policy=payload.policy,
+            )
+        except ValueError as error:
+            raise_api_error(status.HTTP_400_BAD_REQUEST, str(error))
+        return _task_type_view(definition)
+
     @app.get("/v1/auth/tokens", response_model=ApiTokenListResponse)
     def list_tokens(
         request: Request,
@@ -777,6 +1021,34 @@ def create_app(
                 actor_id=payload.actor_id,
                 scopes=payload.scopes,
                 expires_at=payload.expires_at,
+            )
+            return ProvisionApiTokenResponse(
+                token=raw_token,
+                api_token=_token_view(api_token),
+            )
+
+    @app.post(
+        "/v1/actors/me/rotate-key",
+        response_model=ProvisionApiTokenResponse,
+    )
+    def rotate_own_key_endpoint(
+        request: Request,
+        session: Session = Depends(get_db_session),
+        payload: RotateOwnKeyRequest | None = Body(default=None),
+    ) -> ProvisionApiTokenResponse:
+        with write_timeout(session, endpoint="v1.actors.me.rotate_key"):
+            actor = _require_actor(request)
+            current_api_token = _require_api_token(request)
+            revoke_api_token(session, current_api_token.id)
+            api_token, raw_token = issue_api_token(
+                session,
+                actor_id=actor.id,
+                scopes=(
+                    current_api_token.scopes
+                    if payload is None or payload.scopes is None
+                    else payload.scopes
+                ),
+                expires_at=None if payload is None else payload.expires_at,
             )
             return ProvisionApiTokenResponse(
                 token=raw_token,
@@ -979,6 +1251,106 @@ def create_app(
             roles=[_role_assignment_view(assignment) for assignment in page],
         )
 
+    @app.post(
+        "/v1/decisions/{decision_id}/supersede",
+        response_model=EdgeModel,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def supersede_decision_endpoint(
+        decision_id: uuid.UUID,
+        payload: DecisionSupersedeRequest,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> EdgeModel:
+        with write_timeout(session, endpoint="v1.decisions.supersede"):
+            actor = _require_actor(request)
+            _require_token_scope(request, "decision:write")
+            prior_decision = _decision_record_or_404(session, decision_id)
+            replacement_decision = _decision_record_or_404(session, payload.replaced_by)
+            _require_update_task_capability_for_task(
+                session,
+                actor=actor,
+                task=_task_record_for_decision_or_404(session, prior_decision),
+            )
+            _require_update_task_capability_for_task(
+                session,
+                actor=actor,
+                task=_task_record_for_decision_or_404(session, replacement_decision),
+            )
+            try:
+                return create_edge(
+                    session,
+                    EdgeModel.model_validate(
+                        {
+                            "id": str(uuid.uuid4()),
+                            "created_at": dt.datetime.now(dt.UTC).isoformat(),
+                            "src_entity_type": "decision",
+                            "src_id": str(payload.replaced_by),
+                            "dst_entity_type": "decision",
+                            "dst_id": str(decision_id),
+                            "relation": EdgeRelation.SUPERSEDES.value,
+                            "metadata": {},
+                            "created_by": str(actor.id),
+                        }
+                    ),
+                )
+            except sa.exc.IntegrityError as error:
+                raise_api_error(
+                    status.HTTP_409_CONFLICT,
+                    "Decision supersede link already exists",
+                    details={"reason": str(error.orig) if error.orig else None},
+                )
+
+    @app.post(
+        "/v1/decisions/{decision_id}/link",
+        response_model=EdgeModel,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def link_decision_endpoint(
+        decision_id: uuid.UUID,
+        payload: DecisionLinkRequest,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> EdgeModel:
+        with write_timeout(session, endpoint="v1.decisions.link"):
+            actor = _require_actor(request)
+            _require_token_scope(request, "decision:write")
+            decision = _decision_record_or_404(session, decision_id)
+            target_task = _task_record_or_404(session, payload.job_id)
+            _require_update_task_capability_for_task(
+                session,
+                actor=actor,
+                task=_task_record_for_decision_or_404(session, decision),
+            )
+            _require_update_task_capability_for_task(
+                session,
+                actor=actor,
+                task=target_task,
+            )
+            try:
+                return create_edge(
+                    session,
+                    EdgeModel.model_validate(
+                        {
+                            "id": str(uuid.uuid4()),
+                            "created_at": dt.datetime.now(dt.UTC).isoformat(),
+                            "src_entity_type": "decision",
+                            "src_id": str(decision_id),
+                            "dst_entity_type": "task",
+                            "dst_id": str(payload.job_id),
+                            "relation": payload.relation.value,
+                            "metadata": {},
+                            "created_by": str(actor.id),
+                        }
+                    ),
+                )
+            except sa.exc.IntegrityError as error:
+                raise_api_error(
+                    status.HTTP_409_CONFLICT,
+                    "Decision link already exists",
+                    details={"reason": str(error.orig) if error.orig else None},
+                )
+
     def _draft_store_or_error(
         session: Session,
         draft_id: uuid.UUID,
@@ -1127,6 +1499,45 @@ def create_app(
                 )
 
     @app.post(
+        "/v1/tasks/claim",
+        response_model=TaskModel,
+    )
+    def claim_next_task_endpoint(
+        request: Request,
+        project_id: uuid.UUID | None = Query(default=None),
+        labels: list[str] | None = Query(default=None),
+        claim_states: list[str] | None = Query(default=None),
+        claimed_state: str = Query(default="claimed", min_length=1),
+        session: Session = Depends(get_db_session),
+    ) -> TaskModel:
+        with write_timeout(session, endpoint="v1.tasks.claim_next"):
+            actor = _require_actor(request)
+            claimed = claim_next(
+                session,
+                actor_id=actor.id,
+                labels=labels,
+                project_id=project_id,
+                claim_states=claim_states,
+                claimed_state=claimed_state,
+            )
+            if claimed is None:
+                raise_api_error(
+                    status.HTTP_404_NOT_FOUND,
+                    "No matching task found",
+                    details={
+                        "project_id": None if project_id is None else str(project_id),
+                        "labels": labels or [],
+                        "claim_states": claim_states or [],
+                    },
+                )
+            refreshed = _task_record_or_404(session, claimed.id)
+            return with_retry_fields(
+                session,
+                refreshed,
+                task_type_registry=get_task_type_registry(request),
+            )
+
+    @app.post(
         "/tasks/{task_id}/claim",
         include_in_schema=False,
         response_model=TaskModel,
@@ -1171,6 +1582,88 @@ def create_app(
                 refreshed,
                 task_type_registry=get_task_type_registry(request),
             )
+
+    @app.post("/v1/tasks/{task_id}/release", response_model=TaskModel)
+    def release_task_endpoint(
+        task_id: uuid.UUID,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> TaskModel:
+        with write_timeout(session, endpoint="v1.tasks.release"):
+            actor = _require_actor(request)
+            released = release_claim(
+                session,
+                task_id=task_id,
+                expected_actor_id=(
+                    None if actor.actor_type == "admin" else actor.id
+                ),
+            )
+            if released is None:
+                raise_api_error(
+                    status.HTTP_404_NOT_FOUND,
+                    "Task not found or not releasable",
+                )
+            refreshed = _task_record_or_404(session, task_id)
+            return with_retry_fields(
+                session,
+                refreshed,
+                task_type_registry=get_task_type_registry(request),
+            )
+
+    @app.post("/v1/tasks/{task_id}/reset", response_model=TaskModel)
+    def reset_task_endpoint(
+        task_id: uuid.UUID,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> TaskModel:
+        with write_timeout(session, endpoint="v1.tasks.reset"):
+            actor = _require_admin_actor(request)
+            task = _task_record_or_404(session, task_id)
+            task.state = TaskState.QUEUED.value
+            task.attempt_count = 0
+            task.last_failure = None
+            task.claimed_by_actor_id = None
+            task.claimed_at = None
+            _task_audit(
+                session,
+                actor_id=actor.id,
+                task_id=task.id,
+                action="JOB_RESET",
+                after={
+                    "state": task.state,
+                    "attempt_count": task.attempt_count,
+                    "last_failure": task.last_failure,
+                },
+            )
+            session.flush()
+            session.refresh(task)
+            return with_retry_fields(
+                session,
+                task,
+                task_type_registry=get_task_type_registry(request),
+            )
+
+    @app.post("/v1/tasks/{task_id}/comments", response_model=TaskCommentResponse)
+    def comment_on_task_endpoint(
+        task_id: uuid.UUID,
+        payload: TaskCommentRequest,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> TaskCommentResponse:
+        with write_timeout(session, endpoint="v1.tasks.comments"):
+            actor = _require_actor(request)
+            task = _task_record_or_404(session, task_id)
+            _task_audit(
+                session,
+                actor_id=actor.id,
+                task_id=task.id,
+                action="JOB_COMMENTED",
+                after={
+                    "body": payload.body,
+                    "commented_at": dt.datetime.now(dt.UTC).isoformat(),
+                },
+            )
+            return TaskCommentResponse(job_id=task.id, commented=True)
 
     @app.post(
         "/tasks/{task_id}/submit",

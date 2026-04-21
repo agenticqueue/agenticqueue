@@ -41,6 +41,7 @@ def _claim_next_statement(
     *,
     actor_id: uuid.UUID,
     labels: Sequence[str] | None,
+    project_id: uuid.UUID | None,
     claim_states: Sequence[str] | None,
     claimed_state: str,
     claimed_at: dt.datetime | None,
@@ -54,6 +55,8 @@ def _claim_next_statement(
     claim_labels = _normalized_labels(labels)
     if claim_labels:
         filters.append(TaskRecord.labels.contains(claim_labels))
+    if project_id is not None:
+        filters.append(TaskRecord.project_id == project_id)
 
     locked_task = (
         sa.select(TaskRecord.id)
@@ -93,6 +96,7 @@ def claim_next(
     *,
     actor_id: uuid.UUID,
     labels: Sequence[str] | None,
+    project_id: uuid.UUID | None = None,
     claim_states: Sequence[str] | None = None,
     claimed_state: str = "claimed",
     claimed_at: dt.datetime | None = None,
@@ -102,6 +106,7 @@ def claim_next(
     statement = _claim_next_statement(
         actor_id=actor_id,
         labels=labels,
+        project_id=project_id,
         claim_states=claim_states,
         claimed_state=claimed_state,
         claimed_at=claimed_at,
@@ -116,6 +121,7 @@ def claim_next_timed(
     *,
     actor_id: uuid.UUID,
     labels: Sequence[str] | None,
+    project_id: uuid.UUID | None = None,
     claim_states: Sequence[str] | None = None,
     claimed_state: str = "claimed",
     claimed_at: dt.datetime | None = None,
@@ -125,6 +131,7 @@ def claim_next_timed(
     statement = _claim_next_statement(
         actor_id=actor_id,
         labels=labels,
+        project_id=project_id,
         claim_states=claim_states,
         claimed_state=claimed_state,
         claimed_at=claimed_at,

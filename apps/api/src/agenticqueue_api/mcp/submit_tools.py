@@ -685,20 +685,12 @@ def register_submit_tools(
         token: str | None = None,
         limit: int = 25,
     ) -> dict[str, Any]:
-        def _callback(session: Session, authenticated) -> dict[str, Any]:
-            del session, authenticated
-            raise surface_error(
-                501,
-                "search_surface is not implemented yet on the MCP surface",
-                error_code="not_implemented",
-                details={"tag": tag, "limit": limit},
-            )
-
-        return run_session_tool(
-            session_factory,
+        return call_internal_api(
+            app,
+            method="GET",
+            path="/v1/graph/surface",
             token=token,
-            trace_name="search-surface",
-            callback=_callback,
+            params={"tag": tag, "limit": limit},
         )
 
     registered.add("search_surface")
@@ -715,16 +707,9 @@ def register_submit_tools(
         return call_internal_api(
             app,
             method="POST",
-            path="/v1/edges",
+            path=f"/v1/decisions/{decision_id}/supersede",
             token=token,
-            json_body={
-                "src_entity_type": "decision",
-                "src_id": str(replaced_by),
-                "dst_entity_type": "decision",
-                "dst_id": str(decision_id),
-                "relation": EdgeRelation.SUPERSEDES.value,
-                "metadata": {},
-            },
+            json_body={"replaced_by": str(replaced_by)},
         )
 
     registered.add("supersede_decision")
@@ -742,16 +727,9 @@ def register_submit_tools(
         return call_internal_api(
             app,
             method="POST",
-            path="/v1/edges",
+            path=f"/v1/decisions/{decision_id}/link",
             token=token,
-            json_body={
-                "src_entity_type": "decision",
-                "src_id": str(decision_id),
-                "dst_entity_type": "task",
-                "dst_id": str(job_id),
-                "relation": relation,
-                "metadata": {},
-            },
+            json_body={"job_id": str(job_id), "relation": relation},
         )
 
     registered.add("link_decision")
