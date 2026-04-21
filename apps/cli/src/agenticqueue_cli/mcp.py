@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 from agenticqueue_api.app import create_app
 from agenticqueue_api.config import get_mcp_stdio_enabled
 

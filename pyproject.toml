@@ -24,7 +24,8 @@ dependencies = [
 ]
 
 [project.scripts]
-aq = "agenticqueue_api.cli:app"
+aq = "agenticqueue_cli.main:app"
+aq-local = "agenticqueue_api.cli:app"
 aq-mcp = "agenticqueue_cli.mcp:main"
 
 [build-system]
