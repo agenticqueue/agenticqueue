@@ -56,6 +56,10 @@ jobs:
       - name: Run actionlint
         run: actionlint
 
+      - name: Check OpenAPI drift
+        shell: bash
+        run: python scripts/generate_openapi.py --check
+
       - name: Run ruff
         shell: bash
         run: |

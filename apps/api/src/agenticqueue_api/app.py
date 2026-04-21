@@ -526,8 +526,14 @@ def create_app(
 
     app = FastAPI(
         title="AgenticQueue API",
-        docs_url=None,
-        redoc_url=None,
+        summary="REST coordination surface for AgenticQueue.",
+        description=(
+            "Typed task, memory, packet, and governance APIs for the "
+            "AgenticQueue coordination plane."
+        ),
+        version="0.1.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
         openapi_url="/openapi.json",
         lifespan=lifespan,
     )
