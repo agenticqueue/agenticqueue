@@ -85,9 +85,7 @@ def _normalize_http_exception(exc: HTTPException) -> dict[str, Any]:
                 status_code=exc.status_code,
                 message=str(error.get("message", "Request failed")),
                 error_code=(
-                    None
-                    if error.get("code") is None
-                    else str(error.get("code"))
+                    None if error.get("code") is None else str(error.get("code"))
                 ),
                 details=error.get("details"),
             )

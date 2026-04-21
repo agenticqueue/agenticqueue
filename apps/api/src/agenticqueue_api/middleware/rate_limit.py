@@ -64,7 +64,9 @@ class ActorTokenBucket:
                 return True, 0.0
 
             deficit = tokens - state.tokens
-            retry_after = deficit / self.rate_per_second if self.rate_per_second else 1.0
+            retry_after = (
+                deficit / self.rate_per_second if self.rate_per_second else 1.0
+            )
             return False, retry_after
 
 
@@ -119,4 +121,3 @@ class ActorRateLimitMiddleware(BaseHTTPMiddleware):
             ),
             headers=headers,
         )
-

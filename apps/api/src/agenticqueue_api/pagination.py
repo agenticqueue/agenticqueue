@@ -25,7 +25,9 @@ RESERVED_QUERY_PARAMS = frozenset({"cursor", "limit"})
 def encode_cursor(values: list[Any]) -> str:
     """Encode a cursor payload as an opaque URL-safe token."""
 
-    payload = json.dumps(jsonable_encoder(values), separators=(",", ":"), sort_keys=True)
+    payload = json.dumps(
+        jsonable_encoder(values), separators=(",", ":"), sort_keys=True
+    )
     return base64.urlsafe_b64encode(payload.encode("utf-8")).decode("ascii").rstrip("=")
 
 
@@ -97,4 +99,3 @@ def apply_cursor_clause(
         comparisons.append(column > cursor_values[index])
         conditions.append(sa.and_(*comparisons))
     return statement.where(sa.or_(*conditions))
-

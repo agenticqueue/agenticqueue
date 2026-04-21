@@ -181,25 +181,19 @@ def get_task_types_dir() -> Path:
 def get_max_body_bytes() -> int:
     """Return the default HTTP request body cap in bytes."""
 
-    return int(
-        os.getenv("AGENTICQUEUE_MAX_BODY_BYTES", DEFAULT_MAX_BODY_BYTES)
-    )
+    return int(os.getenv("AGENTICQUEUE_MAX_BODY_BYTES", DEFAULT_MAX_BODY_BYTES))
 
 
 def get_rate_limit_rps() -> int:
     """Return the per-actor sustained request budget."""
 
-    return int(
-        os.getenv("AGENTICQUEUE_RATE_LIMIT_RPS", DEFAULT_RATE_LIMIT_RPS)
-    )
+    return int(os.getenv("AGENTICQUEUE_RATE_LIMIT_RPS", DEFAULT_RATE_LIMIT_RPS))
 
 
 def get_rate_limit_burst() -> int:
     """Return the per-actor burst request budget."""
 
-    return int(
-        os.getenv("AGENTICQUEUE_RATE_LIMIT_BURST", DEFAULT_RATE_LIMIT_BURST)
-    )
+    return int(os.getenv("AGENTICQUEUE_RATE_LIMIT_BURST", DEFAULT_RATE_LIMIT_BURST))
 
 
 def get_policies_dir() -> Path:

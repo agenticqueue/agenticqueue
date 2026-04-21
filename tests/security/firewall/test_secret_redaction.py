@@ -17,10 +17,13 @@ from agenticqueue_api.middleware.secret_redaction import (
     SecretMatch,
     SecretRedactionMiddleware,
     _apply_redactions,
+    _looks_generic_high_entropy_secret,
     _replace_content_length,
     _request_looks_json,
+    compile_secret_pattern_rules,
     find_secret_matches,
     has_dictionary_hit,
+    payload_might_contain_secret,
     scan_json_payload,
     shannon_entropy,
 )
@@ -197,6 +200,41 @@ def test_request_and_header_helpers_cover_fallback_paths() -> None:
     assert _request_looks_json(scope, b'{"description":"hello"}')
     updated = _replace_content_length(scope, 17)
     assert (b"content-length", b"17") in updated["headers"]
+
+
+def test_custom_rule_compilation_and_payload_preflight_cover_guard_paths() -> None:
+    assert compile_secret_pattern_rules("not-a-sequence") == ()
+
+    compiled = compile_secret_pattern_rules(
+        [
+            None,
+            {"name": "custom_secret", "pattern": "ZXCVSECRET"},
+            {"kind": "wrong_type", "pattern": 123},
+            {"kind": "   ", "pattern": "still-ignored"},
+            {"kind": "broken", "pattern": "("},
+        ]
+    )
+    assert [rule.kind for rule in compiled] == ["custom_secret"]
+
+    class PayloadObject:
+        def __init__(self) -> None:
+            self.note = "ZXCVSECRET"
+            self._ignored = "ZXCVSECRET"
+
+    assert payload_might_contain_secret(
+        {"items": ["plain", {"note": "ZXCVSECRET"}]},
+        extra_rules=compiled,
+    )
+    assert payload_might_contain_secret(PayloadObject(), extra_rules=compiled)
+    assert not payload_might_contain_secret("")
+    assert not payload_might_contain_secret(123)
+
+
+def test_generic_entropy_guard_paths_reject_short_and_uuid_values() -> None:
+    assert not _looks_generic_high_entropy_secret("short-token")
+    assert not _looks_generic_high_entropy_secret(
+        "550e8400-e29b-41d4-a716-446655440000"
+    )
 
 
 def test_apply_redactions_skips_overlapping_matches() -> None:

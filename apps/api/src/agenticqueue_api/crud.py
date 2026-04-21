@@ -652,8 +652,8 @@ def _register_entity_routes(
         statement = _apply_filters(statement, config, request)
         statement = _apply_default_filters(statement, config, request)
         order_columns = _order_columns(config.record_type)
-        cursor_values = None if cursor is None else _decode_cursor_values(
-            cursor, order_columns
+        cursor_values = (
+            None if cursor is None else _decode_cursor_values(cursor, order_columns)
         )
         statement = apply_cursor_clause(
             statement,

@@ -25,6 +25,7 @@ SECRET_BLOCKED_HEADER: Final = "X-Secret-Blocked"
 _MUTATING_METHODS = frozenset({"POST", "PATCH"})
 _JSON_PREFIXES = ("application/json", "application/merge-patch+json")
 _HIGH_ENTROPY_ALLOWED_CHARS = re.compile(r"^[A-Za-z0-9+/=_-]{20,}$")
+_HIGH_ENTROPY_TOKEN = re.compile(r"[A-Za-z0-9+/=_-]{20,}")
 _UUID_LIKE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
@@ -275,7 +276,13 @@ def _might_contain_secret(value: str) -> bool:
         return False
     if _UUID_LIKE.fullmatch(stripped):
         return False
-    return bool(_HIGH_ENTROPY_ALLOWED_CHARS.fullmatch(stripped))
+    if _HIGH_ENTROPY_ALLOWED_CHARS.fullmatch(stripped):
+        return True
+
+    candidate = _HIGH_ENTROPY_TOKEN.search(value)
+    if candidate is None:
+        return False
+    return not _UUID_LIKE.fullmatch(candidate.group(0))
 
 
 def payload_might_contain_secret(
