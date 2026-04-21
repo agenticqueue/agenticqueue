@@ -33,7 +33,7 @@ jobs:
             else
               context_dir="$(dirname "$dockerfile")"
             fi
-            tag="agenticqueue-ci-$(echo "$dockerfile" | tr '/.' '--')"
+            tag="agenticqueue-ci-$(echo "$dockerfile" | tr '/.' '--' | tr '[:upper:]' '[:lower:]')"
             echo "Building $dockerfile from $context_dir"
             docker build --file "$dockerfile" --tag "$tag" "$context_dir"
           done
