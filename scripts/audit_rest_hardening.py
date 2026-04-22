@@ -56,6 +56,9 @@ from tests.security.firewall.surface_contract import SurfaceOperation
 from tests.security.firewall.surface_contract import load_surface_operations
 from tests.security.firewall.surface_contract import normalize_path_template
 
+SOAK_REQUEST_TIMEOUT_SECONDS = 5.0
+SOAK_CANCEL_GRACE_SECONDS = 5.0
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -1025,13 +1028,26 @@ async def _soak_actor(
         request_id = f"rest-hardening-soak-{actor_index}-{iteration}"
         started = time.perf_counter()
         try:
-            response = await client.get(
-                endpoint,
-                headers=_json_headers(
-                    token=token,
-                    request_id=request_id,
-                    include_idempotency=False,
+            response = await asyncio.wait_for(
+                client.get(
+                    endpoint,
+                    headers=_json_headers(
+                        token=token,
+                        request_id=request_id,
+                        include_idempotency=False,
+                    ),
                 ),
+                timeout=SOAK_REQUEST_TIMEOUT_SECONDS,
+            )
+        except TimeoutError:
+            metrics["request_exceptions"].append(
+                {
+                    "error_type": "TimeoutError",
+                    "message": (
+                        f"{endpoint} exceeded the {SOAK_REQUEST_TIMEOUT_SECONDS:.1f}s "
+                        "request budget during the soak."
+                    ),
+                }
             )
         except httpx.HTTPError as error:
             metrics["request_exceptions"].append(
@@ -1117,18 +1133,18 @@ async def run_soak(
                 )
                 for index, token in enumerate(tokens)
             ]
-            try:
-                await asyncio.wait_for(
-                    asyncio.gather(*tasks),
-                    timeout=duration_seconds + 30,
-                )
-            except TimeoutError:
-                metrics["timed_out_actors"] = sum(
-                    1 for task in tasks if not task.done()
-                )
-                for task in tasks:
+            _done, pending = await asyncio.wait(
+                tasks,
+                timeout=duration_seconds + 30,
+            )
+            if pending:
+                metrics["timed_out_actors"] = len(pending)
+                for task in pending:
                     task.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
+                await asyncio.wait(
+                    pending,
+                    timeout=SOAK_CANCEL_GRACE_SECONDS,
+                )
         ended_at = dt.datetime.now(dt.UTC)
 
         latencies = cast(list[float], metrics["latencies_ms"])

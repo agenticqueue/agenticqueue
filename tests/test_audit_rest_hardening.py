@@ -1,3 +1,4 @@
+import asyncio
 from importlib.util import module_from_spec
 from importlib.util import spec_from_file_location
 from pathlib import Path
@@ -37,3 +38,41 @@ def test_summarize_latency_metrics_uses_small_sample_fallbacks() -> None:
     assert p50 == 25.0
     assert p99 == 50.0
     assert failure is None
+
+
+def test_soak_actor_records_timeout_exception(monkeypatch) -> None:
+    class HangingClient:
+        async def get(self, _endpoint: str, *, headers: dict[str, str]) -> None:
+            del headers
+            await asyncio.sleep(1)
+
+    monkeypatch.setattr(audit_rest_hardening, "SOAK_REQUEST_TIMEOUT_SECONDS", 0.01)
+    metrics = {
+        "latencies_ms": [],
+        "request_count": 0,
+        "server_errors": 0,
+        "rate_limited": 0,
+        "other_errors": [],
+        "request_exceptions": [],
+        "timed_out_actors": 0,
+    }
+
+    asyncio.run(
+        audit_rest_hardening._soak_actor(
+            actor_index=0,
+            token="test-token",
+            duration_seconds=0.001,
+            rps_per_actor=1000.0,
+            metrics=metrics,
+            client=HangingClient(),  # type: ignore[arg-type]
+        )
+    )
+
+    assert metrics["latencies_ms"] == []
+    assert metrics["request_count"] == 0
+    assert metrics["request_exceptions"] == [
+        {
+            "error_type": "TimeoutError",
+            "message": "/v1/workspaces?limit=1 exceeded the 0.0s request budget during the soak.",
+        }
+    ]
