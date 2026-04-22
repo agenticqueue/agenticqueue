@@ -967,19 +967,16 @@ def create_app(
     def _update_task_type_route_capability(
         request: Request,
         payload: dict[str, Any] | None = Body(default=None),
-        entity_id: uuid.UUID | None = None,
         session: Session = Depends(get_db_session),
     ) -> None:
         _update_task_type_capability(
             request=request,
             session=session,
             payload=payload,
-            entity_id=entity_id,
+            entity_id=None,
         )
 
-    _update_task_type_route_capability.__name__ = (
-        _update_task_type_capability.__name__
-    )
+    _update_task_type_route_capability.__name__ = _update_task_type_capability.__name__
 
     @app.patch(
         "/v1/task-types/{task_type_name}",
