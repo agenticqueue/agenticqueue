@@ -10,6 +10,8 @@ from urllib.parse import urlsplit
 _ROW_RE = re.compile(r"^(?P<sequence>\d+\.\d+)\s+(?P<marker>[○✦])$")
 _REST_RE = re.compile(r"^(GET|POST|PATCH|DELETE)\s+(\S+)$")
 _PATH_PARAM_RE = re.compile(r"\{[^}]+\}")
+
+
 @dataclass(frozen=True)
 class SurfaceOperation:
     sequence: str
@@ -53,7 +55,9 @@ def _split_cells(line: str) -> list[str]:
 
 
 @lru_cache(maxsize=1)
-def load_surface_operations(surface_path: Path | None = None) -> tuple[SurfaceOperation, ...]:
+def load_surface_operations(
+    surface_path: Path | None = None,
+) -> tuple[SurfaceOperation, ...]:
     path = surface_doc_path() if surface_path is None else surface_path
     operations: list[SurfaceOperation] = []
 
@@ -76,7 +80,9 @@ def load_surface_operations(surface_path: Path | None = None) -> tuple[SurfaceOp
 
         method, raw_url = rest_match.groups()
         parsed = urlsplit(raw_url)
-        query_params = tuple(name for name, _ in parse_qsl(parsed.query, keep_blank_values=True))
+        query_params = tuple(
+            name for name, _ in parse_qsl(parsed.query, keep_blank_values=True)
+        )
         operations.append(
             SurfaceOperation(
                 sequence=row_match.group("sequence"),

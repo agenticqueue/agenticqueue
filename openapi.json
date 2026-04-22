@@ -6374,11 +6374,18 @@
         "parameters": [
           {
             "in": "query",
-            "name": "query",
-            "required": true,
+            "name": "q",
+            "required": false,
             "schema": {
-              "title": "Query",
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
             }
           },
           {

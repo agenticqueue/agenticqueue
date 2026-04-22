@@ -176,7 +176,9 @@ def _is_error_envelope(payload: Any) -> bool:
     )
 
 
-def _normalize_openapi_index(openapi: dict[str, Any]) -> dict[str, dict[str, dict[str, Any]]]:
+def _normalize_openapi_index(
+    openapi: dict[str, Any],
+) -> dict[str, dict[str, dict[str, Any]]]:
     index: dict[str, dict[str, dict[str, Any]]] = {}
     for path, methods in openapi["paths"].items():
         normalized = normalize_path_template(path)
@@ -567,16 +569,12 @@ def _cleanup_audit_seed(
     with session_factory() as session:
         if cleanup_ids["artifact_ids"]:
             session.execute(
-                sa.text(
-                    "DELETE FROM agenticqueue.artifact WHERE id = ANY(:ids)"
-                ),
+                sa.text("DELETE FROM agenticqueue.artifact WHERE id = ANY(:ids)"),
                 {"ids": cleanup_ids["artifact_ids"]},
             )
         if cleanup_ids["decision_ids"]:
             session.execute(
-                sa.text(
-                    "DELETE FROM agenticqueue.decision WHERE id = ANY(:ids)"
-                ),
+                sa.text("DELETE FROM agenticqueue.decision WHERE id = ANY(:ids)"),
                 {"ids": cleanup_ids["decision_ids"]},
             )
         if cleanup_ids["run_ids"]:
@@ -789,9 +787,8 @@ def run_audit() -> tuple[dict[str, Any], int]:
                             f"Read probe returned {response.status_code}.",
                         )
                     if (
-                        (operation.is_list_like or operation.query_params)
-                        and response.status_code != 200
-                    ):
+                        operation.is_list_like or operation.query_params
+                    ) and response.status_code != 200:
                         _record_failure(
                             record,
                             f"Read probe with documented query params returned {response.status_code} instead of 200.",
@@ -887,7 +884,9 @@ def _attach_pool_tracking(engine: sa.Engine) -> EnginePoolStats:
     return stats
 
 
-def _seed_soak_data(session: Session, *, actor_count: int) -> tuple[list[str], list[uuid.UUID], uuid.UUID]:
+def _seed_soak_data(
+    session: Session, *, actor_count: int
+) -> tuple[list[str], list[uuid.UUID], uuid.UUID]:
     workspace = create_workspace(
         session,
         model_from(
@@ -944,7 +943,9 @@ def _seed_soak_data(session: Session, *, actor_count: int) -> tuple[list[str], l
                     "title": f"REST Soak Task {index}",
                     "state": "queued",
                     "description": "REST hardening soak task",
-                    "contract": make_coding_task_contract(surface_area=["src/api/soak"]),
+                    "contract": make_coding_task_contract(
+                        surface_area=["src/api/soak"]
+                    ),
                     "definition_of_done": ["done"],
                     "created_at": "2026-04-21T00:00:00+00:00",
                     "updated_at": "2026-04-21T00:00:00+00:00",
@@ -998,9 +999,7 @@ async def _soak_actor(
 
     while time.perf_counter() < deadline:
         endpoint = (
-            "/v1/workspaces?limit=1"
-            if iteration % 2 == 0
-            else "/v1/tasks?limit=1"
+            "/v1/workspaces?limit=1" if iteration % 2 == 0 else "/v1/tasks?limit=1"
         )
         request_id = f"rest-hardening-soak-{actor_index}-{iteration}"
         started = time.perf_counter()
@@ -1089,8 +1088,16 @@ async def run_soak(
         ended_at = dt.datetime.now(dt.UTC)
 
         latencies = cast(list[float], metrics["latencies_ms"])
-        p50 = statistics.quantiles(latencies, n=100)[49] if len(latencies) >= 100 else statistics.median(latencies)
-        p99 = statistics.quantiles(latencies, n=100)[98] if len(latencies) >= 100 else max(latencies, default=0.0)
+        p50 = (
+            statistics.quantiles(latencies, n=100)[49]
+            if len(latencies) >= 100
+            else statistics.median(latencies)
+        )
+        p99 = (
+            statistics.quantiles(latencies, n=100)[98]
+            if len(latencies) >= 100
+            else max(latencies, default=0.0)
+        )
         failures_list: list[str] = []
         if metrics["server_errors"] != 0:
             failures_list.append(
