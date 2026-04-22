@@ -959,7 +959,33 @@ def create_app(
             raise_api_error(status.HTTP_404_NOT_FOUND, "Task type not found")
         return _task_type_view(definition)
 
-    @app.patch("/v1/task-types/{task_type_name}", response_model=TaskTypeView)
+    _update_task_type_capability = require_capability(
+        CapabilityKey.UPDATE_TASK,
+        entity_type="task",
+    )
+
+    def _update_task_type_route_capability(
+        request: Request,
+        payload: dict[str, Any] | None = Body(default=None),
+        entity_id: uuid.UUID | None = None,
+        session: Session = Depends(get_db_session),
+    ) -> None:
+        _update_task_type_capability(
+            request=request,
+            session=session,
+            payload=payload,
+            entity_id=entity_id,
+        )
+
+    _update_task_type_route_capability.__name__ = (
+        _update_task_type_capability.__name__
+    )
+
+    @app.patch(
+        "/v1/task-types/{task_type_name}",
+        response_model=TaskTypeView,
+        dependencies=[Depends(_update_task_type_route_capability)],
+    )
     def update_task_type_endpoint(
         task_type_name: str,
         payload: UpdateTaskTypeRequest,
