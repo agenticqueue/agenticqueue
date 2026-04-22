@@ -1,4 +1,24 @@
-from scripts import audit_rest_hardening as audit_rest_hardening
+from importlib.util import module_from_spec
+from importlib.util import spec_from_file_location
+from pathlib import Path
+import sys
+from typing import Any
+
+
+def _load_audit_module() -> Any:
+    spec = spec_from_file_location(
+        "aq_audit_rest_hardening",
+        Path(__file__).resolve().parents[1] / "scripts" / "audit_rest_hardening.py",
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+audit_rest_hardening = _load_audit_module()
 
 
 def test_summarize_latency_metrics_handles_empty_samples() -> None:
