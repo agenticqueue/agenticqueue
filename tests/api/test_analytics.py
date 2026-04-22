@@ -52,7 +52,7 @@ def test_analytics_metrics_roll_up_cycle_time_blockers_retrieval_and_review_load
         scopes=["admin"],
     )
 
-    now = dt.datetime.now(dt.UTC).replace(microsecond=0)
+    now = dt.datetime(2026, 4, 22, 12, 0, 0, tzinfo=dt.UTC)
 
     with session_factory() as session:
         workspace = create_workspace(
