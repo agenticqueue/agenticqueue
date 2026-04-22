@@ -148,6 +148,25 @@ class EnginePoolStats:
     total_checkins: int = 0
 
 
+def _summarize_latency_metrics(
+    latencies: list[float],
+) -> tuple[float, float, str | None]:
+    if not latencies:
+        return 0.0, 0.0, "No successful latency samples were captured during the soak."
+
+    p50 = (
+        statistics.quantiles(latencies, n=100)[49]
+        if len(latencies) >= 100
+        else statistics.median(latencies)
+    )
+    p99 = (
+        statistics.quantiles(latencies, n=100)[98]
+        if len(latencies) >= 100
+        else max(latencies, default=0.0)
+    )
+    return p50, p99, None
+
+
 def _json_headers(
     *,
     token: str | None,
@@ -1113,17 +1132,10 @@ async def run_soak(
         ended_at = dt.datetime.now(dt.UTC)
 
         latencies = cast(list[float], metrics["latencies_ms"])
-        p50 = (
-            statistics.quantiles(latencies, n=100)[49]
-            if len(latencies) >= 100
-            else statistics.median(latencies)
-        )
-        p99 = (
-            statistics.quantiles(latencies, n=100)[98]
-            if len(latencies) >= 100
-            else max(latencies, default=0.0)
-        )
+        p50, p99, missing_latency_failure = _summarize_latency_metrics(latencies)
         failures_list: list[str] = []
+        if missing_latency_failure is not None:
+            failures_list.append(missing_latency_failure)
         if metrics["server_errors"] != 0:
             failures_list.append(
                 f"Observed {metrics['server_errors']} server-error responses during the soak."
@@ -1162,6 +1174,7 @@ async def run_soak(
             "duration_seconds": int((ended_at - started_at).total_seconds()),
             "actors": actor_count,
             "target_rps_per_actor": rps_per_actor,
+            "latency_sample_count": len(latencies),
             "request_count": metrics["request_count"],
             "server_errors": metrics["server_errors"],
             "rate_limited": metrics["rate_limited"],
