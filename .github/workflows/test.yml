@@ -196,6 +196,73 @@ jobs:
             echo "No Vitest suite yet; skipping vitest."
           fi
 
+  rest-hardening-matrix:
+    name: rest-hardening-matrix
+    runs-on: ubuntu-latest
+    env:
+      AGENTICQUEUE_DATABASE_URL: postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:64329/agenticqueue
+      AGENTICQUEUE_DB_PORT: "5432"
+      AGENTICQUEUE_PGBOUNCER_PORT: "64329"
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip downloads
+        if: ${{ hashFiles('requirements*.txt', 'pyproject.toml', 'poetry.lock') != '' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-rest-hardening-${{ hashFiles('requirements*.txt', 'pyproject.toml', 'poetry.lock') }}
+
+      - name: Install Python test dependencies
+        shell: bash
+        run: python -m pip install --upgrade pip uv .
+
+      - name: Start Postgres + PgBouncer
+        shell: bash
+        run: docker compose -f docker-compose.yml -f docker-compose.override.yml up -d db pgbouncer
+
+      - name: Wait for Postgres
+        shell: bash
+        run: python apps/api/scripts/wait_for_db.py
+
+      - name: Apply Alembic migrations
+        shell: bash
+        run: alembic -c apps/api/alembic.ini upgrade head
+
+      - name: Run REST hardening matrix + soak
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          uv run python scripts/audit_rest_hardening.py \
+            --output-json dist/rest-hardening-matrix.json \
+            --soak-output-json dist/rest-hardening-soak.json \
+            --soak-seconds 300 \
+            --actors 100 \
+            --rps-per-actor 10 \
+            --max-read-p99-ms 200
+
+      - name: Stop Postgres
+        if: ${{ always() }}
+        shell: bash
+        run: docker compose -f docker-compose.yml -f docker-compose.override.yml down
+
+      - name: Upload REST hardening artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rest-hardening-reports
+          path: |
+            dist/rest-hardening-matrix.json
+            dist/rest-hardening-soak.json
+          if-no-files-found: error
+
   supply-chain:
     runs-on: ubuntu-latest
     permissions:

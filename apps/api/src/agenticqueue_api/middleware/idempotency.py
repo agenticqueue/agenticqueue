@@ -29,7 +29,7 @@ IDEMPOTENCY_CONFLICT_HEADER: Final = "X-Idempotency-Conflict"
 IDEMPOTENCY_REPLAYED_HEADER: Final = "X-Idempotency-Replayed"
 IDEMPOTENCY_TTL: Final = dt.timedelta(hours=24)
 _ULID_PATTERN = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$", re.IGNORECASE)
-_MUTATING_METHODS = frozenset({"POST", "PATCH"})
+_MUTATING_METHODS = frozenset({"POST", "PATCH", "DELETE"})
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,13 @@ def requires_idempotency(request: Request) -> bool:
         return False
 
     path = request.url.path
-    return path.startswith("/v1/") or path == "/task-types"
+    return (
+        path == "/setup"
+        or path == "/task-types"
+        or path.startswith("/v1/")
+        or path.startswith("/tasks/")
+        or path.startswith("/learnings/drafts/")
+    )
 
 
 def lookup_idempotency_key(

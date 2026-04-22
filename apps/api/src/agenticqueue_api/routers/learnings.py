@@ -16,7 +16,7 @@ from agenticqueue_api.audit import set_session_audit_context
 from agenticqueue_api.auth import AuthenticatedRequest, authenticate_api_token
 from agenticqueue_api.capabilities import ensure_actor_has_capability
 from agenticqueue_api.db import write_timeout
-from agenticqueue_api.errors import error_payload, raise_api_error
+from agenticqueue_api.errors import HTTP_422_STATUS, error_payload, raise_api_error
 from agenticqueue_api.learnings import (
     LearningDedupeService,
     LearningLifecycleService,
@@ -506,8 +506,8 @@ def build_learnings_router(get_db_session: Any) -> APIRouter:
         response_model=SearchLearningsResponse,
     )
     def search_learnings_endpoint(
-        query: str,
         request: Request,
+        q: str | None = Query(default=None, alias="q"),
         project: uuid.UUID | None = None,
         task_type: str | None = None,
         repo_scope: str | None = None,
@@ -515,8 +515,15 @@ def build_learnings_router(get_db_session: Any) -> APIRouter:
         session: Session = Depends(get_db_session),
     ) -> SearchLearningsResponse:
         authenticated = _require_request_auth(request)
+        raw_query = q if q is not None else request.query_params.get("query")
+        if raw_query is None:
+            raise_api_error(
+                HTTP_422_STATUS,
+                "Field required",
+                details=[{"loc": ["query", "q"], "msg": "Field required"}],
+            )
         payload = SearchLearningsRequest(
-            query=query,
+            query=raw_query,
             project=project,
             task_type=task_type,
             repo_scope=repo_scope,

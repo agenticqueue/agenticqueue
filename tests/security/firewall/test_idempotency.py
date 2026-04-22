@@ -28,6 +28,7 @@ from agenticqueue_api.middleware.idempotency import (
     requires_idempotency,
     stats_as_json,
 )
+from tests.security.firewall.surface_contract import load_surface_operations
 
 
 class TempBase(DeclarativeBase):
@@ -224,11 +225,49 @@ def test_requires_idempotency_and_normalization_helpers() -> None:
         {"type": "http", "method": "POST", "path": "/healthz", "headers": []},
         receive=_receive,
     )
+    request_delete = Request(
+        {"type": "http", "method": "DELETE", "path": "/v1/tasks/demo", "headers": []},
+        receive=_receive,
+    )
+    request_setup = Request(
+        {"type": "http", "method": "POST", "path": "/setup", "headers": []},
+        receive=_receive,
+    )
 
     assert requires_idempotency(request_get) is False
     assert requires_idempotency(request_post) is True
     assert requires_idempotency(request_hidden) is True
     assert requires_idempotency(request_other) is False
+    assert requires_idempotency(request_delete) is True
+    assert requires_idempotency(request_setup) is True
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        (operation.method, operation.path)
+        for operation in load_surface_operations()
+        if operation.is_mutation
+    ],
+    ids=[
+        f"{operation.sequence}:{operation.method} {operation.path}"
+        for operation in load_surface_operations()
+        if operation.is_mutation
+    ],
+)
+def test_public_surface_mutations_require_idempotency(
+    method: str,
+    path: str,
+) -> None:
+    async def _receive() -> dict[str, object]:
+        return {"type": "http.request", "body": b"{}", "more_body": False}
+
+    request = Request(
+        {"type": "http", "method": method, "path": path, "headers": []},
+        receive=_receive,
+    )
+
+    assert requires_idempotency(request) is True
 
 
 def test_non_mutating_and_actorless_requests_bypass_cache(

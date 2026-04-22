@@ -35,7 +35,10 @@ from agenticqueue_api.repo import (
     create_task,
     create_workspace,
 )
-from agenticqueue_api.config import get_sqlalchemy_sync_database_url
+from agenticqueue_api.config import (
+    get_psycopg_connect_args,
+    get_sqlalchemy_sync_database_url,
+)
 
 TRUNCATE_TABLES = [
     "api_token",
@@ -99,7 +102,11 @@ def truncate_all_tables(engine: Engine) -> None:
 
 @pytest.fixture(scope="session")
 def engine() -> Engine:
-    return sa.create_engine(get_sqlalchemy_sync_database_url(), future=True)
+    return sa.create_engine(
+        get_sqlalchemy_sync_database_url(),
+        future=True,
+        connect_args=get_psycopg_connect_args(),
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -493,7 +500,7 @@ def test_read_surfaces_match_for_relevant_and_search(
     rest_search = client.get(
         "/v1/learnings/search",
         params={
-            "query": "repo scope",
+            "q": "repo scope",
             "project": str(state["project_id"]),
             "repo_scope": "apps/api/src/agenticqueue_api/mcp/learnings_tools.py",
             "limit": 5,
