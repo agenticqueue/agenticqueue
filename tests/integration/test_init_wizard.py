@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+import uuid
 
 import pytest
 import sqlalchemy as sa
@@ -41,6 +42,10 @@ TRUNCATE_TABLES = [
 ]
 
 runner = CliRunner()
+
+
+def _setup_headers() -> dict[str, str]:
+    return {"Idempotency-Key": str(uuid.uuid4())}
 
 
 def truncate_all_tables(engine: Engine) -> None:
@@ -95,7 +100,7 @@ def test_setup_endpoint_bootstraps_workspace_and_attaches_default_policy(
     client: TestClient,
     session_factory: sessionmaker[Session],
 ) -> None:
-    setup = client.post("/setup")
+    setup = client.post("/setup", headers=_setup_headers())
 
     assert setup.status_code == 201
     payload = setup.json()
@@ -122,10 +127,10 @@ def test_setup_endpoint_bootstraps_workspace_and_attaches_default_policy(
 
 
 def test_setup_endpoint_is_disabled_after_first_run(client: TestClient) -> None:
-    first = client.post("/setup")
+    first = client.post("/setup", headers=_setup_headers())
     assert first.status_code == 201
 
-    second = client.post("/setup")
+    second = client.post("/setup", headers=_setup_headers())
 
     assert second.status_code == 409
     assert second.json()["message"] == "First-run setup already completed"

@@ -887,6 +887,7 @@ def _attach_pool_tracking(engine: sa.Engine) -> EnginePoolStats:
 def _seed_soak_data(
     session: Session, *, actor_count: int
 ) -> tuple[list[str], list[uuid.UUID], uuid.UUID]:
+    run_suffix = uuid.uuid4().hex[:8]
     workspace = create_workspace(
         session,
         model_from(
@@ -956,15 +957,16 @@ def _seed_soak_data(
     tokens: list[str] = []
     actor_ids: list[uuid.UUID] = []
     for index in range(actor_count):
+        actor_handle = f"rest-soak-{run_suffix}-{index:03d}"
         actor = create_actor(
             session,
             ActorModel.model_validate(
                 {
                     "id": str(uuid.uuid4()),
-                    "handle": f"rest-soak-{index:03d}",
+                    "handle": actor_handle,
                     "actor_type": "agent",
                     "display_name": f"REST Soak Actor {index:03d}",
-                    "auth_subject": f"rest-soak-{index:03d}",
+                    "auth_subject": actor_handle,
                     "is_active": True,
                     "created_at": "2026-04-21T00:00:00+00:00",
                     "updated_at": "2026-04-21T00:00:00+00:00",
@@ -1003,28 +1005,37 @@ async def _soak_actor(
         )
         request_id = f"rest-hardening-soak-{actor_index}-{iteration}"
         started = time.perf_counter()
-        response = await client.get(
-            endpoint,
-            headers=_json_headers(
-                token=token,
-                request_id=request_id,
-                include_idempotency=False,
-            ),
-        )
-        latency_ms = (time.perf_counter() - started) * 1000
-        metrics["latencies_ms"].append(latency_ms)
-        metrics["request_count"] += 1
-        if response.status_code >= 500:
-            metrics["server_errors"] += 1
-        elif response.status_code == 429:
-            metrics["rate_limited"] += 1
-        elif response.status_code >= 400:
-            metrics["other_errors"].append(
+        try:
+            response = await client.get(
+                endpoint,
+                headers=_json_headers(
+                    token=token,
+                    request_id=request_id,
+                    include_idempotency=False,
+                ),
+            )
+        except httpx.HTTPError as error:
+            metrics["request_exceptions"].append(
                 {
-                    "status_code": response.status_code,
-                    "body": response.text[:200],
+                    "error_type": type(error).__name__,
+                    "message": str(error),
                 }
             )
+        else:
+            latency_ms = (time.perf_counter() - started) * 1000
+            metrics["latencies_ms"].append(latency_ms)
+            metrics["request_count"] += 1
+            if response.status_code >= 500:
+                metrics["server_errors"] += 1
+            elif response.status_code == 429:
+                metrics["rate_limited"] += 1
+            elif response.status_code >= 400:
+                metrics["other_errors"].append(
+                    {
+                        "status_code": response.status_code,
+                        "body": response.text[:200],
+                    }
+                )
         await asyncio.sleep(max(0.0, interval - (time.perf_counter() - started)))
         iteration += 1
 
@@ -1064,16 +1075,18 @@ async def run_soak(
             "server_errors": 0,
             "rate_limited": 0,
             "other_errors": [],
+            "request_exceptions": [],
+            "timed_out_actors": 0,
         }
 
         started_at = dt.datetime.now(dt.UTC)
         async with httpx.AsyncClient(
             transport=transport,
             base_url="http://agenticqueue.test",
-            timeout=30.0,
+            timeout=5.0,
         ) as client:
-            await asyncio.gather(
-                *[
+            tasks = [
+                asyncio.create_task(
                     _soak_actor(
                         actor_index=index,
                         token=token,
@@ -1082,9 +1095,21 @@ async def run_soak(
                         metrics=metrics,
                         client=client,
                     )
-                    for index, token in enumerate(tokens)
-                ]
-            )
+                )
+                for index, token in enumerate(tokens)
+            ]
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*tasks),
+                    timeout=duration_seconds + 30,
+                )
+            except TimeoutError:
+                metrics["timed_out_actors"] = sum(
+                    1 for task in tasks if not task.done()
+                )
+                for task in tasks:
+                    task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
         ended_at = dt.datetime.now(dt.UTC)
 
         latencies = cast(list[float], metrics["latencies_ms"])
@@ -1119,6 +1144,14 @@ async def run_soak(
             failures_list.append(
                 f"Observed {len(metrics['other_errors'])} non-5xx client errors during the soak."
             )
+        if metrics["request_exceptions"]:
+            failures_list.append(
+                f"Observed {len(metrics['request_exceptions'])} request exceptions during the soak."
+            )
+        if metrics["timed_out_actors"]:
+            failures_list.append(
+                f"Timed out waiting for {metrics['timed_out_actors']} soak actors to finish."
+            )
 
         failures = len(failures_list)
         report = {
@@ -1142,6 +1175,8 @@ async def run_soak(
                 "total_checkins": pool_stats.total_checkins,
             },
             "sample_errors": metrics["other_errors"][:10],
+            "sample_exceptions": metrics["request_exceptions"][:10],
+            "timed_out_actors": metrics["timed_out_actors"],
             "failures": failures_list,
             "notes": {
                 "project_id": str(project_id),
