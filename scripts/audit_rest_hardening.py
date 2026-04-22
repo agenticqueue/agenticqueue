@@ -58,6 +58,9 @@ from tests.security.firewall.surface_contract import normalize_path_template
 
 SOAK_REQUEST_TIMEOUT_SECONDS = 5.0
 SOAK_CANCEL_GRACE_SECONDS = 5.0
+CI_SOAK_DURATION_SECONDS = 60
+CI_SOAK_ACTOR_COUNT = 10
+CI_SOAK_RPS_PER_ACTOR = 2.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -149,6 +152,70 @@ class EnginePoolStats:
     peak_checked_out: int = 0
     total_checkouts: int = 0
     total_checkins: int = 0
+
+
+@dataclass(frozen=True)
+class SoakConfig:
+    requested_duration_seconds: int
+    effective_duration_seconds: int
+    requested_actor_count: int
+    effective_actor_count: int
+    requested_rps_per_actor: float
+    effective_rps_per_actor: float
+    ci_mode_enabled: bool
+
+
+def _env_flag(name: str) -> bool | None:
+    value = os.environ.get(name)
+    if value is None:
+        return None
+
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return None
+
+
+def _resolve_soak_config(
+    *,
+    duration_seconds: int,
+    actor_count: int,
+    rps_per_actor: float,
+) -> SoakConfig:
+    ci_mode_enabled = _env_flag("SOAK_CI_MODE")
+    if ci_mode_enabled is None:
+        ci_mode_enabled = _env_flag("CI") is True
+
+    effective_duration_seconds = duration_seconds
+    effective_actor_count = actor_count
+    effective_rps_per_actor = rps_per_actor
+
+    if ci_mode_enabled:
+        # Shared CI runners cannot sustain the full local soak profile.
+        effective_duration_seconds = min(
+            duration_seconds,
+            CI_SOAK_DURATION_SECONDS,
+        )
+        effective_actor_count = min(
+            actor_count,
+            CI_SOAK_ACTOR_COUNT,
+        )
+        effective_rps_per_actor = min(
+            rps_per_actor,
+            CI_SOAK_RPS_PER_ACTOR,
+        )
+
+    return SoakConfig(
+        requested_duration_seconds=duration_seconds,
+        effective_duration_seconds=effective_duration_seconds,
+        requested_actor_count=actor_count,
+        effective_actor_count=effective_actor_count,
+        requested_rps_per_actor=rps_per_actor,
+        effective_rps_per_actor=effective_rps_per_actor,
+        ci_mode_enabled=ci_mode_enabled,
+    )
 
 
 def _summarize_latency_metrics(
@@ -1084,6 +1151,11 @@ async def run_soak(
 ) -> tuple[dict[str, Any], int]:
     previous_auto_setup = os.environ.get("AGENTICQUEUE_AUTO_SETUP_ENABLED")
     os.environ["AGENTICQUEUE_AUTO_SETUP_ENABLED"] = "0"
+    soak_config = _resolve_soak_config(
+        duration_seconds=duration_seconds,
+        actor_count=actor_count,
+        rps_per_actor=rps_per_actor,
+    )
 
     engine = sa.create_engine(
         get_sqlalchemy_sync_database_url(),
@@ -1098,7 +1170,7 @@ async def run_soak(
         with session_factory() as session:
             tokens, actor_ids, project_id = _seed_soak_data(
                 session,
-                actor_count=actor_count,
+                actor_count=soak_config.effective_actor_count,
             )
             session.commit()
 
@@ -1125,8 +1197,8 @@ async def run_soak(
                     _soak_actor(
                         actor_index=index,
                         token=token,
-                        duration_seconds=duration_seconds,
-                        rps_per_actor=rps_per_actor,
+                        duration_seconds=soak_config.effective_duration_seconds,
+                        rps_per_actor=soak_config.effective_rps_per_actor,
                         metrics=metrics,
                         client=client,
                     )
@@ -1135,7 +1207,7 @@ async def run_soak(
             ]
             _done, pending = await asyncio.wait(
                 tasks,
-                timeout=duration_seconds + 30,
+                timeout=soak_config.effective_duration_seconds + 30,
             )
             if pending:
                 metrics["timed_out_actors"] = len(pending)
@@ -1188,8 +1260,8 @@ async def run_soak(
             "started_at": started_at.isoformat(),
             "ended_at": ended_at.isoformat(),
             "duration_seconds": int((ended_at - started_at).total_seconds()),
-            "actors": actor_count,
-            "target_rps_per_actor": rps_per_actor,
+            "actors": soak_config.effective_actor_count,
+            "target_rps_per_actor": soak_config.effective_rps_per_actor,
             "latency_sample_count": len(latencies),
             "request_count": metrics["request_count"],
             "server_errors": metrics["server_errors"],
@@ -1210,6 +1282,19 @@ async def run_soak(
             "notes": {
                 "project_id": str(project_id),
                 "seeded_actor_count": len(actor_ids),
+                "soak_profile": {
+                    "ci_mode_enabled": soak_config.ci_mode_enabled,
+                    "requested_duration_seconds": (
+                        soak_config.requested_duration_seconds
+                    ),
+                    "effective_duration_seconds": (
+                        soak_config.effective_duration_seconds
+                    ),
+                    "requested_actor_count": soak_config.requested_actor_count,
+                    "effective_actor_count": soak_config.effective_actor_count,
+                    "requested_rps_per_actor": (soak_config.requested_rps_per_actor),
+                    "effective_rps_per_actor": (soak_config.effective_rps_per_actor),
+                },
             },
         }
         return report, failures

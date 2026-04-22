@@ -40,6 +40,57 @@ def test_summarize_latency_metrics_uses_small_sample_fallbacks() -> None:
     assert failure is None
 
 
+def test_resolve_soak_config_uses_full_profile_outside_ci(monkeypatch) -> None:
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("SOAK_CI_MODE", raising=False)
+
+    config = audit_rest_hardening._resolve_soak_config(
+        duration_seconds=300,
+        actor_count=100,
+        rps_per_actor=10.0,
+    )
+
+    assert config.ci_mode_enabled is False
+    assert config.effective_duration_seconds == 300
+    assert config.effective_actor_count == 100
+    assert config.effective_rps_per_actor == 10.0
+
+
+def test_resolve_soak_config_clamps_ci_profile(monkeypatch) -> None:
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.delenv("SOAK_CI_MODE", raising=False)
+
+    config = audit_rest_hardening._resolve_soak_config(
+        duration_seconds=300,
+        actor_count=100,
+        rps_per_actor=10.0,
+    )
+
+    assert config.ci_mode_enabled is True
+    assert (
+        config.effective_duration_seconds
+        == audit_rest_hardening.CI_SOAK_DURATION_SECONDS
+    )
+    assert config.effective_actor_count == audit_rest_hardening.CI_SOAK_ACTOR_COUNT
+    assert config.effective_rps_per_actor == audit_rest_hardening.CI_SOAK_RPS_PER_ACTOR
+
+
+def test_resolve_soak_config_allows_explicit_ci_override(monkeypatch) -> None:
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.setenv("SOAK_CI_MODE", "false")
+
+    config = audit_rest_hardening._resolve_soak_config(
+        duration_seconds=300,
+        actor_count=100,
+        rps_per_actor=10.0,
+    )
+
+    assert config.ci_mode_enabled is False
+    assert config.effective_duration_seconds == 300
+    assert config.effective_actor_count == 100
+    assert config.effective_rps_per_actor == 10.0
+
+
 def test_soak_actor_records_timeout_exception(monkeypatch) -> None:
     class HangingClient:
         async def get(self, _endpoint: str, *, headers: dict[str, str]) -> None:
