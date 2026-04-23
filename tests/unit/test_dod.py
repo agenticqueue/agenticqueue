@@ -285,7 +285,7 @@ def test_run_dod_checks_supports_partial_and_blocked_items(tmp_path: Path) -> No
         (None, "Task contract must declare a non-empty 'dod_checks' list."),
         (
             [{"item": "x", "type": "shell", "cmd": "pytest"}],
-            "shell exec disabled; see ADR-AQ-012",
+            "shell exec disabled by task policy",
         ),
         (
             [{"item": "x", "type": "wat"}],

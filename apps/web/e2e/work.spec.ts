@@ -42,7 +42,7 @@ const WORK_FIXTURE = {
         {
           id: "decision-104",
           summary: "Keep the Work panel read-only",
-          rationale: "ADR-AQ-022 requires mutations to stay outside the UI.",
+          rationale: "Product policy keeps mutations outside the UI.",
           decided_at: "2026-04-21T15:01:00.000Z",
           actor: "codex",
           run_ref: "run-abcd1234",

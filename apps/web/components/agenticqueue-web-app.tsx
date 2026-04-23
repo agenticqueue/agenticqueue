@@ -136,7 +136,7 @@ const VIEW_CONTENT: Record<ViewKey, ViewDefinition> = {
       {
         title: "Read-only by design",
         body: "Analytics is an observability surface over existing API read models, not a backdoor mutation channel.",
-        meta: "ADR-AQ-022",
+        meta: "read-only policy",
       },
       {
         title: "90-day window first",
@@ -163,7 +163,7 @@ const VIEW_CONTENT: Record<ViewKey, ViewDefinition> = {
     rows: [
       {
         title: "Decision lineage",
-        body: "Supersede chains and ADR references stay inspectable even while agents execute elsewhere.",
+        body: "Supersede chains and decision references stay inspectable even while agents execute elsewhere.",
         meta: "graph-first retrieval",
       },
       {
@@ -174,7 +174,7 @@ const VIEW_CONTENT: Record<ViewKey, ViewDefinition> = {
       {
         title: "Surface-area links",
         body: "Learnings, tasks, and artifacts stay joined through deterministic tags before any fuzzy retrieval.",
-        meta: "ADR-AQ-015",
+        meta: "surface-area retrieval",
       },
     ],
   },
@@ -192,17 +192,17 @@ const VIEW_CONTENT: Record<ViewKey, ViewDefinition> = {
       {
         title: "UI stays on in every mode",
         body: "Observability is not optional, even when policy packs disable human approval on the happy path.",
-        meta: "ADR-AQ-003",
+        meta: "observability policy",
       },
       {
         title: "Direct-to-main until launch",
         body: "Codex pushes clean slices directly while CI audits post-push health.",
-        meta: "ADR-AQ-018",
+        meta: "release workflow",
       },
       {
         title: "Escrow over proxy",
         body: "The platform validates at check-in time rather than intercepting every tool call.",
-        meta: "ADR-AQ-012",
+        meta: "contract validation",
       },
     ],
   },
@@ -225,7 +225,7 @@ const VIEW_CONTENT: Record<ViewKey, ViewDefinition> = {
       {
         title: "Failures should draft memory",
         body: "Blocked, retried, or corrected work should emit structured learnings before closeout.",
-        meta: "ADR-AQ-010",
+        meta: "anti-repeat loop",
       },
       {
         title: "Human review upgrades confidence",

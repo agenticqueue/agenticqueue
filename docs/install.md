@@ -107,8 +107,8 @@ database volume.
 
 ## Autonomous mode while keeping the UI
 
-AgenticQueue follows ADR-AQ-003: the UI stays on in every deployment profile.
-What changes is policy, not the container set.
+AgenticQueue keeps the UI on in every deployment profile. What changes is
+policy, not the container set.
 
 Today the bundled default policy pack is `default-coding.policy.yaml`, which
 ships with:

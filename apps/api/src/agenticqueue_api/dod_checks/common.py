@@ -152,7 +152,7 @@ def coerce_check_definition(raw: Any) -> DodCheckDefinition:
     item = _require_non_empty_string(raw, "item")
     check_type = _require_non_empty_string(raw, "type")
     if check_type == "shell":
-        raise DodCheckValidationError("shell exec disabled; see ADR-AQ-012")
+        raise DodCheckValidationError("shell exec disabled by task policy")
 
     timeout_value = raw.get("timeout_seconds", DEFAULT_CHECK_TIMEOUT_SECONDS)
     if not isinstance(timeout_value, (int, float)) or timeout_value <= 0:

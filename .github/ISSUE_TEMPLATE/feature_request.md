@@ -23,5 +23,5 @@ How should we know this request is complete?
 ## Context
 
 - AQ ticket / task link:
-- Related docs / ADRs:
+- Related docs / references:
 - Screenshots / mockups:

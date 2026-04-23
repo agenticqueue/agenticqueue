@@ -37,7 +37,7 @@ DateText = Annotated[
 
 
 class LearningType(StrEnum):
-    """Canonical learning kinds from ADR-AQ-010."""
+    """Canonical learning kinds."""
 
     PITFALL = "pitfall"
     PATTERN = "pattern"
@@ -73,7 +73,7 @@ class LearningStatus(StrEnum):
 
 
 class LearningSchemaModel(BaseModel):
-    """Standalone 13-field learning schema from ADR-AQ-010."""
+    """Standalone 13-field learning schema."""
 
     model_config = ConfigDict(extra="forbid")
 

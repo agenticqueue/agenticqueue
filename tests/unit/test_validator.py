@@ -336,7 +336,7 @@ def test_validate_submission_rejects_invalid_declarative_dod_contract(
 
     assert result.is_valid is False
     assert result.errors[0].rule == "dod_checks_invalid"
-    assert result.errors[0].hint == "shell exec disabled; see ADR-AQ-012"
+    assert result.errors[0].hint == "shell exec disabled by task policy"
 
 
 def test_validate_submission_reports_unmet_declarative_dod_items(

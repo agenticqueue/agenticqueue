@@ -2047,7 +2047,7 @@
       },
       "LearningSchemaModel": {
         "additionalProperties": false,
-        "description": "Standalone 13-field learning schema from ADR-AQ-010.",
+        "description": "Standalone 13-field learning schema.",
         "properties": {
           "action_rule": {
             "maxLength": 4096,
@@ -2161,7 +2161,7 @@
         "type": "string"
       },
       "LearningType": {
-        "description": "Canonical learning kinds from ADR-AQ-010.",
+        "description": "Canonical learning kinds.",
         "enum": [
           "pitfall",
           "pattern",
