@@ -50,7 +50,6 @@ from agenticqueue_api.config import (
 from agenticqueue_api.crud import build_crud_router
 from agenticqueue_api.db import write_timeout
 from agenticqueue_api.errors import (
-    HTTP_422_STATUS,
     install_exception_handlers,
     raise_api_error,
 )

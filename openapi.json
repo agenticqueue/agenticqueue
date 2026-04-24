@@ -6127,7 +6127,7 @@
     },
     "/v1/learnings/drafts/{draft_id}/confirm": {
       "post": {
-        "operationId": "confirm_learning_draft_v1_learnings_drafts__draft_id__confirm_post",
+        "operationId": "confirm_learning_draft_endpoint_v1_learnings_drafts__draft_id__confirm_post",
         "parameters": [
           {
             "in": "path",
@@ -6170,7 +6170,7 @@
                       "$ref": "#/components/schemas/DedupeSuggestion"
                     }
                   ],
-                  "title": "Response Confirm Learning Draft V1 Learnings Drafts  Draft Id  Confirm Post"
+                  "title": "Response Confirm Learning Draft Endpoint V1 Learnings Drafts  Draft Id  Confirm Post"
                 }
               }
             },
@@ -6187,12 +6187,12 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Confirm Learning Draft"
+        "summary": "Confirm Learning Draft Endpoint"
       }
     },
     "/v1/learnings/drafts/{draft_id}/edit": {
       "post": {
-        "operationId": "edit_learning_draft_v1_learnings_drafts__draft_id__edit_post",
+        "operationId": "edit_learning_draft_endpoint_v1_learnings_drafts__draft_id__edit_post",
         "parameters": [
           {
             "in": "path",
@@ -6237,12 +6237,12 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Edit Learning Draft"
+        "summary": "Edit Learning Draft Endpoint"
       }
     },
     "/v1/learnings/drafts/{draft_id}/reject": {
       "post": {
-        "operationId": "reject_learning_draft_v1_learnings_drafts__draft_id__reject_post",
+        "operationId": "reject_learning_draft_endpoint_v1_learnings_drafts__draft_id__reject_post",
         "parameters": [
           {
             "in": "path",
@@ -6287,7 +6287,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Reject Learning Draft"
+        "summary": "Reject Learning Draft Endpoint"
       }
     },
     "/v1/learnings/relevant": {

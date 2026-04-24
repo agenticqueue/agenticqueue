@@ -478,13 +478,15 @@ def test_hidden_alias_routes_match_canonical_learning_draft_responses(
         ) == _normalize_response_payload(alias_payload["draft"])
         return
 
-    assert canonical_payload["draft"]["draft_status"] == alias_payload["draft"][
-        "draft_status"
-    ]
+    assert (
+        canonical_payload["draft"]["draft_status"]
+        == alias_payload["draft"]["draft_status"]
+    )
     assert canonical_payload["learning"]["title"] == alias_payload["learning"]["title"]
-    assert canonical_payload["learning"]["action_rule"] == alias_payload["learning"][
-        "action_rule"
-    ]
+    assert (
+        canonical_payload["learning"]["action_rule"]
+        == alias_payload["learning"]["action_rule"]
+    )
 
 
 def test_reject_requires_reason_and_confirm_rejects_invalid_payload(
