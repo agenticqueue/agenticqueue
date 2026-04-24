@@ -229,8 +229,13 @@ def test_requires_idempotency_and_normalization_helpers() -> None:
         {"type": "http", "method": "DELETE", "path": "/v1/tasks/demo", "headers": []},
         receive=_receive,
     )
-    request_setup = Request(
-        {"type": "http", "method": "POST", "path": "/setup", "headers": []},
+    request_bootstrap = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/auth/bootstrap_admin",
+            "headers": [],
+        },
         receive=_receive,
     )
 
@@ -239,7 +244,7 @@ def test_requires_idempotency_and_normalization_helpers() -> None:
     assert requires_idempotency(request_hidden) is True
     assert requires_idempotency(request_other) is False
     assert requires_idempotency(request_delete) is True
-    assert requires_idempotency(request_setup) is True
+    assert requires_idempotency(request_bootstrap) is False
 
 
 @pytest.mark.parametrize(

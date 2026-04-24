@@ -103,8 +103,8 @@ ROOT_SPECS = (
     CommandSpec(
         name="setup",
         method="POST",
-        path="/setup",
-        help="Run first-time setup with an optional JSON payload.",
+        path="/api/auth/bootstrap_admin",
+        help="Run first-time local owner bootstrap.",
         accepts_body=True,
     ),
 )

@@ -29,8 +29,8 @@ The unified `AgenticQueue` MCP server only exposes the canonical public surface
 listed in this document.
 
 - Canonical MCP count: 62 tools.
-- `aq setup` / `POST /setup` is intentionally REST/CLI-only and does not have a
-  unified MCP tool.
+- First-run bootstrap is intentionally REST/UI-only and does not have a unified
+  MCP tool.
 - The standalone learnings and memory helpers
   (`get_relevant_learnings`, `submit_task_learning`, `search_memory`,
   `sync_memory`, `memory_stats`) are not mounted into the unified server
@@ -182,19 +182,20 @@ Legend:
 |---|---|---|---|---|---|---|
 | 12.1 ○ | health | `aq health` | `GET /healthz` | `health_check` | — | AQ-138 |
 | 12.2 ○ | stats | `aq stats` | `GET /stats` | `get_stats` | `read` | AQ-138 |
-| 12.3 ✦ | first-run setup | `aq setup` | `POST /setup` (disabled after first run) | n/a | initial | AQ-137 |
+| 12.3 ○ | bootstrap status | n/a | `GET /api/auth/bootstrap_status` | n/a | initial | AQ-293 |
 
 ## Coverage audit
 
 The table maps 63 canonical transport operations across the public surfaces.
-There are 62 canonical MCP tools because first-run setup remains intentionally
-REST/CLI-only. No transport families were introduced beyond CLI, REST, and MCP.
+There are 62 canonical MCP tools because first-run bootstrap remains
+intentionally REST/UI-only. No transport families were introduced beyond CLI,
+REST, and MCP.
 
 ## Counts
 
 - Total operations: 63
-- Mutations: 35
-- Reads: 28
+- Mutations: 34
+- Reads: 29
 - Canonical MCP tools: 62
 - Unified MCP profile counts: `worker` 30, `reviewer` 38, `supervisor` 45, `admin` 62
 - Capability gates: `admin`, `supervisor`, `approve`, `read`, `write:decision`, `write:job`, `write:learning`, `write:pipeline`, `capability-matched`, `claimant`, `self`, `initial`

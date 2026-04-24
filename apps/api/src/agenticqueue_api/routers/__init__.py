@@ -3,6 +3,7 @@
 from agenticqueue_api.routers.analytics import build_analytics_router
 from agenticqueue_api.routers.auth_tokens import build_auth_tokens_router
 from agenticqueue_api.routers.audit import build_audit_router
+from agenticqueue_api.routers.bootstrap import build_bootstrap_router
 from agenticqueue_api.routers.decisions import build_decisions_router
 from agenticqueue_api.routers.graph import build_graph_router
 from agenticqueue_api.routers.learnings import build_learnings_router
@@ -16,6 +17,7 @@ __all__ = [
     "build_analytics_router",
     "build_auth_tokens_router",
     "build_audit_router",
+    "build_bootstrap_router",
     "build_decisions_router",
     "build_graph_router",
     "build_learnings_router",

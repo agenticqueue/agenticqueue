@@ -25,16 +25,18 @@ from agenticqueue_api.models import (
     ApiTokenRecord,
 )
 
-TOKEN_PREFIX = "aq__"
+TOKEN_PREFIX = "aq_live_"
+LEGACY_TOKEN_PREFIX = "aq__"
 TOKEN_HASH_PREFIX_LENGTH = 16
 TOKEN_SEPARATOR = "_"
 WWW_AUTHENTICATE_HEADER = {"WWW-Authenticate": "Bearer"}
 ANONYMOUS_PATHS = {
+    "/api/auth/bootstrap_admin",
+    "/api/auth/bootstrap_status",
     "/api/session",
     "/api/healthz",
     "/health",
     "/healthz",
-    "/setup",
     "/v1/health",
 }
 
@@ -70,7 +72,7 @@ def token_display_prefix(token_hash: str) -> str:
 
 
 def _render_token(raw_secret: str, token_hash: str) -> str:
-    return f"{TOKEN_PREFIX}{_token_prefix_from_hash(token_hash)}{TOKEN_SEPARATOR}{raw_secret}"
+    return f"{TOKEN_PREFIX}{_token_prefix_from_hash(token_hash)}{raw_secret}"
 
 
 def extract_bearer_token(authorization_header: str | None) -> str:
@@ -85,10 +87,22 @@ def extract_bearer_token(authorization_header: str | None) -> str:
 
 
 def _parse_token(token_value: str) -> tuple[str, str]:
-    if not token_value.startswith(TOKEN_PREFIX):
+    if token_value.startswith(TOKEN_PREFIX):
+        token_body = token_value[len(TOKEN_PREFIX) :]
+        prefix = token_body[:TOKEN_HASH_PREFIX_LENGTH]
+        raw_secret = token_body[TOKEN_HASH_PREFIX_LENGTH:]
+        if (
+            len(prefix) != TOKEN_HASH_PREFIX_LENGTH
+            or not raw_secret
+            or any(character not in "0123456789abcdef" for character in prefix.lower())
+        ):
+            raise AuthenticationError("Invalid bearer token")
+        return prefix.lower(), raw_secret
+
+    if not token_value.startswith(LEGACY_TOKEN_PREFIX):
         raise AuthenticationError("Invalid bearer token")
 
-    prefix, separator, raw_secret = token_value[len(TOKEN_PREFIX) :].partition(
+    prefix, separator, raw_secret = token_value[len(LEGACY_TOKEN_PREFIX) :].partition(
         TOKEN_SEPARATOR
     )
     if (

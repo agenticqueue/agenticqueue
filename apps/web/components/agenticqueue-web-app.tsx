@@ -667,7 +667,7 @@ export function LoginScreen({ errorMessage, onLogin }: LoginScreenProps) {
               inputMode="text"
               name="api-token"
               onChange={(event) => setToken(event.target.value)}
-              placeholder="aq__prefix_secret"
+              placeholder="aq_live_prefixsecret"
               spellCheck={false}
               type={showToken ? "text" : "password"}
               value={token}

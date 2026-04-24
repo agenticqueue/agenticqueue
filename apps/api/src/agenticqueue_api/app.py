@@ -46,14 +46,6 @@ from agenticqueue_api.errors import (
     install_exception_handlers,
     raise_api_error,
 )
-from agenticqueue_api.init_wizard import (
-    BOOT_TRACE_ID,
-    SETUP_ROUTE_TRACE_ID,
-    InitWizardResult,
-    apply_database_migrations,
-    emit_bootstrap_message,
-    run_first_run_setup,
-)
 from agenticqueue_api.local_auth import (
     CSRF_COOKIE_NAME,
     SESSION_COOKIE_NAME,
@@ -61,6 +53,7 @@ from agenticqueue_api.local_auth import (
     authenticate_email_password,
     create_browser_session,
 )
+from agenticqueue_api.migrations import apply_database_migrations
 from agenticqueue_api.middleware import (
     ActorRateLimitMiddleware,
     ContentSizeLimitMiddleware,
@@ -96,6 +89,7 @@ from agenticqueue_api.routers import (
     build_analytics_router,
     build_auth_tokens_router,
     build_audit_router,
+    build_bootstrap_router,
     build_decisions_router,
     build_graph_router,
     build_learnings_router,
@@ -637,28 +631,13 @@ def create_app(
     packet_cache = PacketCache(session_factory=resolved_session_factory)
     mcp_lifespan_apps: list[Any] = []
 
-    def run_auto_setup() -> None:
+    def run_auto_migrations() -> None:
         apply_database_migrations()
-        setup_session = resolved_session_factory()
-        try:
-            set_session_audit_context(
-                setup_session,
-                actor_id=None,
-                trace_id=BOOT_TRACE_ID,
-            )
-            bootstrap = run_first_run_setup(setup_session)
-            setup_session.commit()
-            emit_bootstrap_message(bootstrap)
-        except Exception:
-            setup_session.rollback()
-            raise
-        finally:
-            setup_session.close()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if get_auto_setup_enabled():
-            await asyncio.to_thread(run_auto_setup)
+            await asyncio.to_thread(run_auto_migrations)
 
         del app
         packet_cache.start()
@@ -715,6 +694,7 @@ def create_app(
     app.include_router(build_operational_router(app, get_db_session))
     app.include_router(build_packets_router(get_db_session))
     app.include_router(build_crud_router(get_db_session))
+    app.include_router(build_bootstrap_router(get_db_session))
 
     @app.post("/api/session", response_model=LocalSessionResponse)
     def create_local_session(
@@ -764,37 +744,6 @@ def create_app(
                 is_admin=user.is_admin,
             )
         )
-
-    @app.post(
-        "/setup",
-        response_model=InitWizardResult,
-        status_code=status.HTTP_201_CREATED,
-    )
-    def setup(request: Request) -> InitWizardResult:
-        apply_database_migrations()
-        session = request.app.state.session_factory()
-        trace_id = getattr(request.state, "request_id", None) or SETUP_ROUTE_TRACE_ID
-        try:
-            set_session_audit_context(
-                session,
-                actor_id=None,
-                trace_id=trace_id,
-            )
-            result = run_first_run_setup(session)
-            if result.status == "noop":
-                session.rollback()
-                raise_api_error(
-                    status.HTTP_409_CONFLICT,
-                    "First-run setup already completed",
-                    details={"workspace_id": str(result.workspace_id)},
-                )
-            session.commit()
-            return result
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
 
     app.include_router(build_task_types_router(get_db_session))
     app.include_router(build_auth_tokens_router(get_db_session))

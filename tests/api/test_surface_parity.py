@@ -104,7 +104,8 @@ def test_surface_paths_are_served_and_documented(
     assert {
         "/healthz",
         "/stats",
-        "/setup",
+        "/api/auth/bootstrap_status",
+        "/api/auth/bootstrap_admin",
         "/v1/actors/me/rotate-key",
         "/v1/capabilities/grant",
         "/v1/capabilities/revoke",
@@ -151,8 +152,8 @@ def test_rotate_own_key_and_task_type_detail_update_routes_work(
     )
     assert rotate_response.status_code == 200
     rotated_payload = rotate_response.json()
-    assert rotated_payload["token"].startswith("aq__")
-    assert rotated_payload["api_token"]["token_prefix"].startswith("aq__")
+    assert rotated_payload["token"].startswith("aq_live_")
+    assert rotated_payload["api_token"]["token_prefix"].startswith("aq_live_")
 
     tokens_response = client.get(
         "/v1/auth/tokens",

@@ -86,8 +86,7 @@ def requires_idempotency(request: Request) -> bool:
 
     path = request.url.path
     return (
-        path == "/setup"
-        or path == "/task-types"
+        path == "/task-types"
         or path.startswith("/v1/")
         or path.startswith("/tasks/")
         or path.startswith("/learnings/drafts/")

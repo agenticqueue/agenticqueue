@@ -19,13 +19,13 @@ test("keeps the API token masked until the operator explicitly reveals it", asyn
   await expect(tokenInput).toHaveAttribute("autocapitalize", "off");
   await expect(tokenInput).toHaveAttribute("inputmode", "text");
 
-  await tokenInput.fill("aq__playwright_token");
+  await tokenInput.fill("aq_live_playwright_token");
 
   const toggle = page.getByRole("button", { name: /^show$/i });
   await toggle.click();
 
   await expect(tokenInput).toHaveAttribute("type", "text");
-  await expect(tokenInput).toHaveValue("aq__playwright_token");
+  await expect(tokenInput).toHaveValue("aq_live_playwright_token");
   await expect(page.getByRole("button", { name: /^hide$/i })).toHaveText(
     /hide/i,
   );

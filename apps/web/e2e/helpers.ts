@@ -84,7 +84,7 @@ export async function seedAuthenticatedSession(
   } = {},
 ) {
   const remember = options.remember ?? false;
-  const token = options.token ?? "aq__playwright_token";
+  const token = options.token ?? "aq_live_playwright_token";
 
   await page.addInitScript(
     ({ apiToken, persist }) => {

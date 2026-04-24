@@ -169,7 +169,7 @@ def test_valid_bearer_returns_actor_context_and_token_list(
         "display_name": "User One",
     }
     assert body["tokens"][0]["actor_id"] == str(user_id)
-    assert body["tokens"][0]["token_prefix"].startswith("aq__")
+    assert body["tokens"][0]["token_prefix"].startswith("aq_live_")
 
 
 def test_expired_token_returns_401(
@@ -313,7 +313,7 @@ def test_provision_endpoint_creates_token_and_returns_raw_value_once(
 
     assert response.status_code == 201
     body = response.json()
-    assert body["token"].startswith("aq__")
+    assert body["token"].startswith("aq_live_")
     assert body["api_token"]["actor_id"] == str(user_id)
     assert body["api_token"]["scopes"] == ["task:read", "task:write"]
     assert "raw_token" not in body["api_token"]
@@ -455,7 +455,7 @@ def test_auth_helpers_handle_missing_rows_and_invalid_token_shapes(
         assert get_api_token(session, missing_token_id) is None
         assert revoke_api_token(session, missing_token_id) is None
         assert authenticate_api_token(session, "not-prefixed") is None
-        assert authenticate_api_token(session, "aq__missing-separator") is None
+        assert authenticate_api_token(session, "aq_live_missing-token-prefix") is None
 
 
 def test_authenticate_token_handles_prefix_mismatch_and_unknown_hash(
@@ -480,7 +480,7 @@ def test_authenticate_token_handles_prefix_mismatch_and_unknown_hash(
 
     unknown_secret = "f" * 64
     unknown_hash = _hash_token_secret(unknown_secret)
-    unknown_token = f"aq__{_token_prefix_from_hash(unknown_hash)}_{unknown_secret}"
+    unknown_token = f"aq_live_{_token_prefix_from_hash(unknown_hash)}{unknown_secret}"
 
     with session_factory() as session:
         assert (

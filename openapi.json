@@ -700,6 +700,93 @@
         "title": "BlockedHeatmapCellView",
         "type": "object"
       },
+      "BootstrapAdminRequest": {
+        "description": "First-run local owner bootstrap payload.",
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "pattern": "^[^@\\s]+@[^@\\s]+$",
+            "title": "Email",
+            "type": "string"
+          },
+          "passcode": {
+            "minLength": 1,
+            "title": "Passcode",
+            "type": "string"
+          },
+          "password": {
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "passcode",
+          "password"
+        ],
+        "title": "BootstrapAdminRequest",
+        "type": "object"
+      },
+      "BootstrapAdminResponse": {
+        "description": "Successful first-run bootstrap response.",
+        "properties": {
+          "first_token": {
+            "title": "First Token",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/BootstrapUserResponse"
+          }
+        },
+        "required": [
+          "user",
+          "first_token"
+        ],
+        "title": "BootstrapAdminResponse",
+        "type": "object"
+      },
+      "BootstrapStatusResponse": {
+        "description": "Whether the first local admin still needs to be bootstrapped.",
+        "properties": {
+          "needs_bootstrap": {
+            "title": "Needs Bootstrap",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "needs_bootstrap"
+        ],
+        "title": "BootstrapStatusResponse",
+        "type": "object"
+      },
+      "BootstrapUserResponse": {
+        "description": "Local owner returned after bootstrap.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "role": {
+            "const": "owner",
+            "default": "owner",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email"
+        ],
+        "title": "BootstrapUserResponse",
+        "type": "object"
+      },
       "CapabilityGrantView": {
         "description": "Capability grant returned from the API.",
         "properties": {
@@ -1771,105 +1858,6 @@
           "active_count"
         ],
         "title": "IdempotencyStatsResponse",
-        "type": "object"
-      },
-      "InitWizardResult": {
-        "description": "Result payload for the first-run setup flow.",
-        "properties": {
-          "actor_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Actor Id"
-          },
-          "api_token": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Api Token"
-          },
-          "message": {
-            "title": "Message",
-            "type": "string"
-          },
-          "policy_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Policy Id"
-          },
-          "policy_name": {
-            "default": "default-coding",
-            "title": "Policy Name",
-            "type": "string"
-          },
-          "project_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Id"
-          },
-          "status": {
-            "enum": [
-              "initialized",
-              "noop"
-            ],
-            "title": "Status",
-            "type": "string"
-          },
-          "task_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Task Id"
-          },
-          "workspace_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Workspace Id"
-          }
-        },
-        "required": [
-          "status",
-          "message"
-        ],
-        "title": "InitWizardResult",
         "type": "object"
       },
       "LearningConfidence": {
@@ -3977,6 +3965,62 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/auth/bootstrap_admin": {
+      "post": {
+        "operationId": "bootstrap_admin_api_auth_bootstrap_admin_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BootstrapAdminRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BootstrapAdminResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bootstrap Admin"
+      }
+    },
+    "/api/auth/bootstrap_status": {
+      "get": {
+        "operationId": "bootstrap_status_api_auth_bootstrap_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BootstrapStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Bootstrap Status"
+      }
+    },
     "/api/session": {
       "post": {
         "operationId": "create_local_session_api_session_post",
@@ -4035,24 +4079,6 @@
           }
         },
         "summary": "Health"
-      }
-    },
-    "/setup": {
-      "post": {
-        "operationId": "setup_setup_post",
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InitWizardResult"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Setup"
       }
     },
     "/stats": {

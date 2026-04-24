@@ -65,6 +65,27 @@ owner: "codex"
 review_date: "2026-05-24"
 ```
 
+### AQ-293: Token format changes must update deterministic seed renderers too
+
+```yaml
+title: "Token renderers outside the live issuer can drift during prefix migrations"
+type: "pitfall"
+what_happened: "AQ-293 changed live API token rendering from the legacy `aq__<prefix>_<secret>` shape to `aq_live_<prefix><secret>` so first-run bootstrap could return `aq_live_...`, but the deterministic seed fixture still rendered `aq_live_<prefix>_<secret>`. The full pytest suite then failed `tests/integration/test_seed_idempotency.py::test_seed_happy_path_creates_expected_entities_and_claimable_task` with a 401 because seeded tokens no longer parsed."
+what_learned: "AgenticQueue has more than one token-rendering path: runtime token issuance and deterministic seed fixture rendering. A prefix or delimiter change must update both paths, or seed smoke tests can generate tokens that the auth parser rejects."
+action_rule: "When changing token prefix, delimiter, display-prefix, or parser semantics, grep for `render_raw_token`, `token_display_prefix`, `_render_token`, and seed fixtures; then run both auth tests and `tests/integration/test_seed_idempotency.py` before broad verification."
+applies_when: "An auth ticket changes API token shape, token parsing, token display prefixes, bootstrap first-token issuance, or deterministic local seed output."
+does_not_apply_when: "The change is limited to session cookies or password handling and does not touch API token rendering or parsing."
+evidence:
+  - "`uv run pytest --no-cov -q` first failed on 2026-04-24 with `tests/integration/test_seed_idempotency.py::test_seed_happy_path_creates_expected_entities_and_claimable_task` returning 401 from `/v1/tasks`."
+  - "`apps/api/src/agenticqueue_api/seed.py::SeedToken.render_raw_token()` still inserted an underscore separator after `token_display_prefix()` while `authenticate_api_token()` parsed the new `aq_live_` token body as fixed 16-character hash prefix plus raw secret."
+  - "After aligning `SeedToken.render_raw_token()` with the new issuer shape, the seed test passed and the full suite passed with `719 passed`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ### AQ-271: Tuple-style None guards do not narrow constructor arguments for mypy
 
 ```yaml

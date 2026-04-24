@@ -21,6 +21,9 @@ uv sync --frozen
 docker compose up -d
 ```
 
+Before first boot, set `AQ_ADMIN_PASSCODE` in `.env`. The setup page uses that
+passcode to claim the first local owner account.
+
 The compose stack defaults to:
 
 - API: `http://127.0.0.1:8000`
@@ -37,26 +40,21 @@ uv run aq health
 
 ## First-run bootstrap
 
-By default the API container auto-runs first-time setup on boot
-(`AGENTICQUEUE_AUTO_SETUP=1`) and prints a one-time admin token to the API
-logs. Capture that token immediately:
+Open the web UI at `http://127.0.0.1:3000` and follow the first-run setup flow.
+The setup form asks for:
+
+- email
+- `AQ_ADMIN_PASSCODE`
+- password
+- password confirmation
+
+The API returns the first admin API token once after setup. It starts with
+`aq_live_`; save it immediately because the database stores only its hash.
+
+Export that token for CLI use:
 
 ```bash
-docker compose logs api
-```
-
-Look for a line like:
-
-```text
-[aq-init] One-time admin token: aq__...
-```
-
-Save that token right away. The stack only prints it once.
-
-Export the token for CLI use:
-
-```bash
-export AGENTICQUEUE_TOKEN="aq__paste_the_token_here"
+export AGENTICQUEUE_TOKEN="aq_live_paste_the_token_here"
 ```
 
 Now verify the install from the public CLI surface:
@@ -67,26 +65,24 @@ uv run aq project list
 uv run aq job list
 ```
 
-Open the web UI at `http://127.0.0.1:3000`, paste the same token into the login
-screen, and you should land in the read-only shell.
+After setup, use the login screen with the email and password you created.
 
 ## Manual bootstrap variant
 
-If you prefer to run first-time setup yourself instead of reading the API logs,
-set `AGENTICQUEUE_AUTO_SETUP=0` in `.env` before `docker compose up -d`, then
-run the public setup command once the API is healthy:
+If you prefer to run first-time setup through HTTP, call the bootstrap endpoint
+once the API is healthy:
 
 ```bash
-BOOTSTRAP_JSON="$(uv run aq setup)"
-printf '%s\n' "$BOOTSTRAP_JSON"
+BOOTSTRAP_JSON="$(
+  curl -fsS http://127.0.0.1:8000/api/auth/bootstrap_admin \
+    -H 'Content-Type: application/json' \
+    -d '{"email":"admin@localhost","passcode":"'"$AQ_ADMIN_PASSCODE"'","password":"CorrectHorse12!"}'
+)"
 export AGENTICQUEUE_TOKEN="$(
   printf '%s' "$BOOTSTRAP_JSON" \
-    | uv run python -c "import json, sys; print(json.load(sys.stdin)['api_token'])"
+    | uv run python -c "import json, sys; print(json.load(sys.stdin)['first_token'])"
 )"
 ```
-
-For local-only bootstrap debugging, the helper behind that flow is still
-available as `uv run aq-local init`. It is not the public REST CLI surface.
 
 ## Restarting and shutting down
 

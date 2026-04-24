@@ -250,7 +250,7 @@ const donePayload = {
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem("aq:web:remember-token", "false");
-    window.sessionStorage.setItem("aq:web:api-token", "aq__playwright_token");
+    window.sessionStorage.setItem("aq:web:api-token", "aq_live_playwright_token");
   });
 
   await page.route("**/api/session", async (route) => {

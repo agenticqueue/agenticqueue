@@ -86,7 +86,7 @@ class SeedToken(TimestampedSchema):
         return _hash_token_secret(self.raw_secret)
 
     def render_raw_token(self) -> str:
-        return f"{token_display_prefix(self._token_hash())}_{self.raw_secret}"
+        return f"{token_display_prefix(self._token_hash())}{self.raw_secret}"
 
     def to_model(self, *, actor_id: uuid.UUID) -> ApiTokenModel:
         return ApiTokenModel.model_validate(

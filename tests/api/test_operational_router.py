@@ -30,4 +30,9 @@ def test_operational_routes_live_in_dedicated_router() -> None:
     assert modules_by_path["/stats"] == "agenticqueue_api.routers.operational"
     assert modules_by_path["/audit/verify"] == "agenticqueue_api.routers.operational"
     assert modules_by_path["/v1/audit/verify"] == "agenticqueue_api.routers.operational"
-    assert modules_by_path["/setup"] == "agenticqueue_api.app"
+    assert modules_by_path["/api/auth/bootstrap_status"] == (
+        "agenticqueue_api.routers.bootstrap"
+    )
+    assert modules_by_path["/api/auth/bootstrap_admin"] == (
+        "agenticqueue_api.routers.bootstrap"
+    )
