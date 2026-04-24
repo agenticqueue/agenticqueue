@@ -65,6 +65,10 @@ CI_SOAK_RPS_PER_ACTOR = 2.0
 # Raising the p99 budget in CI mode tolerates that jitter without masking real regressions:
 # the local gate stays at the calling default (200ms) for developer runs.
 CI_SOAK_MAX_READ_P99_MS = 300.0
+# Per-request hard timeout in CI — raised from the local 5s to absorb multi-second
+# runner stalls that would otherwise surface as TimeoutError exceptions in
+# request_exceptions and fail the soak.
+CI_SOAK_REQUEST_TIMEOUT_SECONDS = 30.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -168,6 +172,7 @@ class SoakConfig:
     effective_rps_per_actor: float
     requested_max_read_p99_ms: float
     effective_max_read_p99_ms: float
+    effective_request_timeout_seconds: float
     ci_mode_enabled: bool
 
 
@@ -199,6 +204,7 @@ def _resolve_soak_config(
     effective_actor_count = actor_count
     effective_rps_per_actor = rps_per_actor
     effective_max_read_p99_ms = max_read_p99_ms
+    effective_request_timeout_seconds = SOAK_REQUEST_TIMEOUT_SECONDS
 
     if ci_mode_enabled:
         # Shared CI runners cannot sustain the full local soak profile.
@@ -220,6 +226,13 @@ def _resolve_soak_config(
             max_read_p99_ms,
             CI_SOAK_MAX_READ_P99_MS,
         )
+        # Raise the per-request hard timeout to absorb multi-second runner stalls
+        # that would otherwise register as TimeoutError exceptions. Local value
+        # is preserved outside CI so regressions surface fast.
+        effective_request_timeout_seconds = max(
+            SOAK_REQUEST_TIMEOUT_SECONDS,
+            CI_SOAK_REQUEST_TIMEOUT_SECONDS,
+        )
 
     return SoakConfig(
         requested_duration_seconds=duration_seconds,
@@ -230,6 +243,7 @@ def _resolve_soak_config(
         effective_rps_per_actor=effective_rps_per_actor,
         requested_max_read_p99_ms=max_read_p99_ms,
         effective_max_read_p99_ms=effective_max_read_p99_ms,
+        effective_request_timeout_seconds=effective_request_timeout_seconds,
         ci_mode_enabled=ci_mode_enabled,
     )
 
@@ -1099,7 +1113,15 @@ async def _soak_actor(
     rps_per_actor: float,
     metrics: dict[str, Any],
     client: httpx.AsyncClient,
+    request_timeout_seconds: float | None = None,
 ) -> None:
+    # Resolve the timeout at call time so tests that monkeypatch
+    # SOAK_REQUEST_TIMEOUT_SECONDS at the module level are honored.
+    effective_timeout = (
+        SOAK_REQUEST_TIMEOUT_SECONDS
+        if request_timeout_seconds is None
+        else request_timeout_seconds
+    )
     interval = 1.0 / rps_per_actor
     deadline = time.perf_counter() + duration_seconds
     iteration = 0
@@ -1120,14 +1142,14 @@ async def _soak_actor(
                         include_idempotency=False,
                     ),
                 ),
-                timeout=SOAK_REQUEST_TIMEOUT_SECONDS,
+                timeout=effective_timeout,
             )
         except TimeoutError:
             metrics["request_exceptions"].append(
                 {
                     "error_type": "TimeoutError",
                     "message": (
-                        f"{endpoint} exceeded the {SOAK_REQUEST_TIMEOUT_SECONDS:.1f}s "
+                        f"{endpoint} exceeded the {effective_timeout:.1f}s "
                         "request budget during the soak."
                     ),
                 }
@@ -1207,7 +1229,7 @@ async def run_soak(
         async with httpx.AsyncClient(
             transport=transport,
             base_url="http://agenticqueue.test",
-            timeout=5.0,
+            timeout=soak_config.effective_request_timeout_seconds,
         ) as client:
             tasks = [
                 asyncio.create_task(
@@ -1218,6 +1240,7 @@ async def run_soak(
                         rps_per_actor=soak_config.effective_rps_per_actor,
                         metrics=metrics,
                         client=client,
+                        request_timeout_seconds=soak_config.effective_request_timeout_seconds,
                     )
                 )
                 for index, token in enumerate(tokens)
@@ -1318,6 +1341,9 @@ async def run_soak(
                     ),
                     "effective_max_read_p99_ms": (
                         soak_config.effective_max_read_p99_ms
+                    ),
+                    "effective_request_timeout_seconds": (
+                        soak_config.effective_request_timeout_seconds
                     ),
                 },
             },

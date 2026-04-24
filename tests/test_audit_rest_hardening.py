@@ -105,8 +105,7 @@ def test_resolve_soak_config_relaxes_p99_budget_in_ci(monkeypatch) -> None:
     assert config.ci_mode_enabled is True
     assert config.requested_max_read_p99_ms == 200.0
     assert (
-        config.effective_max_read_p99_ms
-        == audit_rest_hardening.CI_SOAK_MAX_READ_P99_MS
+        config.effective_max_read_p99_ms == audit_rest_hardening.CI_SOAK_MAX_READ_P99_MS
     )
 
 
@@ -138,6 +137,40 @@ def test_resolve_soak_config_keeps_caller_p99_outside_ci(monkeypatch) -> None:
 
     assert config.ci_mode_enabled is False
     assert config.effective_max_read_p99_ms == 200.0
+
+
+def test_resolve_soak_config_relaxes_request_timeout_in_ci(monkeypatch) -> None:
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.delenv("SOAK_CI_MODE", raising=False)
+
+    config = audit_rest_hardening._resolve_soak_config(
+        duration_seconds=300,
+        actor_count=100,
+        rps_per_actor=10.0,
+    )
+
+    assert config.ci_mode_enabled is True
+    assert (
+        config.effective_request_timeout_seconds
+        == audit_rest_hardening.CI_SOAK_REQUEST_TIMEOUT_SECONDS
+    )
+
+
+def test_resolve_soak_config_keeps_local_request_timeout(monkeypatch) -> None:
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("SOAK_CI_MODE", raising=False)
+
+    config = audit_rest_hardening._resolve_soak_config(
+        duration_seconds=300,
+        actor_count=100,
+        rps_per_actor=10.0,
+    )
+
+    assert config.ci_mode_enabled is False
+    assert (
+        config.effective_request_timeout_seconds
+        == audit_rest_hardening.SOAK_REQUEST_TIMEOUT_SECONDS
+    )
 
 
 def test_soak_actor_records_timeout_exception(monkeypatch) -> None:
