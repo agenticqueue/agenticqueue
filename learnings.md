@@ -2,6 +2,26 @@
 
 ## 2026-04-24
 
+### AQ-267: Mutating MCP adapters must carry idempotency keys when routed through REST
+
+```yaml
+title: "MCP mutation adapters must synthesize idempotency keys when delegating to REST"
+type: "repo-behavior"
+what_happened: "AQ-267 normalized `register_task_type` and `update_task_type` in `apps/api/src/agenticqueue_api/mcp/submit_tools.py` to call the internal REST task-type routes instead of mutating the registry directly. The first parity run failed because the REST mutation path enforces `Idempotency-Key`, but the MCP adapter forwarded the payload without that header."
+what_learned: "Once an MCP tool becomes a thin wrapper over a mutating REST route, parity requires inheriting the REST surface's idempotency contract instead of bypassing it."
+action_rule: "When an AgenticQueue MCP tool delegates a POST/PATCH/DELETE operation to an internal REST endpoint, include a deterministic `Idempotency-Key` derived from stable request content unless the route explicitly documents that no idempotency header is required."
+applies_when: "A mutating MCP tool uses `call_internal_api()` or another adapter to reach a REST endpoint guarded by the API's idempotency middleware."
+does_not_apply_when: "The MCP tool is read-only or the delegated route explicitly bypasses idempotency enforcement."
+evidence:
+  - "`uv run pytest tests/mcp/test_task_type_authz.py tests/mcp/test_task_type_parity.py -q` failed on 2026-04-24 with `Idempotency-Key header is required` after `update_task_type` was first routed through the REST surface without a synthesized header."
+  - "`uv run pytest tests/mcp/test_task_type_authz.py tests/mcp/test_task_type_parity.py tests/mcp/test_conformance.py tests/aq/test_mcp_server.py tests/api/test_surface_parity.py tests/unit/test_task_type_registry.py -q` passed on 2026-04-24 after the MCP mutation adapters added deterministic UUIDv5 idempotency headers."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ### AQ-264: Lazy router extraction needs module-global model rebinding
 
 ```yaml
