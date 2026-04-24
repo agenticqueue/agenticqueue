@@ -88,8 +88,6 @@ from agenticqueue_api.models import (
     CapabilityGrantModel,
     CapabilityKey,
     DecisionRecord,
-    EdgeModel,
-    EdgeRelation,
     LearningRecord,
     RoleAssignmentModel,
     RoleModel,
@@ -111,6 +109,7 @@ from agenticqueue_api.pagination import (
 from agenticqueue_api.routers import (
     build_analytics_router,
     build_audit_router,
+    build_decisions_router,
     build_graph_router,
     build_learnings_router,
     build_memory_router,
@@ -118,7 +117,7 @@ from agenticqueue_api.routers import (
     build_packets_router,
     build_task_types_router,
 )
-from agenticqueue_api.repo import claim_next, claim_task, create_edge, release_claim
+from agenticqueue_api.repo import claim_next, claim_task, release_claim
 from agenticqueue_api.roles import (
     assign_role,
     list_role_assignments_for_actor,
@@ -325,19 +324,6 @@ class TaskCommentResponse(SchemaModel):
 
     job_id: uuid.UUID
     commented: bool
-
-
-class DecisionSupersedeRequest(SchemaModel):
-    """Payload linking a replacement decision to the superseded one."""
-
-    replaced_by: uuid.UUID
-
-
-class DecisionLinkRequest(SchemaModel):
-    """Payload linking one decision to one job/task."""
-
-    job_id: uuid.UUID
-    relation: EdgeRelation = EdgeRelation.INFORMED_BY
 
 
 def _default_session_factory() -> sessionmaker[Session]:
@@ -738,6 +724,7 @@ def create_app(
     install_exception_handlers(app)
     app.include_router(build_analytics_router(get_db_session))
     app.include_router(build_audit_router(get_db_session))
+    app.include_router(build_decisions_router(get_db_session))
     app.include_router(build_graph_router(get_db_session))
     app.include_router(build_learnings_router(get_db_session))
     app.include_router(build_memory_router(get_db_session))
@@ -1051,106 +1038,6 @@ def create_app(
             actor=_actor_summary(ActorModel.model_validate(target_actor)),
             roles=[_role_assignment_view(assignment) for assignment in page],
         )
-
-    @app.post(
-        "/v1/decisions/{decision_id}/supersede",
-        response_model=EdgeModel,
-        status_code=status.HTTP_201_CREATED,
-    )
-    def supersede_decision_endpoint(
-        decision_id: uuid.UUID,
-        payload: DecisionSupersedeRequest,
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> EdgeModel:
-        with write_timeout(session, endpoint="v1.decisions.supersede"):
-            actor = _require_actor(request)
-            _require_token_scope(request, "decision:write")
-            prior_decision = _decision_record_or_404(session, decision_id)
-            replacement_decision = _decision_record_or_404(session, payload.replaced_by)
-            _require_update_task_capability_for_task(
-                session,
-                actor=actor,
-                task=_task_record_for_decision_or_404(session, prior_decision),
-            )
-            _require_update_task_capability_for_task(
-                session,
-                actor=actor,
-                task=_task_record_for_decision_or_404(session, replacement_decision),
-            )
-            try:
-                return create_edge(
-                    session,
-                    EdgeModel.model_validate(
-                        {
-                            "id": str(uuid.uuid4()),
-                            "created_at": dt.datetime.now(dt.UTC).isoformat(),
-                            "src_entity_type": "decision",
-                            "src_id": str(payload.replaced_by),
-                            "dst_entity_type": "decision",
-                            "dst_id": str(decision_id),
-                            "relation": EdgeRelation.SUPERSEDES.value,
-                            "metadata": {},
-                            "created_by": str(actor.id),
-                        }
-                    ),
-                )
-            except sa.exc.IntegrityError as error:
-                raise_api_error(
-                    status.HTTP_409_CONFLICT,
-                    "Decision supersede link already exists",
-                    details={"reason": str(error.orig) if error.orig else None},
-                )
-
-    @app.post(
-        "/v1/decisions/{decision_id}/link",
-        response_model=EdgeModel,
-        status_code=status.HTTP_201_CREATED,
-    )
-    def link_decision_endpoint(
-        decision_id: uuid.UUID,
-        payload: DecisionLinkRequest,
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> EdgeModel:
-        with write_timeout(session, endpoint="v1.decisions.link"):
-            actor = _require_actor(request)
-            _require_token_scope(request, "decision:write")
-            decision = _decision_record_or_404(session, decision_id)
-            target_task = _task_record_or_404(session, payload.job_id)
-            _require_update_task_capability_for_task(
-                session,
-                actor=actor,
-                task=_task_record_for_decision_or_404(session, decision),
-            )
-            _require_update_task_capability_for_task(
-                session,
-                actor=actor,
-                task=target_task,
-            )
-            try:
-                return create_edge(
-                    session,
-                    EdgeModel.model_validate(
-                        {
-                            "id": str(uuid.uuid4()),
-                            "created_at": dt.datetime.now(dt.UTC).isoformat(),
-                            "src_entity_type": "decision",
-                            "src_id": str(decision_id),
-                            "dst_entity_type": "task",
-                            "dst_id": str(payload.job_id),
-                            "relation": payload.relation.value,
-                            "metadata": {},
-                            "created_by": str(actor.id),
-                        }
-                    ),
-                )
-            except sa.exc.IntegrityError as error:
-                raise_api_error(
-                    status.HTTP_409_CONFLICT,
-                    "Decision link already exists",
-                    details={"reason": str(error.orig) if error.orig else None},
-                )
 
     def _draft_store_or_error(
         session: Session,
