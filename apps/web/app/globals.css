@@ -392,14 +392,59 @@ input {
   color: var(--ink-muted);
 }
 
-.aq-auth-input {
-  width: 100%;
-  padding: 1rem;
+.aq-auth-input-wrap {
+  display: flex;
+  align-items: stretch;
   border: 1px solid var(--border);
   border-radius: 1rem;
   background: rgba(9, 14, 20, 0.88);
+  overflow: hidden;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.aq-auth-input-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(63, 118, 255, 0.24);
+}
+
+.aq-auth-input {
+  width: 100%;
+  padding: 1rem;
+  border: 0;
+  background: transparent;
   color: var(--ink);
-  resize: vertical;
+  font-family: var(--font-mono);
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.aq-auth-input:focus {
+  outline: none;
+}
+
+.aq-auth-toggle {
+  border: 0;
+  border-left: 1px solid var(--border-subtle);
+  background: rgba(17, 24, 39, 0.84);
+  color: var(--ink-muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  padding: 0 1rem;
+  text-transform: uppercase;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
+}
+
+.aq-auth-toggle:hover,
+.aq-auth-toggle[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--ink);
 }
 
 .aq-auth-checkbox {

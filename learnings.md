@@ -123,6 +123,26 @@ owner: "codex"
 review_date: "2026-05-24"
 ```
 
+### AQ-278: Vitest needs the React Vite plugin to load Next TSX under this repo
+
+```yaml
+title: "Root Vitest runs need `@vitejs/plugin-react` before they can import Next TSX modules"
+type: "tooling"
+what_happened: "AQ-278 added a render-level regression for the login screen, but `npx vitest run apps/web/components/agenticqueue-web-app.test.tsx` initially failed before executing any assertions because the repo-level Vitest setup tried to import `apps/web/components/agenticqueue-web-app.tsx` under Next's `jsx: preserve` config without the React Vite plugin."
+what_learned: "In this repo, a bare `vitest.config.ts` is not enough for TSX files that live under the Next app; Vitest needs `@vitejs/plugin-react` plus the web alias mapping so tests can import the real component graph instead of failing during Vite import analysis."
+action_rule: "When adding the first Vitest coverage for a Next TSX surface in AgenticQueue, wire `@vitejs/plugin-react` into `vitest.config.ts` and map `@` to `apps/web` before blaming the test or component for import-analysis failures."
+applies_when: "A new Vitest test imports files from `apps/web/**` and Vite reports parse or import-analysis errors tied to `jsx: preserve` or unresolved `@/...` imports."
+does_not_apply_when: "The test only touches plain TS modules outside the Next web app or the repo already has a working React/Vite test harness."
+evidence:
+  - "`npx vitest run apps/web/components/agenticqueue-web-app.test.tsx` failed on 2026-04-24 with `Failed to parse source for import analysis` against `apps/web/components/agenticqueue-web-app.tsx` until `@vitejs/plugin-react` and the `@ -> apps/web` alias were added to `vitest.config.ts`."
+  - "The same command passed on 2026-04-24 after the Vitest config was updated and the login screen test executed normally."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ## 2026-04-23
 
 ### AQ-294: Authenticated requests must not open a second ORM session

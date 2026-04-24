@@ -487,14 +487,15 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
   );
 }
 
-type LoginScreenProps = {
+export type LoginScreenProps = {
   errorMessage: string | null;
   onLogin: (token: string, remember: boolean) => Promise<void>;
 };
 
-function LoginScreen({ errorMessage, onLogin }: LoginScreenProps) {
+export function LoginScreen({ errorMessage, onLogin }: LoginScreenProps) {
   const [token, setToken] = useState("");
   const [remember, setRemember] = useState(false);
+  const [showToken, setShowToken] = useState(false);
 
   useEffect(() => {
     setRemember(window.localStorage.getItem(PERSIST_TOKEN_KEY) === "true");
@@ -519,15 +520,29 @@ function LoginScreen({ errorMessage, onLogin }: LoginScreenProps) {
           <label className="aq-auth-label" htmlFor="api-token">
             API token
           </label>
-          <textarea
-            className="aq-auth-input"
-            id="api-token"
-            name="api-token"
-            onChange={(event) => setToken(event.target.value)}
-            placeholder="aq__prefix_secret"
-            rows={4}
-            value={token}
-          />
+          <div className="aq-auth-input-wrap">
+            <input
+              autoCapitalize="off"
+              autoComplete="off"
+              className="aq-auth-input"
+              id="api-token"
+              inputMode="text"
+              name="api-token"
+              onChange={(event) => setToken(event.target.value)}
+              placeholder="aq__prefix_secret"
+              spellCheck={false}
+              type={showToken ? "text" : "password"}
+              value={token}
+            />
+            <button
+              aria-pressed={showToken}
+              className="aq-auth-toggle"
+              onClick={() => setShowToken((current) => !current)}
+              type="button"
+            >
+              {showToken ? "Hide" : "Show"}
+            </button>
+          </div>
 
           <label className="aq-auth-checkbox">
             <input
