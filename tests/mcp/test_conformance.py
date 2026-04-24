@@ -5,7 +5,10 @@ from typing import Any
 from jsonschema import Draft202012Validator, validate  # type: ignore[import-untyped]
 import pytest
 
-from agenticqueue_api.mcp.common import canonical_surface_tool_names, worker_visible_tool_names
+from agenticqueue_api.mcp.common import (
+    canonical_surface_tool_names,
+    worker_visible_tool_names,
+)
 from tests.mcp.conftest import SeededTask, run_transport, tool_result_payload
 
 
