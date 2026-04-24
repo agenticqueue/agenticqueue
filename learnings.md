@@ -45,6 +45,46 @@ owner: "codex"
 review_date: "2026-05-24"
 ```
 
+### AQ-299: Do not run Next build and standalone typecheck in parallel
+
+```yaml
+title: "Next build can race `tsc` by recreating `.next/types`"
+type: "tooling"
+what_happened: "During AQ-299 verification, `pnpm typecheck` was run in parallel with `npm --workspace @agenticqueue/web run build`. The typecheck failed with `TS6053` missing `.next/types/...` files while `next build` was recreating the generated types directory."
+what_learned: "The web tsconfig includes `.next/types/**/*.ts`, so a standalone `tsc` process can race with Next's build output cleanup/generation if both commands run at the same time."
+action_rule: "Run `next build` and `pnpm typecheck` sequentially in AgenticQueue web verification; if `TS6053` reports missing `.next/types` during parallel verification, rerun typecheck after the build has finished before treating it as a code failure."
+applies_when: "Verifying Next.js app-router changes with both `next build` and standalone `tsc`."
+does_not_apply_when: "The tsconfig no longer includes generated `.next/types` paths or the commands are isolated into separate worktrees."
+evidence:
+  - "`pnpm typecheck` failed once on 2026-04-24 with multiple `TS6053` missing `.next/types/...` files while `next build` was running in parallel."
+  - "The same `pnpm typecheck` command passed immediately after `next build` completed."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
+### AQ-299: Redirect smoke tests should not depend on a future route's App Router behavior
+
+```yaml
+title: "Use hard browser redirects when guarding to a route that is implemented by a later ticket"
+type: "frontend-testing"
+what_happened: "The AQ-299 setup guard initially used `router.replace(\"/login\")`. The focused setup Playwright spec passed, but the full parallel Playwright suite sometimes rendered the Next 404 shell for the future `/login` route while `expect(page).toHaveURL(/\\/login$/)` still observed `/setup`."
+what_learned: "Client-side App Router navigation to a route that does not exist yet can make redirect tests depend on not-found handling rather than the redirect contract. In a dependency chain where `/login` lands in the next ticket, the setup guard needs deterministic URL navigation."
+action_rule: "When a guard redirects to a route that is intentionally implemented by a later ticket, prefer `window.location.replace(target)` or add a minimal target route before asserting the browser URL in Playwright."
+applies_when: "A frontend ticket adds a guard to a not-yet-implemented route in the same planned chain."
+does_not_apply_when: "The target route already exists and App Router navigation can resolve it normally."
+evidence:
+  - "`npx playwright test apps/web/e2e/setup.spec.ts --project=chromium` passed after AQ-299 implementation, but the full `npx playwright test --project=chromium` run failed once with the setup redirect test still observing `/setup` while the page snapshot was a 404."
+  - "Switching the already-bootstrapped guard to `window.location.replace(\"/login\")` made both the focused setup smoke and the full Playwright suite pass."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ### AQ-298: pnpm verification needs explicit workspace metadata in this npm-root repo
 
 ```yaml
