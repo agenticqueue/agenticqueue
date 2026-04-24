@@ -45,6 +45,26 @@ owner: "codex"
 review_date: "2026-05-24"
 ```
 
+### AQ-297: SQL text call shapes must be stable under both ruff-format and Black
+
+```yaml
+title: "Avoid nested `sa.text` triple-quoted calls that ruff-format and Black reflow differently"
+type: "tooling"
+what_happened: "AQ-297 pushed new `apps/api/tests/test_auth.py` and `apps/api/tests/test_seed.py` files that passed local Black checks, but GitHub Actions `pre-commit` failed because `ruff-format` wrapped nested `session.scalar(sa.text(\"\"\"...\"\"\"))` and `session.execute(sa.text(\"\"\"...\"\"\")).one()` calls, then Black reformatted the same call sites again."
+what_learned: "The repo runs both ruff-format and Black in pre-commit, so a test can be individually Black-clean while still unstable across the full hook order."
+action_rule: "For multi-line SQL in tests, assign `sa.text(\"\"\"...\"\"\")` to a short local variable before passing it into `session.scalar()` or `session.execute()`; verify touched files with both `ruff format --check` and `black --check` using the pre-commit versions when CI reports formatter churn."
+applies_when: "A Python test uses nested function calls around a triple-quoted SQL string or any other long multiline literal."
+does_not_apply_when: "The multiline literal is already bound to a local variable or the repository has only one formatter enforcing the file."
+evidence:
+  - "GitHub Actions pre-commit run `24904435479` on `9ca7212` failed with `ruff-format` and Black both modifying `apps/api/tests/test_auth.py` and `apps/api/tests/test_seed.py`."
+  - "`ruff format --check --diff apps/api/tests/test_auth.py apps/api/tests/test_seed.py` and `black --check --diff apps/api/tests/test_auth.py apps/api/tests/test_seed.py` both passed after the SQL text variables were introduced."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ### AQ-271: Tuple-style None guards do not narrow constructor arguments for mypy
 
 ```yaml

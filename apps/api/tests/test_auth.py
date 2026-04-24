@@ -65,13 +65,14 @@ def client(session_factory: sessionmaker[Session]) -> Iterator[TestClient]:
 
 def seed_admin(session_factory: sessionmaker[Session]) -> None:
     with session_factory() as session:
-        actor_id = session.scalar(sa.text("""
+        actor_insert = sa.text("""
                 INSERT INTO agenticqueue.actor
                     (handle, actor_type, display_name, auth_subject, is_active)
                 VALUES
                     ('admin', 'admin', 'Admin', 'local:admin', true)
                 RETURNING id
-                """))
+                """)
+        actor_id = session.scalar(actor_insert)
         session.execute(
             sa.text("""
                 INSERT INTO agenticqueue.users
@@ -110,10 +111,11 @@ def test_session_accepts_email_password_and_sets_cookie(
     assert "Max-Age=604800" in set_cookie
 
     with session_factory() as session:
-        session_row = session.execute(sa.text("""
+        session_query = sa.text("""
                 SELECT expires_at, revoked_at
                 FROM agenticqueue.auth_sessions
-                """)).one()
+                """)
+        session_row = session.execute(session_query).one()
 
     assert session_row.revoked_at is None
     assert session_row.expires_at > dt.datetime.now(dt.UTC)

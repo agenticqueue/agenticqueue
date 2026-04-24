@@ -55,10 +55,11 @@ def test_ensure_admin_seed_uses_admin_email_fallback(
         session.commit()
 
     with session_factory() as session:
-        row = session.execute(sa.text("""
+        user_query = sa.text("""
                 SELECT email, is_admin
                 FROM agenticqueue.users
-                """)).one()
+                """)
+        row = session.execute(user_query).one()
 
     assert row.email == "admin@localhost"
     assert row.is_admin is True
