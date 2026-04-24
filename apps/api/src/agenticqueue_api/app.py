@@ -12,7 +12,7 @@ from pathlib import Path
 
 import sqlalchemy as sa
 from fastapi import Body, Depends, FastAPI, Query, Request, Response, status
-from pydantic import ConfigDict, Field, ValidationError
+from pydantic import ConfigDict, Field
 from sqlalchemy.orm import Session, sessionmaker
 
 from agenticqueue_api.audit import (
@@ -69,16 +69,6 @@ from agenticqueue_api.middleware import (
     RequestIdMiddleware,
     REQUEST_ID_HEADER,
     SecretRedactionMiddleware,
-)
-from agenticqueue_api.learnings import (
-    ConfirmLearningDraftRequest,
-    ConfirmedDraftLearningView,
-    DedupeSuggestion,
-    DraftLearningPatch,
-    DraftLearningRecord,
-    DraftLearningView,
-    DraftRejectRequest,
-    DraftStore,
 )
 from agenticqueue_api.models import (
     ActorModel,
@@ -550,33 +540,6 @@ def _require_token_scope(request: Request, required_scope: str) -> None:
     )
 
 
-def _learning_draft_capability_scope(
-    request: Request,
-    session: Session,
-    payload: dict[str, Any] | None,
-    entity_id: uuid.UUID | None,
-) -> dict[str, str]:
-    del request, payload
-    if entity_id is None:
-        return {}
-    project_id = session.scalar(
-        sa.select(TaskRecord.project_id)
-        .join(
-            DraftLearningRecord,
-            DraftLearningRecord.task_id == TaskRecord.id,
-        )
-        .where(DraftLearningRecord.id == entity_id)
-    )
-    return {} if project_id is None else {"project_id": str(project_id)}
-
-
-_require_learning_draft_write_capability = require_capability(
-    CapabilityKey.WRITE_LEARNING,
-    _learning_draft_capability_scope,
-    entity_type="learning",
-)
-
-
 def _learning_promotion_capability_scope(
     request: Request,
     session: Session,
@@ -1038,153 +1001,6 @@ def create_app(
             actor=_actor_summary(ActorModel.model_validate(target_actor)),
             roles=[_role_assignment_view(assignment) for assignment in page],
         )
-
-    def _draft_store_or_error(
-        session: Session,
-        draft_id: uuid.UUID,
-    ) -> DraftStore:
-        store = DraftStore(session)
-        try:
-            draft = store.get(draft_id)
-        except ValidationError as error:
-            raise_api_error(
-                HTTP_422_STATUS,
-                "Learning draft payload is invalid",
-                details=error.errors(),
-            )
-        if draft is None:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "Learning draft not found")
-        return store
-
-    @app.post(
-        "/learnings/drafts/{draft_id}/edit",
-        include_in_schema=False,
-        response_model=DraftLearningView,
-    )
-    @app.post(
-        "/v1/learnings/drafts/{draft_id}/edit",
-        response_model=DraftLearningView,
-    )
-    def edit_learning_draft(
-        draft_id: uuid.UUID,
-        payload: DraftLearningPatch,
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> DraftLearningView:
-        actor = _require_actor(request)
-        _require_token_scope(request, "learning:write")
-        store = _draft_store_or_error(session, draft_id)
-        with write_timeout(session, endpoint="v1.learnings.drafts.edit"):
-            _require_learning_draft_write_capability(
-                request=request,
-                session=session,
-                entity_id=draft_id,
-            )
-            try:
-                return store.edit(draft_id, payload)
-            except ValidationError as error:
-                raise_api_error(
-                    HTTP_422_STATUS,
-                    "Learning draft payload is invalid",
-                    details=error.errors(),
-                )
-            except KeyError:
-                raise_api_error(
-                    status.HTTP_404_NOT_FOUND,
-                    "Learning draft not found",
-                )
-            except ValueError as error:
-                raise_api_error(
-                    status.HTTP_409_CONFLICT,
-                    str(error),
-                    details={"draft_id": str(draft_id), "actor_id": str(actor.id)},
-                )
-
-    @app.post(
-        "/learnings/drafts/{draft_id}/reject",
-        include_in_schema=False,
-        response_model=DraftLearningView,
-    )
-    @app.post(
-        "/v1/learnings/drafts/{draft_id}/reject",
-        response_model=DraftLearningView,
-    )
-    def reject_learning_draft(
-        draft_id: uuid.UUID,
-        payload: DraftRejectRequest,
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> DraftLearningView:
-        actor = _require_actor(request)
-        _require_token_scope(request, "learning:write")
-        store = _draft_store_or_error(session, draft_id)
-        with write_timeout(session, endpoint="v1.learnings.drafts.reject"):
-            _require_learning_draft_write_capability(
-                request=request,
-                session=session,
-                entity_id=draft_id,
-            )
-            try:
-                return store.reject(draft_id, reason=payload.reason)
-            except KeyError:
-                raise_api_error(
-                    status.HTTP_404_NOT_FOUND,
-                    "Learning draft not found",
-                )
-            except ValueError as error:
-                raise_api_error(
-                    status.HTTP_409_CONFLICT,
-                    str(error),
-                    details={"draft_id": str(draft_id), "actor_id": str(actor.id)},
-                )
-
-    @app.post(
-        "/learnings/drafts/{draft_id}/confirm",
-        include_in_schema=False,
-        response_model=ConfirmedDraftLearningView | DedupeSuggestion,
-    )
-    @app.post(
-        "/v1/learnings/drafts/{draft_id}/confirm",
-        response_model=ConfirmedDraftLearningView | DedupeSuggestion,
-    )
-    def confirm_learning_draft(
-        draft_id: uuid.UUID,
-        request: Request,
-        session: Session = Depends(get_db_session),
-        payload: ConfirmLearningDraftRequest | None = Body(default=None),
-    ) -> ConfirmedDraftLearningView | DedupeSuggestion:
-        actor = _require_actor(request)
-        _require_token_scope(request, "learning:write")
-        store = _draft_store_or_error(session, draft_id)
-        with write_timeout(session, endpoint="v1.learnings.drafts.confirm"):
-            _require_learning_draft_write_capability(
-                request=request,
-                session=session,
-                entity_id=draft_id,
-            )
-            try:
-                return store.confirm(
-                    draft_id,
-                    owner_actor_id=actor.id,
-                    request=payload,
-                )
-            except ValidationError as error:
-                raise_api_error(
-                    HTTP_422_STATUS,
-                    "Learning draft payload is invalid",
-                    details=error.errors(),
-                )
-            except KeyError:
-                raise_api_error(
-                    status.HTTP_404_NOT_FOUND,
-                    "Learning draft not found",
-                )
-            except ValueError as error:
-                raise_api_error(
-                    status.HTTP_409_CONFLICT,
-                    str(error),
-                    details={"draft_id": str(draft_id), "actor_id": str(actor.id)},
-                )
 
     @app.post(
         "/v1/tasks/claim",

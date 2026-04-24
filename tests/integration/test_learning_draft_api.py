@@ -283,6 +283,22 @@ def _post_headers(token: str) -> dict[str, str]:
     }
 
 
+def _normalize_response_payload(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _normalize_response_payload(item)
+            for key, item in value.items()
+            if key != "id"
+            and not key.endswith("_id")
+            and key not in {"created_at", "updated_at"}
+        }
+    if isinstance(value, list):
+        return [_normalize_response_payload(item) for item in value]
+    if isinstance(value, str) and value.startswith("run://"):
+        return "run://<redacted>"
+    return value
+
+
 def _create_existing_learning(
     session_factory: sessionmaker[Session],
     *,
@@ -402,6 +418,73 @@ def test_learning_draft_edit_confirm_flow_promotes_active_learning(
     assert learning["title"] == (
         "Capture validator retry pattern before the next handoff"
     )
+
+
+@pytest.mark.parametrize(
+    ("suffix", "body"),
+    [
+        ("edit", {"title": "Keep the validator retry lesson colocated"}),
+        ("reject", {"reason": "Needs a stronger action rule"}),
+        ("confirm", None),
+    ],
+)
+def test_hidden_alias_routes_match_canonical_learning_draft_responses(
+    client: TestClient,
+    engine: Engine,
+    session_factory: sessionmaker[Session],
+    suffix: str,
+    body: dict[str, Any] | None,
+) -> None:
+    handle = f"alias-route-{suffix}"
+
+    _, canonical_token, canonical_draft_id = _seed_pending_draft(
+        session_factory,
+        handle=handle,
+    )
+
+    canonical_response = client.post(
+        f"/v1/learnings/drafts/{canonical_draft_id}/{suffix}",
+        headers=_post_headers(canonical_token),
+        json=body,
+    )
+
+    truncate_all_tables(engine)
+
+    _, alias_token, alias_draft_id = _seed_pending_draft(
+        session_factory,
+        handle=handle,
+    )
+    alias_response = client.post(
+        f"/learnings/drafts/{alias_draft_id}/{suffix}",
+        headers=_post_headers(alias_token),
+        json=body,
+    )
+
+    assert canonical_response.status_code == alias_response.status_code == 200
+    canonical_payload = canonical_response.json()
+    alias_payload = alias_response.json()
+
+    if suffix == "edit":
+        assert canonical_payload["draft_status"] == alias_payload["draft_status"]
+        assert canonical_payload.get("reason") == alias_payload.get("reason")
+        assert canonical_payload["draft"]["title"] == alias_payload["draft"]["title"]
+        return
+
+    if suffix == "reject":
+        assert canonical_payload["draft_status"] == alias_payload["draft_status"]
+        assert canonical_payload.get("reason") == alias_payload.get("reason")
+        assert _normalize_response_payload(
+            canonical_payload["draft"]
+        ) == _normalize_response_payload(alias_payload["draft"])
+        return
+
+    assert canonical_payload["draft"]["draft_status"] == alias_payload["draft"][
+        "draft_status"
+    ]
+    assert canonical_payload["learning"]["title"] == alias_payload["learning"]["title"]
+    assert canonical_payload["learning"]["action_rule"] == alias_payload["learning"][
+        "action_rule"
+    ]
 
 
 def test_reject_requires_reason_and_confirm_rejects_invalid_payload(

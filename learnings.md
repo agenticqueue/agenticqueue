@@ -1,5 +1,27 @@
 # AgenticQueue Learnings
 
+## 2026-04-24
+
+### AQ-263: Alias regression tests for stateful POST routes need reset state
+
+```yaml
+title: "Alias-vs-canonical POST route checks need reset fixture state and metadata normalization"
+type: "tooling"
+what_happened: "AQ-263 added a hidden-alias regression for the learning draft edit/reject/confirm endpoints. Comparing canonical and alias POST responses in one shared database state produced false diffs because confirm created a learning on the first call and reject/edit responses carried per-run `run://...` evidence and record IDs."
+what_learned: "For stateful POST routes, alias-vs-canonical regression tests only stay meaningful when each request starts from the same reset fixture state and the assertion ignores run-specific IDs and evidence URIs."
+action_rule: "When verifying hidden legacy aliases for AgenticQueue POST endpoints, reseed or reset the test database between canonical and alias calls and compare only stable semantic fields after normalizing per-run metadata."
+applies_when: "An integration test compares canonical and hidden alias responses for endpoints that mutate drafts, learnings, or other persisted records."
+does_not_apply_when: "The endpoint is read-only or the response shape is already deterministic and free of per-run IDs, timestamps, or evidence URIs."
+evidence:
+  - "`uv run pytest tests/integration/test_learning_draft_api.py -q` failed on 2026-04-24 until the alias assertions reset the shared Postgres state between canonical and alias POSTs and normalized `run://...` evidence values."
+  - "`uv run pytest tests/unit/test_learnings_router.py tests/integration/test_learning_draft_api.py -q` passed on 2026-04-24 after the reset-state alias regression was in place."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ## 2026-04-23
 
 ### AQ-294: Authenticated requests must not open a second ORM session
