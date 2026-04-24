@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -18,6 +19,7 @@ from tests.secret_redaction_support import (
     fake_github_pat,
     policy_dir,
 )
+
 
 def test_secret_redaction_blocks_payload_when_policy_enables_hard_block(
     tmp_path: Path,

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import Any
 import uuid
 
 from agenticqueue_api.middleware import secret_redaction as secret_redaction_module
