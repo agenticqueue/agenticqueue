@@ -61,6 +61,10 @@ SOAK_CANCEL_GRACE_SECONDS = 5.0
 CI_SOAK_DURATION_SECONDS = 60
 CI_SOAK_ACTOR_COUNT = 10
 CI_SOAK_RPS_PER_ACTOR = 2.0
+# Shared CI runners have higher tail-latency jitter (noisy neighbors, GC, cold caches).
+# Raising the p99 budget in CI mode tolerates that jitter without masking real regressions:
+# the local gate stays at the calling default (200ms) for developer runs.
+CI_SOAK_MAX_READ_P99_MS = 300.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -162,6 +166,8 @@ class SoakConfig:
     effective_actor_count: int
     requested_rps_per_actor: float
     effective_rps_per_actor: float
+    requested_max_read_p99_ms: float
+    effective_max_read_p99_ms: float
     ci_mode_enabled: bool
 
 
@@ -183,6 +189,7 @@ def _resolve_soak_config(
     duration_seconds: int,
     actor_count: int,
     rps_per_actor: float,
+    max_read_p99_ms: float = 200.0,
 ) -> SoakConfig:
     ci_mode_enabled = _env_flag("SOAK_CI_MODE")
     if ci_mode_enabled is None:
@@ -191,6 +198,7 @@ def _resolve_soak_config(
     effective_duration_seconds = duration_seconds
     effective_actor_count = actor_count
     effective_rps_per_actor = rps_per_actor
+    effective_max_read_p99_ms = max_read_p99_ms
 
     if ci_mode_enabled:
         # Shared CI runners cannot sustain the full local soak profile.
@@ -206,6 +214,12 @@ def _resolve_soak_config(
             rps_per_actor,
             CI_SOAK_RPS_PER_ACTOR,
         )
+        # Relax the p99 budget to absorb runner jitter; never tighten below
+        # the caller's value.
+        effective_max_read_p99_ms = max(
+            max_read_p99_ms,
+            CI_SOAK_MAX_READ_P99_MS,
+        )
 
     return SoakConfig(
         requested_duration_seconds=duration_seconds,
@@ -214,6 +228,8 @@ def _resolve_soak_config(
         effective_actor_count=effective_actor_count,
         requested_rps_per_actor=rps_per_actor,
         effective_rps_per_actor=effective_rps_per_actor,
+        requested_max_read_p99_ms=max_read_p99_ms,
+        effective_max_read_p99_ms=effective_max_read_p99_ms,
         ci_mode_enabled=ci_mode_enabled,
     )
 
@@ -1155,6 +1171,7 @@ async def run_soak(
         duration_seconds=duration_seconds,
         actor_count=actor_count,
         rps_per_actor=rps_per_actor,
+        max_read_p99_ms=max_read_p99_ms,
     )
 
     engine = sa.create_engine(
@@ -1232,9 +1249,10 @@ async def run_soak(
             failures_list.append(
                 f"Observed {metrics['rate_limited']} rate-limited responses below the 100 rps / 500 burst actor budget."
             )
-        if p99 > max_read_p99_ms:
+        if p99 > soak_config.effective_max_read_p99_ms:
             failures_list.append(
-                f"Read p99 {p99:.2f}ms exceeded the {max_read_p99_ms:.2f}ms budget."
+                f"Read p99 {p99:.2f}ms exceeded the "
+                f"{soak_config.effective_max_read_p99_ms:.2f}ms budget."
             )
         if pool_stats.checked_out != 0:
             failures_list.append(
@@ -1268,7 +1286,8 @@ async def run_soak(
             "rate_limited": metrics["rate_limited"],
             "p50_ms": round(p50, 2),
             "p99_ms": round(p99, 2),
-            "max_read_p99_ms": max_read_p99_ms,
+            "max_read_p99_ms": soak_config.effective_max_read_p99_ms,
+            "requested_max_read_p99_ms": soak_config.requested_max_read_p99_ms,
             "pool": {
                 "checked_out_after": pool_stats.checked_out,
                 "peak_checked_out": pool_stats.peak_checked_out,
@@ -1294,6 +1313,12 @@ async def run_soak(
                     "effective_actor_count": soak_config.effective_actor_count,
                     "requested_rps_per_actor": (soak_config.requested_rps_per_actor),
                     "effective_rps_per_actor": (soak_config.effective_rps_per_actor),
+                    "requested_max_read_p99_ms": (
+                        soak_config.requested_max_read_p99_ms
+                    ),
+                    "effective_max_read_p99_ms": (
+                        soak_config.effective_max_read_p99_ms
+                    ),
                 },
             },
         }

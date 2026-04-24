@@ -91,6 +91,55 @@ def test_resolve_soak_config_allows_explicit_ci_override(monkeypatch) -> None:
     assert config.effective_rps_per_actor == 10.0
 
 
+def test_resolve_soak_config_relaxes_p99_budget_in_ci(monkeypatch) -> None:
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.delenv("SOAK_CI_MODE", raising=False)
+
+    config = audit_rest_hardening._resolve_soak_config(
+        duration_seconds=300,
+        actor_count=100,
+        rps_per_actor=10.0,
+        max_read_p99_ms=200.0,
+    )
+
+    assert config.ci_mode_enabled is True
+    assert config.requested_max_read_p99_ms == 200.0
+    assert (
+        config.effective_max_read_p99_ms
+        == audit_rest_hardening.CI_SOAK_MAX_READ_P99_MS
+    )
+
+
+def test_resolve_soak_config_never_tightens_p99_below_caller(monkeypatch) -> None:
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.delenv("SOAK_CI_MODE", raising=False)
+
+    # Caller asks for a looser budget than the CI default — must not be tightened.
+    config = audit_rest_hardening._resolve_soak_config(
+        duration_seconds=300,
+        actor_count=100,
+        rps_per_actor=10.0,
+        max_read_p99_ms=500.0,
+    )
+
+    assert config.effective_max_read_p99_ms == 500.0
+
+
+def test_resolve_soak_config_keeps_caller_p99_outside_ci(monkeypatch) -> None:
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("SOAK_CI_MODE", raising=False)
+
+    config = audit_rest_hardening._resolve_soak_config(
+        duration_seconds=300,
+        actor_count=100,
+        rps_per_actor=10.0,
+        max_read_p99_ms=200.0,
+    )
+
+    assert config.ci_mode_enabled is False
+    assert config.effective_max_read_p99_ms == 200.0
+
+
 def test_soak_actor_records_timeout_exception(monkeypatch) -> None:
     class HangingClient:
         async def get(self, _endpoint: str, *, headers: dict[str, str]) -> None:
