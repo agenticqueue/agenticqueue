@@ -2,6 +2,28 @@
 
 ## 2026-04-24
 
+### AQ-291: Alembic merge revisions can be order-sensitive under downgrade tests
+
+```yaml
+title: "Alembic merge parent order can affect downgrade traversal"
+type: "pitfall"
+what_happened: "AQ-291 first used merge revision `20260423_28` with `down_revision = (\"20260423_26\", \"20260423_27\")`. Fresh upgrade worked, but the migration reversibility test failed on downgrade because Alembic walked the auth branch down while the `20260423_27` actor-to-workspace foreign key still depended on the `workspace` table. A `depends_on` variant avoided that specific drop order but left multiple effective heads."
+what_learned: "Alembic mergepoints can look correct on fresh upgrade while still producing an invalid downgrade traversal. In this repo, `depends_on` is not a substitute for consuming both branch heads when future migrations need a single linear head."
+action_rule: "When converging AgenticQueue Alembic branches, run `alembic heads`, fresh `alembic upgrade head`, an existing-head-to-head upgrade simulation, and `tests/integration/test_migration.py`; if downgrade-to-base fails on dependent constraints, test the tuple merge parent order before changing schema semantics."
+applies_when: "A migration ticket merges two or more AgenticQueue Alembic branches, especially when one branch adds outbound foreign keys to tables managed by the other branch."
+does_not_apply_when: "The chain is already linear with one parent and `alembic heads` reports a single head without a mergepoint."
+evidence:
+  - "AQ-291 local verification showed `down_revision = (\"20260423_26\", \"20260423_27\")` failed the migration reversibility test during downgrade-to-base, while `down_revision = (\"20260423_27\", \"20260423_26\")` passed."
+  - "`uv run alembic -c apps/api/alembic.ini heads` reported only `20260423_28 (head)` after the final merge revision."
+  - "`uv run pytest --no-cov tests/integration/test_migration.py -q` passed on 2026-04-24 with 3 tests passing after the test was updated to downgrade explicitly to the merge parents."
+  - "Fresh empty DB `uv run alembic -c apps/api/alembic.ini upgrade head` reached `20260423_28 (head) (mergepoint)`, and GitHub Actions for commit `aee7684` completed green across build, lint, pre-commit, scorecard, test, and CodeQL."
+scope: "project"
+confidence: "validated"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ### AQ-271: Tuple-style None guards do not narrow constructor arguments for mypy
 
 ```yaml
