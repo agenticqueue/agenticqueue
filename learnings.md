@@ -2,6 +2,47 @@
 
 ## 2026-04-24
 
+### AQ-266: Direct-to-main formatter jobs can surface untouched repo drift
+
+```yaml
+title: "Whole-repo formatter jobs can fail on untouched files after a small direct push"
+type: "repo-behavior"
+what_happened: "AQ-266 reconciled the unified MCP surface and pushed a small set of MCP/doc changes to `main`, but GitHub Actions `pre-commit` on `d23b10c` and then `72f89d5` failed on formatter rewrites outside the intended feature diff. After the touched conformance import was fixed, the CI logs still surfaced Ruff-format-only changes in `tests/mcp/test_task_type_authz.py` and `tests/mcp/test_task_type_parity.py`, which were pre-existing style drift."
+what_learned: "In this repo, direct-to-main slots inherit the full repository formatter state because `pre-commit` and `lint` run over all tracked Python files, not just the files changed by the ticket."
+action_rule: "When a direct push turns `pre-commit` or formatter-driven `lint` red, inspect the failed job's rewritten diff before assuming the feature logic is wrong; if the diff is pure no-op formatting debt in other files, fix-forward the minimal formatting cleanup and continue."
+applies_when: "A GitHub Actions `pre-commit` or `lint` failure shows formatter-generated diffs in files outside the current ticket's intended scope."
+does_not_apply_when: "The failed diff points at the files you just changed semantically or the failing job is a real logic/type/test error rather than formatter output."
+evidence:
+  - "GitHub Actions run `24879982402` on `d23b10ced4fa01db114be2a6a13f89b69f2b2fe4` first failed because `tests/mcp/test_conformance.py` needed formatter wrapping."
+  - "GitHub Actions run `24880277550` on `72f89d5f4b23fad8cd26fa707ee75293474b90ea` then failed with Ruff-format diffs in untouched files `tests/mcp/test_task_type_authz.py` and `tests/mcp/test_task_type_parity.py`."
+  - "`uv run pytest tests/mcp/test_task_type_authz.py tests/mcp/test_task_type_parity.py -q` passed on 2026-04-24 after the no-op formatting cleanup."
+scope: "project"
+confidence: "validated"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
+### AQ-266: FastMCP middleware overrides must keep the base Sequence signatures
+
+```yaml
+title: "FastMCP middleware overrides must mirror the base `Sequence[Tool]` typing"
+type: "tooling"
+what_happened: "AQ-266 added `AgenticQueueToolVisibilityMiddleware` for profile-filtered `tools/list` output and initially typed `on_list_tools()` with `CallNext[..., list[Tool]]` returning `list[Tool]`. The runtime behavior worked, but GitHub Actions `lint` on `8d95666` failed in mypy because FastMCP's `Middleware.on_list_tools()` contract uses `Sequence[Tool]`."
+what_learned: "FastMCP middleware hook annotations are part of the enforced typing contract; narrowing a callback or return container type breaks mypy even when the code returns a compatible concrete list at runtime."
+action_rule: "When overriding FastMCP middleware hooks, copy the base-class `CallNext[...]` and return annotations exactly; for `on_list_tools()`, use `Sequence[Tool]` rather than a narrower `list[Tool]` signature."
+applies_when: "Adding or editing subclasses of `fastmcp.server.middleware.middleware.Middleware` in the AgenticQueue MCP layer."
+does_not_apply_when: "The override does not change the hook signature or the upstream base class already uses the narrower type."
+evidence:
+  - "GitHub Actions run `24880326396` on `8d95666b682fa4feddb4918a7e0a806dfd21758b` failed with `apps/api/src/agenticqueue_api/mcp/visibility.py:46: error: Argument 2 of \\\"on_list_tools\\\" is incompatible with supertype \\\"Middleware\\\"`."
+  - "`uv run pytest tests/aq/test_mcp_server.py tests/mcp/test_conformance.py::test_tool_listing_matches_canonical_surface[http] tests/mcp/test_task_type_authz.py tests/mcp/test_task_type_parity.py -q` passed on 2026-04-24 after the signature was aligned."
+scope: "project"
+confidence: "validated"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ### AQ-267: Mutating MCP adapters must carry idempotency keys when routed through REST
 
 ```yaml
