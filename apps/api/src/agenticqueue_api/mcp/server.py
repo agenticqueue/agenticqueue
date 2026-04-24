@@ -97,8 +97,36 @@ def build_agenticqueue_mcp(
 def _mounted_tool_names(server: FastMCP) -> set[str]:
     """Read already-registered child tools without starting a nested event loop."""
 
+    names: set[str] = set()
+
     tool_manager = getattr(server, "_tool_manager", None)
     tools = getattr(tool_manager, "_tools", None)
-    if not isinstance(tools, dict):
+    if isinstance(tools, dict):
+        names.update(tools.keys())
+
+    names.update(_provider_tool_names(getattr(server, "_local_provider", None)))
+    for provider in getattr(server, "providers", ()):
+        names.update(_provider_tool_names(provider))
+
+    return names
+
+
+def _provider_tool_names(provider: Any) -> set[str]:
+    components = getattr(provider, "_components", None)
+    if not isinstance(components, dict):
         return set()
-    return set(tools.keys())
+
+    names: set[str] = set()
+    for component_key, component in components.items():
+        tool_name = getattr(component, "name", None)
+        if isinstance(tool_name, str) and tool_name:
+            names.add(tool_name)
+            continue
+
+        if not isinstance(component_key, str) or not component_key.startswith("tool:"):
+            continue
+        component_name = component_key.removeprefix("tool:").split("@", 1)[0]
+        if component_name:
+            names.add(component_name)
+
+    return names
