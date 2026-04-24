@@ -59,10 +59,6 @@ type DecisionLineageResponse = {
   }>;
 };
 
-type DecisionsViewProps = {
-  authToken: string;
-};
-
 const DATE_RANGE_OPTIONS: Array<{ value: DateRangeFilter; label: string }> = [
   { value: "all", label: "All time" },
   { value: "24h", label: "Last 24h" },
@@ -83,7 +79,7 @@ const SCOPE_OPTIONS: Array<{ value: FilterValue; label: string }> = [
   { value: "task", label: "Task" },
 ];
 
-export function DecisionsView({ authToken }: DecisionsViewProps) {
+export function DecisionsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<DecisionItem[]>([]);
@@ -107,9 +103,6 @@ export function DecisionsView({ authToken }: DecisionsViewProps) {
         setError(null);
 
         const response = await fetch("/api/v1/decisions", {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
           cache: "no-store",
         });
 
@@ -170,7 +163,7 @@ export function DecisionsView({ authToken }: DecisionsViewProps) {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [authToken, items.length, refreshNonce]);
+  }, [items.length, refreshNonce]);
 
   const filteredItems = useMemo(
     () =>
@@ -240,9 +233,6 @@ export function DecisionsView({ authToken }: DecisionsViewProps) {
         setLineageError(null);
 
         const response = await fetch(`/api/v1/decisions/${selectedId}/lineage`, {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
           cache: "no-store",
         });
 
@@ -286,7 +276,7 @@ export function DecisionsView({ authToken }: DecisionsViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [authToken, selectedId]);
+  }, [selectedId]);
 
   useEffect(() => {
     if (!selectedId) {

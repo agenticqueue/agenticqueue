@@ -70,10 +70,6 @@ type WorkResponse = {
   items: WorkItem[];
 };
 
-type WorkViewProps = {
-  authToken: string;
-};
-
 const PAGE_SIZE = 50;
 
 const DATE_RANGE_OPTIONS: Array<{ value: DateRangeFilter; label: string }> = [
@@ -99,7 +95,7 @@ const STATUS_ORDER: WorkStatus[] = [
   "done",
 ];
 
-export function WorkView({ authToken }: WorkViewProps) {
+export function WorkView() {
   const searchParams = useSearchParams();
   const initialRef = searchParams.get("job");
   const [loading, setLoading] = useState(true);
@@ -135,9 +131,6 @@ export function WorkView({ authToken }: WorkViewProps) {
         setError(null);
 
         const response = await fetch("/api/v1/work", {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
           cache: "no-store",
           signal: controller.signal,
         });
@@ -202,7 +195,7 @@ export function WorkView({ authToken }: WorkViewProps) {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [authToken, items.length, refreshNonce]);
+  }, [items.length, refreshNonce]);
 
   const actorOptions = useMemo(
     () =>

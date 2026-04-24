@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
 import { AnalyticsView } from "@/components/analytics-view";
@@ -9,6 +9,7 @@ import { DecisionsView } from "@/components/decisions-view";
 import { GraphView } from "@/components/graph-view";
 import { LearningsView } from "@/components/learnings-view";
 import { PipelinesView } from "@/components/pipelines-view";
+import { TokenSettingsView } from "@/components/token-settings-view";
 import { WorkView } from "@/components/work-view";
 
 type ViewKey =
@@ -18,7 +19,8 @@ type ViewKey =
   | "graph"
   | "decisions"
   | "learnings"
-  | "settings";
+  | "settings"
+  | "tokens";
 
 type AuthActor = {
   id: string;
@@ -52,9 +54,6 @@ type ViewDefinition = {
 type AgenticQueueWebAppProps = {
   view: ViewKey;
 };
-
-const SESSION_TOKEN_KEY = "aq:web:api-token";
-const PERSIST_TOKEN_KEY = "aq:web:remember-token";
 
 const NAV_ITEMS = [
   { href: "/pipelines", label: "Pipelines", count: "12", view: "pipelines" },
@@ -238,78 +237,73 @@ const VIEW_CONTENT: Record<ViewKey, ViewDefinition> = {
     title: "Settings",
     eyebrow: "Workspace + session controls",
     summary:
-      "Bearer-token auth stays intentionally simple: paste a key, validate it, and clear it to log out.",
+      "Session controls stay local to this deployment, with agent credentials managed from an authenticated settings route.",
     cards: [
-      { label: "Auth mode", value: "Bearer only", tone: "info" },
-      { label: "Storage", value: "Session / local", tone: "ok" },
+      { label: "Auth mode", value: "Local", tone: "info" },
+      { label: "Session", value: "Cookie", tone: "ok" },
       { label: "UI mode", value: "Always on", tone: "ok" },
     ],
     rows: [
       {
-        title: "Session storage is the default",
-        body: "Keys stay in session storage unless the user explicitly opts into local persistence on the login screen.",
-        meta: "AQ-102 scope",
+        title: "Browser session",
+        body: "Human access uses a secure cookie returned by the local auth endpoint.",
+        meta: "ADR-AQ-026",
       },
       {
-        title: "No passwords or OAuth",
-        body: "The shell mirrors the API actor model instead of inventing a parallel identity system.",
-        meta: "token auth only",
+        title: "Agent credentials",
+        body: "Generate API keys from the authenticated token settings page after signing in.",
+        meta: "settings/tokens",
       },
       {
-        title: "Future work stays additive",
-        body: "RBAC, OIDC, and SCIM can layer on later without rewriting the phase-7 shell.",
+        title: "Future identity",
+        body: "RBAC, OIDC, and SCIM can layer on later without changing the local first-run model.",
         meta: "phase 9 follow-ons",
       },
     ],
+  },
+  tokens: {
+    title: "API tokens",
+    eyebrow: "Settings",
+    summary:
+      "Authenticated operators generate agent credentials from settings, never from the login screen.",
+    cards: [],
+    rows: [],
   },
 };
 
 export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [status, setStatus] = useState<"booting" | "logging-in" | "ready">(
     "booting",
   );
   const [actor, setActor] = useState<AuthActor | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
   const [apiBaseUrl, setApiBaseUrl] = useState("http://127.0.0.1:8010");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = getStoredToken();
-
-    if (!token) {
-      setStatus("ready");
-      setActor(null);
-      setAuthToken(null);
-      return;
-    }
-
     let cancelled = false;
 
-    setStatus("logging-in");
+    setStatus("booting");
     setErrorMessage(null);
 
-    void validateToken(token)
+    void restoreSession()
       .then((session) => {
         if (cancelled) {
           return;
         }
 
         setActor(session.actor);
-        setAuthToken(token);
         setApiBaseUrl(session.apiBaseUrl);
         setStatus("ready");
       })
-      .catch((error: unknown) => {
+      .catch(() => {
         if (cancelled) {
           return;
         }
 
-        clearStoredToken();
         setActor(null);
-        setAuthToken(null);
         setStatus("ready");
-        setErrorMessage(errorMessageFrom(error));
       });
 
     return () => {
@@ -317,31 +311,47 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
     };
   }, []);
 
-  async function handleLogin(token: string, remember: boolean) {
+  useEffect(() => {
+    if (status !== "ready") {
+      return;
+    }
+
+    if (!actor && pathname !== "/login") {
+      router.replace("/login");
+      return;
+    }
+
+    if (actor && pathname === "/login") {
+      router.replace("/pipelines");
+    }
+  }, [actor, pathname, router, status]);
+
+  async function handleLogin(username: string, passcode: string) {
     setStatus("logging-in");
     setErrorMessage(null);
 
     try {
-      const session = await validateToken(token);
+      const session = await loginWithPasscode(username, passcode);
 
-      storeToken(token, remember);
       setActor(session.actor);
-      setAuthToken(token);
       setApiBaseUrl(session.apiBaseUrl);
       setStatus("ready");
+      router.replace("/pipelines");
     } catch (error: unknown) {
       setActor(null);
-      setAuthToken(null);
       setStatus("ready");
       setErrorMessage(errorMessageFrom(error));
     }
   }
 
-  function handleLogout() {
-    clearStoredToken();
+  async function handleLogout() {
+    await fetch("/api/logout", {
+      method: "POST",
+      cache: "no-store",
+    }).catch(() => null);
     setActor(null);
-    setAuthToken(null);
     setErrorMessage(null);
+    router.replace("/login");
   }
 
   if (status !== "ready") {
@@ -351,7 +361,7 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
           <p className="aq-auth-kicker">Restoring session</p>
           <h1 className="aq-auth-title">Loading the AgenticQueue shell</h1>
           <p className="aq-auth-copy">
-            Validating the stored API key before the UI unlocks.
+            Checking for an active local browser session before the UI unlocks.
           </p>
         </section>
       </main>
@@ -421,18 +431,20 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
       </nav>
 
       <section className="aq-content">
-        {view === "pipelines" && authToken ? (
-          <PipelinesView authToken={authToken} />
-        ) : view === "work" && authToken ? (
-          <WorkView authToken={authToken} />
-        ) : view === "analytics" && authToken ? (
-          <AnalyticsView authToken={authToken} />
-        ) : view === "graph" && authToken ? (
-          <GraphView authToken={authToken} />
-        ) : view === "decisions" && authToken ? (
-          <DecisionsView authToken={authToken} />
-        ) : view === "learnings" && authToken ? (
-          <LearningsView authToken={authToken} />
+        {view === "pipelines" ? (
+          <PipelinesView />
+        ) : view === "work" ? (
+          <WorkView />
+        ) : view === "analytics" ? (
+          <AnalyticsView />
+        ) : view === "graph" ? (
+          <GraphView />
+        ) : view === "decisions" ? (
+          <DecisionsView />
+        ) : view === "learnings" ? (
+          <LearningsView />
+        ) : view === "tokens" ? (
+          <TokenSettingsView />
         ) : (
           <>
             <div className="aq-content-head">
@@ -489,54 +501,56 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
 
 type LoginScreenProps = {
   errorMessage: string | null;
-  onLogin: (token: string, remember: boolean) => Promise<void>;
+  onLogin: (username: string, passcode: string) => Promise<void>;
 };
 
 function LoginScreen({ errorMessage, onLogin }: LoginScreenProps) {
-  const [token, setToken] = useState("");
-  const [remember, setRemember] = useState(false);
-
-  useEffect(() => {
-    setRemember(window.localStorage.getItem(PERSIST_TOKEN_KEY) === "true");
-  }, []);
+  const [username, setUsername] = useState("");
+  const [passcode, setPasscode] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onLogin(token, remember);
+    await onLogin(username, passcode);
   }
 
   return (
     <main className="aq-auth-shell">
       <section className="aq-auth-card">
         <p className="aq-auth-kicker">UI always on</p>
-        <h1 className="aq-auth-title">Paste an AgenticQueue API key</h1>
+        <h1 className="aq-auth-title">Sign in to AgenticQueue</h1>
         <p className="aq-auth-copy">
-          This shell mirrors the Phase 1 actor model. No passwords, no OAuth,
-          no signup flow. A valid bearer token unlocks the dashboard.
+          Use the local username and passcode created by your deployment
+          admin. Account creation and credential reset stay outside the public
+          login page.
         </p>
 
-        <form className="aq-auth-form" onSubmit={handleSubmit}>
-          <label className="aq-auth-label" htmlFor="api-token">
-            API token
+        <form
+          aria-label="Sign in to AgenticQueue"
+          className="aq-auth-form"
+          onSubmit={handleSubmit}
+        >
+          <label className="aq-auth-label" htmlFor="username">
+            Username
           </label>
-          <textarea
+          <input
             className="aq-auth-input"
-            id="api-token"
-            name="api-token"
-            onChange={(event) => setToken(event.target.value)}
-            placeholder="aq__prefix_secret"
-            rows={4}
-            value={token}
+            id="username"
+            name="username"
+            onChange={(event) => setUsername(event.target.value)}
+            value={username}
           />
 
-          <label className="aq-auth-checkbox">
-            <input
-              checked={remember}
-              onChange={(event) => setRemember(event.target.checked)}
-              type="checkbox"
-            />
-            <span>Remember on this device</span>
+          <label className="aq-auth-label" htmlFor="passcode">
+            Passcode
           </label>
+          <input
+            className="aq-auth-input"
+            id="passcode"
+            name="passcode"
+            onChange={(event) => setPasscode(event.target.value)}
+            type="password"
+            value={passcode}
+          />
 
           {errorMessage ? (
             <p className="aq-auth-error" role="alert">
@@ -545,31 +559,39 @@ function LoginScreen({ errorMessage, onLogin }: LoginScreenProps) {
           ) : null}
 
           <button className="aq-auth-submit" type="submit">
-            Validate token and open shell
+            Sign in
           </button>
         </form>
-
-        <div className="aq-auth-notes">
-          <p>
-            Nav order is fixed: Pipelines, Work, Analytics, Graph, Decisions,
-            Learnings.
-          </p>
-          <p>Settings lives in the footer because the shell stays edge-to-edge.</p>
-        </div>
       </section>
     </main>
   );
 }
 
-async function validateToken(token: string): Promise<SessionPayload> {
+async function restoreSession(): Promise<SessionPayload> {
+  const response = await fetch("/api/session", {
+    cache: "no-store",
+  });
+
+  return readSessionResponse(response, "Local user session required.");
+}
+
+async function loginWithPasscode(
+  username: string,
+  passcode: string,
+): Promise<SessionPayload> {
   const response = await fetch("/api/session", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ token }),
+    body: JSON.stringify({ username, passcode }),
+    cache: "no-store",
   });
 
+  return readSessionResponse(response, "Invalid username or passcode");
+}
+
+async function readSessionResponse(response: Response, fallback: string) {
   const payload = (await response.json().catch(() => null)) as
     | SessionPayload
     | { error?: string }
@@ -579,35 +601,11 @@ async function validateToken(token: string): Promise<SessionPayload> {
     throw new Error(
       payload && "error" in payload && typeof payload.error === "string"
         ? payload.error
-        : "Token validation failed.",
+        : fallback,
     );
   }
 
   return payload;
-}
-
-function getStoredToken() {
-  const localToken = window.localStorage.getItem(SESSION_TOKEN_KEY);
-  const sessionToken = window.sessionStorage.getItem(SESSION_TOKEN_KEY);
-
-  return localToken ?? sessionToken;
-}
-
-function storeToken(token: string, remember: boolean) {
-  clearStoredToken();
-
-  if (remember) {
-    window.localStorage.setItem(SESSION_TOKEN_KEY, token);
-  } else {
-    window.sessionStorage.setItem(SESSION_TOKEN_KEY, token);
-  }
-
-  window.localStorage.setItem(PERSIST_TOKEN_KEY, remember ? "true" : "false");
-}
-
-function clearStoredToken() {
-  window.localStorage.removeItem(SESSION_TOKEN_KEY);
-  window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
 }
 
 function toneLabel(tone: "info" | "ok" | "warn") {

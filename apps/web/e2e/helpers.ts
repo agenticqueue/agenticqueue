@@ -11,9 +11,6 @@ type SessionPayload = {
   apiBaseUrl: string;
 };
 
-const SESSION_TOKEN_KEY = "aq:web:api-token";
-const PERSIST_TOKEN_KEY = "aq:web:remember-token";
-
 const DEFAULT_SESSION_PAYLOAD: SessionPayload = {
   actor: {
     id: "actor-1",
@@ -76,33 +73,11 @@ const EMPTY_ANALYTICS_PAYLOAD = {
 export async function seedAuthenticatedSession(
   page: Page,
   options: {
-    remember?: boolean;
     sessionPayload?: SessionPayload;
     sessionStatus?: number;
     sessionJson?: unknown;
-    token?: string;
   } = {},
 ) {
-  const remember = options.remember ?? false;
-  const token = options.token ?? "aq__playwright_token";
-
-  await page.addInitScript(
-    ({ apiToken, persist }) => {
-      window.localStorage.setItem(
-        "aq:web:remember-token",
-        persist ? "true" : "false",
-      );
-      window.localStorage.removeItem("aq:web:api-token");
-      window.sessionStorage.removeItem("aq:web:api-token");
-      if (persist) {
-        window.localStorage.setItem("aq:web:api-token", apiToken);
-      } else {
-        window.sessionStorage.setItem("aq:web:api-token", apiToken);
-      }
-    },
-    { apiToken: token, persist: remember },
-  );
-
   const status = options.sessionStatus ?? 200;
   const json = options.sessionJson ?? options.sessionPayload ?? DEFAULT_SESSION_PAYLOAD;
 
@@ -217,22 +192,15 @@ export async function openAuthedView(
   await page.goto(path);
 }
 
-export async function expectClearedStoredToken(page: Page) {
-  return page.evaluate(
-    ({
-      persistKey,
-      sessionKey,
-    }: {
-      persistKey: string;
-      sessionKey: string;
-    }) => ({
-      persistedPreference: window.localStorage.getItem(persistKey),
-      localToken: window.localStorage.getItem(sessionKey),
-      sessionToken: window.sessionStorage.getItem(sessionKey),
-    }),
-    {
-      persistKey: PERSIST_TOKEN_KEY,
-      sessionKey: SESSION_TOKEN_KEY,
-    },
-  );
+export async function expectNoStoredSessionSecrets(page: Page) {
+  return page.evaluate(() => {
+    const localKeys = Object.keys(window.localStorage).filter((key) =>
+      /session|token|jwt/i.test(key),
+    );
+    const sessionKeys = Object.keys(window.sessionStorage).filter((key) =>
+      /session|token|jwt/i.test(key),
+    );
+
+    return { localKeys, sessionKeys };
+  });
 }

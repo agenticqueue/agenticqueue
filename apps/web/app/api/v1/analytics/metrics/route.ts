@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.AGENTICQUEUE_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_AGENTICQUEUE_API_BASE_URL ??
-  "http://127.0.0.1:8010";
+import {
+  API_BASE_URL,
+  authHeadersFromRequest,
+  unauthorizedSessionResponse,
+} from "../../../_upstream";
 
 export async function GET(request: NextRequest) {
-  const authorization = request.headers.get("authorization")?.trim();
-  if (!authorization) {
-    return NextResponse.json(
-      { error: "Authorization header is required." },
-      { status: 401 },
-    );
+  const authHeaders = authHeadersFromRequest(request);
+  if (!authHeaders) {
+    return unauthorizedSessionResponse();
   }
 
   const windowKey = request.nextUrl.searchParams.get("window")?.trim() || "90d";
@@ -19,9 +17,7 @@ export async function GET(request: NextRequest) {
   upstreamUrl.searchParams.set("window", windowKey);
 
   const upstream = await fetch(upstreamUrl, {
-    headers: {
-      Authorization: authorization,
-    },
+    headers: authHeaders,
     cache: "no-store",
     signal: request.signal,
   });

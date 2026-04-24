@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.AGENTICQUEUE_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_AGENTICQUEUE_API_BASE_URL ??
-  "http://127.0.0.1:8010";
+import {
+  API_BASE_URL,
+  authHeadersFromRequest,
+  unauthorizedSessionResponse,
+} from "../../../_upstream";
 
 const PAGE_LIMIT = 200;
 
@@ -84,12 +85,9 @@ class UpstreamError extends Error {
 }
 
 export async function GET(request: NextRequest) {
-  const authorization = request.headers.get("authorization")?.trim();
-  if (!authorization) {
-    return NextResponse.json(
-      { error: "Authorization header is required." },
-      { status: 401 },
-    );
+  const authHeaders = authHeadersFromRequest(request);
+  if (!authHeaders) {
+    return unauthorizedSessionResponse();
   }
 
   const query = request.nextUrl.searchParams.get("query")?.trim() ?? "";
@@ -97,25 +95,25 @@ export async function GET(request: NextRequest) {
   try {
     const [active, superseded, expired, tasks] = await Promise.all([
       fetchAllPages<LearningEntity>({
-        authorization,
+        authHeaders,
         path: "/v1/learnings",
         query: { status: "active" },
         signal: request.signal,
       }),
       fetchAllPages<LearningEntity>({
-        authorization,
+        authHeaders,
         path: "/v1/learnings",
         query: { status: "superseded" },
         signal: request.signal,
       }),
       fetchAllPages<LearningEntity>({
-        authorization,
+        authHeaders,
         path: "/v1/learnings",
         query: { status: "expired" },
         signal: request.signal,
       }),
       fetchAllPages<TaskEntity>({
-        authorization,
+        authHeaders,
         path: "/v1/tasks",
         signal: request.signal,
       }),
@@ -154,12 +152,12 @@ export async function GET(request: NextRequest) {
 }
 
 async function fetchAllPages<T>({
-  authorization,
+  authHeaders,
   path,
   query,
   signal,
 }: {
-  authorization: string;
+  authHeaders: Headers;
   path: string;
   query?: Record<string, string>;
   signal: AbortSignal;
@@ -180,9 +178,7 @@ async function fetchAllPages<T>({
     }
 
     const response = await fetch(url, {
-      headers: {
-        Authorization: authorization,
-      },
+      headers: authHeaders,
       cache: "no-store",
       signal,
     });

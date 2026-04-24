@@ -6,19 +6,20 @@ import {
   loadDecisionDataset,
   UpstreamError,
 } from "./data";
+import {
+  authHeadersFromRequest,
+  unauthorizedSessionResponse,
+} from "../../_upstream";
 
 export async function GET(request: NextRequest) {
-  const authorization = request.headers.get("authorization")?.trim();
-  if (!authorization) {
-    return NextResponse.json(
-      { error: "Authorization header is required." },
-      { status: 401 },
-    );
+  const authHeaders = authHeadersFromRequest(request);
+  if (!authHeaders) {
+    return unauthorizedSessionResponse();
   }
 
   try {
     const dataset = await loadDecisionDataset({
-      authorization,
+      authHeaders,
       signal: request.signal,
     });
     const items = buildDecisionItems(dataset);

@@ -1,7 +1,4 @@
-const API_BASE_URL =
-  process.env.AGENTICQUEUE_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_AGENTICQUEUE_API_BASE_URL ??
-  "http://127.0.0.1:8010";
+import { API_BASE_URL } from "../../_upstream";
 
 const PAGE_LIMIT = 200;
 
@@ -164,36 +161,36 @@ export class UpstreamError extends Error {
 }
 
 export async function loadDecisionDataset({
-  authorization,
+  authHeaders,
   signal,
 }: {
-  authorization: string;
+  authHeaders: Headers;
   signal: AbortSignal;
 }): Promise<DecisionDataset> {
   const [actors, projects, tasks, decisions, edges] = await Promise.all([
     fetchAllPages<ActorEntity>({
       path: "/v1/actors",
-      authorization,
+      authHeaders,
       signal,
     }),
     fetchAllPages<ProjectEntity>({
       path: "/v1/projects",
-      authorization,
+      authHeaders,
       signal,
     }),
     fetchAllPages<TaskEntity>({
       path: "/v1/tasks",
-      authorization,
+      authHeaders,
       signal,
     }),
     fetchAllPages<DecisionEntity>({
       path: "/v1/decisions",
-      authorization,
+      authHeaders,
       signal,
     }),
     fetchAllPages<EdgeEntity>({
       path: "/v1/edges",
-      authorization,
+      authHeaders,
       signal,
     }),
   ]);
@@ -318,11 +315,11 @@ export function buildDecisionLineage(
 
 async function fetchAllPages<T>({
   path,
-  authorization,
+  authHeaders,
   signal,
 }: {
   path: string;
-  authorization: string;
+  authHeaders: Headers;
   signal: AbortSignal;
 }): Promise<T[]> {
   const items: T[] = [];
@@ -336,9 +333,7 @@ async function fetchAllPages<T>({
     }
 
     const response = await fetch(url, {
-      headers: {
-        Authorization: authorization,
-      },
+      headers: authHeaders,
       cache: "no-store",
       signal,
     });

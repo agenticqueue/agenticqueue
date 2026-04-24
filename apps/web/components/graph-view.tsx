@@ -87,10 +87,6 @@ type DecisionListResponse = {
   items: DecisionItem[];
 };
 
-type GraphViewProps = {
-  authToken: string;
-};
-
 type GraphNodeData = {
   dimmed: boolean;
   kind: GraphKind;
@@ -183,7 +179,7 @@ const NODE_KIND_LABEL: Record<GraphKind, string> = {
   artifact: "artifact",
 };
 
-export function GraphView({ authToken }: GraphViewProps) {
+export function GraphView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
@@ -209,15 +205,9 @@ export function GraphView({ authToken }: GraphViewProps) {
       try {
         const [workResponse, decisionResponse] = await Promise.all([
           fetch("/api/v1/work", {
-            headers: {
-              Authorization: `Bearer ${authToken}`,
-            },
             cache: "no-store",
           }),
           fetch("/api/v1/decisions", {
-            headers: {
-              Authorization: `Bearer ${authToken}`,
-            },
             cache: "no-store",
           }),
         ]);
@@ -309,7 +299,7 @@ export function GraphView({ authToken }: GraphViewProps) {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [authToken, refreshNonce]);
+  }, [refreshNonce]);
 
   useEffect(() => {
     setCollapsedRoots([]);

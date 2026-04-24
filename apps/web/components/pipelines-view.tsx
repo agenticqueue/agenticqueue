@@ -78,10 +78,6 @@ type PipelinesResponse = {
   pipelines: PipelineSummary[];
 };
 
-type PipelinesViewProps = {
-  authToken: string;
-};
-
 type JobLayout = {
   columns: Map<number, PipelineJob[]>;
   positions: Map<string, { x: number; y: number }>;
@@ -111,7 +107,7 @@ const JOB_ICON: Record<PipelineJobState, string> = {
   done: "✓",
 };
 
-export function PipelinesView({ authToken }: PipelinesViewProps) {
+export function PipelinesView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [inProgress, setInProgress] = useState<PipelineSummary[]>([]);
@@ -129,8 +125,8 @@ export function PipelinesView({ authToken }: PipelinesViewProps) {
     setError(null);
 
     void Promise.all([
-      fetchPipelines("in_progress", authToken, controller.signal),
-      fetchPipelines("done", authToken, controller.signal),
+      fetchPipelines("in_progress", controller.signal),
+      fetchPipelines("done", controller.signal),
     ])
       .then(([inProgressPayload, completedPayload]) => {
         setInProgress(inProgressPayload.pipelines);
@@ -162,7 +158,7 @@ export function PipelinesView({ authToken }: PipelinesViewProps) {
       });
 
     return () => controller.abort();
-  }, [authToken]);
+  }, []);
 
   return (
     <div className="aq-pipelines-view">
@@ -755,13 +751,9 @@ function layoutJobs(jobs: PipelineJob[]): JobLayout {
 
 async function fetchPipelines(
   state: PipelineSectionState,
-  authToken: string,
   signal: AbortSignal,
 ) {
   const response = await fetch(`/api/v1/pipelines?state=${state}`, {
-    headers: {
-      Authorization: `Bearer ${authToken}`,
-    },
     cache: "no-store",
     signal,
   });

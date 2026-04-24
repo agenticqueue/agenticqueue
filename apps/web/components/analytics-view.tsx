@@ -72,17 +72,13 @@ type AnalyticsResponse = {
   review_load: ReviewLoadPoint[];
 };
 
-type AnalyticsViewProps = {
-  authToken: string;
-};
-
 const WINDOW_OPTIONS: Array<{ value: WindowKey; label: string }> = [
   { value: "30d", label: "Last 30d" },
   { value: "90d", label: "Last 90d" },
   { value: "180d", label: "Last 180d" },
 ];
 
-export function AnalyticsView({ authToken }: AnalyticsViewProps) {
+export function AnalyticsView() {
   const [windowKey, setWindowKey] = useState<WindowKey>("90d");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,9 +104,6 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
         setError(null);
 
         const response = await fetch(`/api/v1/analytics/metrics?window=${windowKey}`, {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
           cache: "no-store",
           signal: controller.signal,
         });
@@ -174,7 +167,7 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [authToken, data, refreshNonce, windowKey]);
+  }, [data, refreshNonce, windowKey]);
 
   const cycleTime = data?.cycle_time ?? [];
   const blockedHeatmap = data?.blocked_heatmap ?? [];

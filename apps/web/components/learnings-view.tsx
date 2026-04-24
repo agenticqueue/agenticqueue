@@ -41,10 +41,6 @@ type LearningsResponse = {
   items: LearningItem[];
 };
 
-type LearningsViewProps = {
-  authToken: string;
-};
-
 type TierFilter = "all" | "1" | "2" | "3";
 type ScopeFilter = "all" | LearningScope;
 type StatusFilter = "all" | LearningStatus;
@@ -70,7 +66,7 @@ const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: "expired", label: "Expired" },
 ];
 
-export function LearningsView({ authToken }: LearningsViewProps) {
+export function LearningsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<LearningItem[]>([]);
@@ -95,7 +91,7 @@ export function LearningsView({ authToken }: LearningsViewProps) {
     setLoading(true);
     setError(null);
 
-    void fetchLearnings(debouncedQuery, authToken, controller.signal)
+    void fetchLearnings(debouncedQuery, controller.signal)
       .then((payload) => {
         setItems(payload.items);
         setGeneratedAt(payload.generated_at);
@@ -122,7 +118,7 @@ export function LearningsView({ authToken }: LearningsViewProps) {
       });
 
     return () => controller.abort();
-  }, [authToken, debouncedQuery]);
+  }, [debouncedQuery]);
 
   const counts = useMemo(() => buildCounts(items), [items]);
   const filteredItems = useMemo(
@@ -470,15 +466,11 @@ function FilterGroup<T extends string>({
 
 async function fetchLearnings(
   query: string,
-  authToken: string,
   signal: AbortSignal,
 ) {
   const response = await fetch(
     `/api/v1/learnings/search?query=${encodeURIComponent(query)}`,
     {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
       cache: "no-store",
       signal,
     },

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
-  expectClearedStoredToken,
+  expectNoStoredSessionSecrets,
   mockShellReadApis,
   openAuthedView,
   seedAuthenticatedSession,
@@ -137,9 +137,9 @@ test("keeps primary nav route-aware and settings anchored in the footer", async 
   }
 });
 
-test("returns expired tokens to the login shell", async ({ page }) => {
+test("returns expired sessions to the login shell", async ({ page }) => {
   await seedAuthenticatedSession(page, {
-    sessionJson: { error: "Token expired." },
+    sessionJson: { error: "Session expired." },
     sessionStatus: 401,
   });
   await mockShellReadApis(page);
@@ -149,14 +149,13 @@ test("returns expired tokens to the login shell", async ({ page }) => {
   await expect(
     page.getByRole("heading", {
       level: 1,
-      name: "Paste an AgenticQueue API key",
+      name: "Sign in to AgenticQueue",
     }),
   ).toBeVisible();
-  await expect(page.locator(".aq-auth-error")).toContainText("Token expired.");
 
-  const stored = await expectClearedStoredToken(page);
-  expect(stored.localToken).toBeNull();
-  expect(stored.sessionToken).toBeNull();
+  const stored = await expectNoStoredSessionSecrets(page);
+  expect(stored.localKeys).toEqual([]);
+  expect(stored.sessionKeys).toEqual([]);
 });
 
 test("renders the work queue detail panel when AQ-104 is live", async ({

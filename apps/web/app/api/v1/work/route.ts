@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.AGENTICQUEUE_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_AGENTICQUEUE_API_BASE_URL ??
-  "http://127.0.0.1:8010";
+import {
+  API_BASE_URL,
+  authHeadersFromRequest,
+  unauthorizedSessionResponse,
+} from "../../_upstream";
 
 const PAGE_LIMIT = 200;
 
@@ -184,12 +185,9 @@ class UpstreamError extends Error {
 }
 
 export async function GET(request: NextRequest) {
-  const authorization = request.headers.get("authorization")?.trim();
-  if (!authorization) {
-    return NextResponse.json(
-      { error: "Authorization header is required." },
-      { status: 401 },
-    );
+  const authHeaders = authHeadersFromRequest(request);
+  if (!authHeaders) {
+    return unauthorizedSessionResponse();
   }
 
   try {
@@ -197,37 +195,37 @@ export async function GET(request: NextRequest) {
       await Promise.all([
         fetchAllPages<ActorEntity>({
           path: "/v1/actors",
-          authorization,
+          authHeaders,
           signal: request.signal,
         }),
         fetchAllPages<ProjectEntity>({
           path: "/v1/projects",
-          authorization,
+          authHeaders,
           signal: request.signal,
         }),
         fetchAllPages<TaskEntity>({
           path: "/v1/tasks",
-          authorization,
+          authHeaders,
           signal: request.signal,
         }),
         fetchAllPages<RunEntity>({
           path: "/v1/runs",
-          authorization,
+          authHeaders,
           signal: request.signal,
         }),
         fetchAllPages<ArtifactEntity>({
           path: "/v1/artifacts",
-          authorization,
+          authHeaders,
           signal: request.signal,
         }),
         fetchAllPages<DecisionEntity>({
           path: "/v1/decisions",
-          authorization,
+          authHeaders,
           signal: request.signal,
         }),
         fetchAllPages<EdgeEntity>({
           path: "/v1/edges",
-          authorization,
+          authHeaders,
           signal: request.signal,
         }),
       ]);
@@ -269,11 +267,11 @@ export async function GET(request: NextRequest) {
 
 async function fetchAllPages<T>({
   path,
-  authorization,
+  authHeaders,
   signal,
 }: {
   path: string;
-  authorization: string;
+  authHeaders: Headers;
   signal: AbortSignal;
 }): Promise<T[]> {
   const items: T[] = [];
@@ -287,9 +285,7 @@ async function fetchAllPages<T>({
     }
 
     const response = await fetch(url, {
-      headers: {
-        Authorization: authorization,
-      },
+      headers: authHeaders,
       cache: "no-store",
       signal,
     });
