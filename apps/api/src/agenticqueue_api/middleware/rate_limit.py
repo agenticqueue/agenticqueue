@@ -13,6 +13,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
+from agenticqueue_api.auth.local import login_rate_limit_status
 from agenticqueue_api.errors import error_payload
 
 
@@ -120,4 +121,50 @@ class ActorRateLimitMiddleware(BaseHTTPMiddleware):
                 },
             ),
             headers=headers,
+        )
+
+
+def _client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+    if request.client is None:
+        return "unknown"
+    return request.client.host
+
+
+class LoginRateLimitMiddleware(BaseHTTPMiddleware):
+    """Postgres-backed rate limiter for local passcode login attempts."""
+
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: RequestResponseEndpoint,
+    ) -> Response:
+        if request.method != "POST" or request.url.path != "/v1/auth/login":
+            return await call_next(request)
+
+        session = request.app.state.session_factory()
+        try:
+            allowed, retry_after = login_rate_limit_status(
+                session,
+                ip_address=_client_ip(request),
+            )
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+        if allowed:
+            return await call_next(request)
+
+        return JSONResponse(
+            status_code=429,
+            content=error_payload(
+                status_code=429,
+                message="Login rate limit exceeded",
+            ),
+            headers={"Retry-After": str(retry_after)},
         )

@@ -2,6 +2,9 @@
 
 from agenticqueue_api.models.api_token import ApiTokenModel, ApiTokenRecord
 from agenticqueue_api.models.actor import ActorModel, ActorRecord
+from agenticqueue_api.models.auth_audit_log import AuthAuditLogRecord
+from agenticqueue_api.models.auth_rate_limit import AuthRateLimitRecord
+from agenticqueue_api.models.auth_session import AuthSessionModel, AuthSessionRecord
 from agenticqueue_api.models.artifact import ArtifactModel, ArtifactRecord
 from agenticqueue_api.models.audit_log import AuditLogModel, AuditLogRecord
 from agenticqueue_api.models.capability import (
@@ -20,6 +23,10 @@ from agenticqueue_api.models.packet_version import (
     PacketVersionRecord,
 )
 from agenticqueue_api.models.policy import PolicyModel, PolicyRecord
+from agenticqueue_api.models.project_member import (
+    ProjectMemberModel,
+    ProjectMemberRecord,
+)
 from agenticqueue_api.models.project import ProjectModel, ProjectRecord
 from agenticqueue_api.models.role import (
     RoleAssignmentModel,
@@ -30,6 +37,7 @@ from agenticqueue_api.models.role import (
 )
 from agenticqueue_api.models.run import RunModel, RunRecord
 from agenticqueue_api.models.task import TaskModel, TaskRecord
+from agenticqueue_api.models.user import UserModel, UserRecord
 from agenticqueue_api.models.workspace import WorkspaceModel, WorkspaceRecord
 
 __all__ = [
@@ -37,6 +45,10 @@ __all__ = [
     "ApiTokenRecord",
     "ActorModel",
     "ActorRecord",
+    "AuthAuditLogRecord",
+    "AuthRateLimitRecord",
+    "AuthSessionModel",
+    "AuthSessionRecord",
     "ArtifactModel",
     "ArtifactRecord",
     "AuditLogModel",
@@ -58,6 +70,8 @@ __all__ = [
     "PacketVersionRecord",
     "PolicyModel",
     "PolicyRecord",
+    "ProjectMemberModel",
+    "ProjectMemberRecord",
     "ProjectModel",
     "ProjectRecord",
     "RoleAssignmentModel",
@@ -69,6 +83,8 @@ __all__ = [
     "RunRecord",
     "TaskModel",
     "TaskRecord",
+    "UserModel",
+    "UserRecord",
     "WorkspaceModel",
     "WorkspaceRecord",
 ]

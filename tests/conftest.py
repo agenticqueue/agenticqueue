@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any, cast
 
 import psycopg
@@ -10,6 +11,8 @@ from agenticqueue_api.config import get_psycopg_connect_args
 
 _ORIGINAL_CREATE_ENGINE = sa.create_engine
 _ORIGINAL_PSYCOPG_CONNECT = psycopg.connect
+
+os.environ.setdefault("AQ_ADMIN_PASSCODE", "test-admin-passcode")
 
 
 def _patched_create_engine(url: Any, *args: Any, **kwargs: Any) -> Engine:

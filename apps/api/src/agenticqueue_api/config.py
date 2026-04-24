@@ -161,6 +161,17 @@ def get_token_signing_secret() -> str:
     )
 
 
+def get_admin_passcode() -> str | None:
+    """Return the one-time bootstrap admin passcode, if configured."""
+
+    configured = os.getenv("AQ_ADMIN_PASSCODE") or os.getenv(
+        "AGENTICQUEUE_ADMIN_PASSCODE"
+    )
+    if configured is None or not configured.strip():
+        return None
+    return configured
+
+
 def get_auto_setup_enabled() -> bool:
     """Return whether the API should auto-run first-boot setup during startup."""
 

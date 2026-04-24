@@ -62,7 +62,7 @@ def main() -> int:
         print(f"OpenAPI artifact is current: {output_path}")
         return 0
 
-    output_path.write_text(rendered, encoding="utf-8")
+    output_path.write_text(rendered, encoding="utf-8", newline="\n")
     print(f"Wrote OpenAPI artifact: {output_path}")
     return 0
 

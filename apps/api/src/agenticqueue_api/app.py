@@ -27,6 +27,7 @@ from agenticqueue_api.auth import (
     revoke_api_token,
     token_display_prefix,
 )
+from agenticqueue_api.auth.local import ensure_admin_seed
 from agenticqueue_api.capabilities import (
     ensure_actor_has_capability,
     grant_capability,
@@ -66,7 +67,9 @@ from agenticqueue_api.init_wizard import (
 from agenticqueue_api.middleware import (
     ActorRateLimitMiddleware,
     ContentSizeLimitMiddleware,
+    CsrfDoubleSubmitMiddleware,
     IdempotencyKeyMiddleware,
+    LoginRateLimitMiddleware,
     RequestIdMiddleware,
     REQUEST_ID_HEADER,
     SecretRedactionMiddleware,
@@ -112,6 +115,7 @@ from agenticqueue_api.pagination import (
 )
 from agenticqueue_api.routers import (
     build_analytics_router,
+    build_auth_router,
     build_audit_router,
     build_graph_router,
     build_learnings_router,
@@ -743,10 +747,27 @@ def create_app(
         finally:
             setup_session.close()
 
+    def run_admin_seed() -> None:
+        setup_session = resolved_session_factory()
+        try:
+            set_session_audit_context(
+                setup_session,
+                actor_id=None,
+                trace_id=BOOT_TRACE_ID,
+            )
+            ensure_admin_seed(setup_session)
+            setup_session.commit()
+        except Exception:
+            setup_session.rollback()
+            raise
+        finally:
+            setup_session.close()
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if get_auto_setup_enabled():
             await asyncio.to_thread(run_auto_setup)
+        await asyncio.to_thread(run_admin_seed)
 
         del app
         packet_cache.start()
@@ -787,7 +808,9 @@ def create_app(
         rate_per_second=get_rate_limit_rps(),
         burst_size=get_rate_limit_burst(),
     )
+    app.add_middleware(LoginRateLimitMiddleware)
     app.add_middleware(AgenticQueueAuthMiddleware)
+    app.add_middleware(CsrfDoubleSubmitMiddleware)
     app.add_middleware(
         ContentSizeLimitMiddleware,
         default_limit=get_max_body_bytes(),
@@ -795,6 +818,7 @@ def create_app(
     app.add_middleware(RequestIdMiddleware)
     install_exception_handlers(app)
     app.include_router(build_analytics_router(get_db_session))
+    app.include_router(build_auth_router(get_db_session))
     app.include_router(build_audit_router(get_db_session))
     app.include_router(build_graph_router(get_db_session))
     app.include_router(build_learnings_router(get_db_session))

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -144,10 +146,30 @@ def call_internal_api(
 ) -> dict[str, Any]:
     """Call the in-process FastAPI app and normalize JSON responses."""
 
+    def _idempotency_key() -> str:
+        token_digest = None
+        if token is not None:
+            token_digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        payload = json.dumps(
+            {
+                "method": method,
+                "path": path,
+                "params": params,
+                "json_body": json_body,
+                "token_digest": token_digest,
+            },
+            default=str,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, payload))
+
     async def _call() -> dict[str, Any]:
         resolved_headers = {} if headers is None else dict(headers)
         if token is not None and token.strip():
             resolved_headers["Authorization"] = f"Bearer {token.strip()}"
+        if method.upper() in {"POST", "PATCH", "DELETE"}:
+            resolved_headers.setdefault("Idempotency-Key", _idempotency_key())
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),
             base_url="http://agenticqueue.local",

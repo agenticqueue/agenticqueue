@@ -15,6 +15,7 @@ from agenticqueue_api.app import create_app
 from agenticqueue_api.auth import (
     AuthenticationError,
     _hash_token_secret,
+    _legacy_hash_token_secret,
     _token_prefix_from_hash,
     authenticate_api_token,
     extract_bearer_token,
@@ -23,7 +24,12 @@ from agenticqueue_api.auth import (
     revoke_api_token,
 )
 from agenticqueue_api.config import get_sqlalchemy_sync_database_url
-from agenticqueue_api.models import ActorModel, CapabilityKey, CapabilityRecord
+from agenticqueue_api.models import (
+    ActorModel,
+    ApiTokenRecord,
+    CapabilityKey,
+    CapabilityRecord,
+)
 from agenticqueue_api.repo import create_actor
 
 TRUNCATE_TABLES = [
@@ -170,6 +176,45 @@ def test_valid_bearer_returns_actor_context_and_token_list(
     }
     assert body["tokens"][0]["actor_id"] == str(user_id)
     assert body["tokens"][0]["token_prefix"].startswith("aq__")
+
+
+def test_legacy_hmac_token_authenticates_and_rehashes_to_argon2id(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor = seed_actor(
+        session_factory,
+        make_actor_payload(
+            handle="legacy-token-user",
+            actor_type="agent",
+            display_name="Legacy Token User",
+        ),
+    )
+    raw_secret = "f" * 64
+    legacy_hash = _legacy_hash_token_secret(raw_secret)
+    raw_token = f"aq__{legacy_hash[:16]}_{raw_secret}"
+    with session_factory() as session:
+        record = ApiTokenRecord(
+            actor_id=actor.id,
+            token_hash=legacy_hash,
+            scopes=["read:tokens"],
+            expires_at=None,
+            revoked_at=None,
+        )
+        session.add(record)
+        session.commit()
+        token_id = record.id
+
+    response = client.get(
+        "/v1/auth/tokens",
+        headers={"Authorization": f"Bearer {raw_token}"},
+    )
+
+    assert response.status_code == 200
+    with session_factory() as session:
+        upgraded_hash = session.get(ApiTokenRecord, token_id).token_hash
+    assert upgraded_hash.startswith("$argon2id$")
+    assert upgraded_hash != legacy_hash
 
 
 def test_expired_token_returns_401(

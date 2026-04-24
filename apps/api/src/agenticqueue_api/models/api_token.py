@@ -32,7 +32,7 @@ class ApiTokenRecord(IdentifiedTable, TimestampedTable, Base):
 
     __tablename__ = "api_token"
 
-    token_hash: Mapped[str] = mapped_column(sa.String(64), nullable=False, unique=True)
+    token_hash: Mapped[str] = mapped_column(sa.Text(), nullable=False, unique=True)
     actor_id: Mapped[uuid.UUID] = mapped_column(
         sa.ForeignKey("agenticqueue.actor.id", ondelete="CASCADE"),
         nullable=False,

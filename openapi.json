@@ -2174,6 +2174,43 @@
         "title": "LearningType",
         "type": "string"
       },
+      "LoginRequest": {
+        "description": "Local passcode login payload.",
+        "properties": {
+          "passcode": {
+            "minLength": 1,
+            "title": "Passcode",
+            "type": "string"
+          },
+          "username": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "passcode"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "LoginResponse": {
+        "description": "Successful local login response.",
+        "properties": {
+          "user": {
+            "additionalProperties": true,
+            "title": "User",
+            "type": "object"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "title": "LoginResponse",
+        "type": "object"
+      },
       "McpStatsResponse": {
         "description": "Current MCP transport statistics.",
         "properties": {
@@ -2395,6 +2432,24 @@
         ],
         "title": "MergeDecision",
         "type": "string"
+      },
+      "MyProjectsResponse": {
+        "description": "Projects visible to the authenticated human user.",
+        "properties": {
+          "projects": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Projects",
+            "type": "array"
+          }
+        },
+        "required": [
+          "projects"
+        ],
+        "title": "MyProjectsResponse",
+        "type": "object"
       },
       "PacketCacheStatsResponse": {
         "description": "Current compiled-packet cache counters.",
@@ -2708,6 +2763,54 @@
           "autonomy_tier"
         ],
         "title": "PolicyModel",
+        "type": "object"
+      },
+      "ProjectMemberRequest": {
+        "description": "Project membership creation payload.",
+        "properties": {
+          "role": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Role",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "role"
+        ],
+        "title": "ProjectMemberRequest",
+        "type": "object"
+      },
+      "ProjectMemberResponse": {
+        "description": "Project membership response.",
+        "properties": {
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "project_id",
+          "role"
+        ],
+        "title": "ProjectMemberResponse",
         "type": "object"
       },
       "ProjectModel": {
@@ -4923,6 +5026,66 @@
         "summary": "Verify Audit Log Chain"
       }
     },
+    "/v1/auth/login": {
+      "post": {
+        "operationId": "login_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login"
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "operationId": "logout_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Logout V1 Auth Logout Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout"
+      }
+    },
     "/v1/auth/tokens": {
       "get": {
         "operationId": "list_tokens_v1_auth_tokens_get",
@@ -5015,6 +5178,39 @@
           }
         },
         "summary": "Provision Token"
+      }
+    },
+    "/v1/auth/tokens/{token_id}": {
+      "delete": {
+        "operationId": "delete_token_v1_auth_tokens__token_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Token Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Token"
       }
     },
     "/v1/auth/tokens/{token_id}/revoke": {
@@ -7298,6 +7494,24 @@
         "summary": "Create Projects"
       }
     },
+    "/v1/projects/mine": {
+      "get": {
+        "operationId": "list_my_projects_v1_projects_mine_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProjectsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List My Projects"
+      }
+    },
     "/v1/projects/{entity_id}": {
       "delete": {
         "operationId": "delete_projects_v1_projects__entity_id__delete",
@@ -7449,6 +7663,56 @@
           }
         },
         "summary": "Update Projects"
+      }
+    },
+    "/v1/projects/{project_id}/members": {
+      "post": {
+        "operationId": "add_project_member_v1_projects__project_id__members_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectMemberRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectMemberResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Project Member"
       }
     },
     "/v1/roles": {
