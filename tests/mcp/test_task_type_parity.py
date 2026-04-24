@@ -32,7 +32,9 @@ def _build_temp_task_type_registry(tmp_path: Path) -> TaskTypeRegistry:
     return registry
 
 
-def _mcp_call(server: Any, tool_name: str, arguments: dict[str, object]) -> dict[str, Any]:
+def _mcp_call(
+    server: Any, tool_name: str, arguments: dict[str, object]
+) -> dict[str, Any]:
     async def _invoke() -> dict[str, Any]:
         async with FastMCPClient(server) as client:
             result = await client.call_tool(tool_name, arguments)
