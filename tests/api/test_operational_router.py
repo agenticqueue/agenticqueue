@@ -23,7 +23,5 @@ def test_operational_routes_live_in_dedicated_router() -> None:
     assert modules_by_path["/v1/health"] == "agenticqueue_api.routers.operational"
     assert modules_by_path["/stats"] == "agenticqueue_api.routers.operational"
     assert modules_by_path["/audit/verify"] == "agenticqueue_api.routers.operational"
-    assert (
-        modules_by_path["/v1/audit/verify"] == "agenticqueue_api.routers.operational"
-    )
+    assert modules_by_path["/v1/audit/verify"] == "agenticqueue_api.routers.operational"
     assert modules_by_path["/setup"] == "agenticqueue_api.app"
