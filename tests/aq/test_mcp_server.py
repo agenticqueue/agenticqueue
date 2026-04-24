@@ -44,6 +44,14 @@ def _remote_mcp_call(
     return asyncio.run(_invoke())
 
 
+async def _mcp_tool_names(mcp_server: Any) -> set[str]:
+    get_tools = getattr(mcp_server, "get_tools", None)
+    if get_tools is not None:
+        return set((await get_tools()).keys())
+
+    return {tool.name for tool in await mcp_server.list_tools()}
+
+
 @contextmanager
 def _serve_app(app: FastAPI) -> Iterator[str]:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -104,7 +112,7 @@ def test_build_agenticqueue_mcp_registers_every_canonical_tool(session_factory) 
     app = create_app(session_factory=session_factory)
 
     canonical_tools = canonical_surface_tool_names()
-    server_tools = set(asyncio.run(app.state.mcp_server.get_tools()).keys())
+    server_tools = asyncio.run(_mcp_tool_names(app.state.mcp_server))
 
     assert len(canonical_tools) >= 48
     assert set(canonical_tools).issubset(server_tools)
