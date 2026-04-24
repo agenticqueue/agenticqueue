@@ -1,5 +1,27 @@
 # AgenticQueue Learnings
 
+## 2026-04-24
+
+### AQ-272: Secret-bearing reset responses must bypass idempotency caching
+
+```yaml
+title: "Do not cache one-time plaintext secret responses"
+type: "security"
+what_happened: "The passcode reset endpoint returns a generated passcode once, while the existing idempotency middleware persists successful mutating `/v1/*` response bodies in `agenticqueue.idempotency_key.response_body`."
+what_learned: "A response-body idempotency cache can silently violate a one-time-secret contract even when the endpoint and audit log avoid storing plaintext themselves."
+action_rule: "When an endpoint returns a one-time plaintext secret, explicitly exempt that path from response-body idempotency caching and add a regression assertion that the cache table remains empty."
+applies_when: "Building auth recovery, token issuance, invite, credential, or bootstrap flows that return a raw secret exactly once."
+does_not_apply_when: "The response contains only non-secret metadata, a redacted token prefix, or a secret is delivered through a separate non-persistent channel."
+evidence:
+  - "`apps/api/tests/auth/test_reset.py::test_endpoint_requires_admin` asserts `agenticqueue.idempotency_key` has no cached reset response body."
+  - "`pytest apps/api/tests/auth -v` passed on 2026-04-24 with `/v1/auth/reset-passcode` idempotency-exempt."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ## 2026-04-21
 
 ### AQ-137: Shared test DB modules must run sequentially
