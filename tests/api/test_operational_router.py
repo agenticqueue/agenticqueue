@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 from fastapi.routing import APIRoute
+from sqlalchemy.orm import Session, sessionmaker
 
 from agenticqueue_api.app import create_app
 from tests.entities import helpers as entity_helpers
 
 
 def _endpoint_module_by_path() -> dict[str, str]:
-    app = create_app(session_factory=entity_helpers.session_factory)
+    session_factory: sessionmaker[Session] = sessionmaker(
+        bind=entity_helpers.engine,
+        expire_on_commit=False,
+    )
+    app = create_app(session_factory=session_factory)
     return {
         route.path: route.endpoint.__module__
         for route in app.routes
