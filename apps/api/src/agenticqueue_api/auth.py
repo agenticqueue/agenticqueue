@@ -236,7 +236,10 @@ class AgenticQueueAuthMiddleware(BaseHTTPMiddleware):
             request.state.actor = authenticated.actor
             request.state.api_token = authenticated.api_token
             response = await call_next(request)
-            session.commit()
+            if session.is_active:
+                session.commit()
+            else:
+                session.rollback()
             return response
         except AuthenticationError as error:
             session.rollback()
