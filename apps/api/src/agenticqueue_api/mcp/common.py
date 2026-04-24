@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from enum import StrEnum
 import os
 from pathlib import Path
 import re
@@ -232,3 +233,171 @@ def canonical_surface_tool_names() -> list[str]:
         if tool_name not in tool_names:
             tool_names.append(tool_name)
     return tool_names
+
+
+class McpToolProfile(StrEnum):
+    """Discoverability profiles for unified MCP tool listings."""
+
+    WORKER = "worker"
+    REVIEWER = "reviewer"
+    SUPERVISOR = "supervisor"
+    ADMIN = "admin"
+
+
+def tool_visibility_profiles() -> dict[str, frozenset[McpToolProfile]]:
+    """Return the AQ-228 profile visibility map for canonical MCP tools."""
+
+    all_profiles = frozenset(McpToolProfile)
+    worker_execution_profiles = frozenset(
+        {
+            McpToolProfile.WORKER,
+            McpToolProfile.SUPERVISOR,
+            McpToolProfile.ADMIN,
+        }
+    )
+    reviewer_profiles = frozenset(
+        {
+            McpToolProfile.REVIEWER,
+            McpToolProfile.SUPERVISOR,
+            McpToolProfile.ADMIN,
+        }
+    )
+    supervisor_profiles = frozenset(
+        {
+            McpToolProfile.SUPERVISOR,
+            McpToolProfile.ADMIN,
+        }
+    )
+    admin_profiles = frozenset({McpToolProfile.ADMIN})
+
+    visibility: dict[str, frozenset[McpToolProfile]] = {
+        name: all_profiles
+        for name in (
+            "attach_artifact",
+            "comment_on_job",
+            "compile_packet",
+            "create_decision",
+            "get_artifact",
+            "get_decision",
+            "get_job",
+            "get_learning",
+            "get_pipeline",
+            "get_project",
+            "get_self",
+            "get_task_type",
+            "health_check",
+            "link_decision",
+            "list_artifacts",
+            "list_decisions",
+            "list_jobs",
+            "list_learnings",
+            "list_pipelines",
+            "list_projects",
+            "list_task_types",
+            "query_graph",
+            "rotate_own_key",
+            "search_learnings",
+            "search_surface",
+            "submit_learning",
+            "traverse_graph",
+        )
+    }
+    visibility.update(
+        {
+            name: worker_execution_profiles
+            for name in (
+                "claim_next_job",
+                "release_job",
+                "submit_payload",
+            )
+        }
+    )
+    visibility.update(
+        {
+            name: reviewer_profiles
+            for name in (
+                "approve_job",
+                "edit_learning",
+                "expire_learning",
+                "get_policy_pack",
+                "get_run",
+                "list_policy_packs",
+                "list_runs",
+                "promote_learning",
+                "reject_job",
+                "supersede_decision",
+                "supersede_learning",
+            )
+        }
+    )
+    visibility.update(
+        {
+            name: supervisor_profiles
+            for name in (
+                "force_unlock_escrow",
+                "get_stats",
+                "query_audit_log",
+                "reset_job",
+            )
+        }
+    )
+    visibility.update(
+        {
+            name: admin_profiles
+            for name in (
+                "archive_project",
+                "attach_policy",
+                "cancel_pipeline",
+                "create_actor",
+                "create_job",
+                "create_pipeline",
+                "create_project",
+                "grant_capability",
+                "list_actors",
+                "load_policy_pack",
+                "register_task_type",
+                "revoke_actor",
+                "revoke_capability",
+                "update_job",
+                "update_pipeline",
+                "update_project",
+                "update_task_type",
+            )
+        }
+    )
+
+    canonical_tools = set(canonical_surface_tool_names())
+    if set(visibility) != canonical_tools:
+        missing = sorted(canonical_tools - set(visibility))
+        extra = sorted(set(visibility) - canonical_tools)
+        problems: list[str] = []
+        if missing:
+            problems.append(f"missing={missing}")
+        if extra:
+            problems.append(f"extra={extra}")
+        raise RuntimeError(
+            "MCP tool visibility map drifted from docs/surface-1.0.md: "
+            + "; ".join(problems)
+        )
+
+    return visibility
+
+
+def visible_tool_names(profile: McpToolProfile | str) -> list[str]:
+    """Return canonical tools visible for one discoverability profile."""
+
+    resolved_profile = (
+        profile if isinstance(profile, McpToolProfile) else McpToolProfile(profile)
+    )
+    visibility = tool_visibility_profiles()
+    return [
+        tool_name
+        for tool_name in canonical_surface_tool_names()
+        if resolved_profile in visibility[tool_name]
+    ]
+
+
+def worker_visible_tool_names() -> list[str]:
+    """Return the default worker-safe MCP listing."""
+
+    return visible_tool_names(McpToolProfile.WORKER)

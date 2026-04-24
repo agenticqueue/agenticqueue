@@ -45,6 +45,10 @@ def _remote_mcp_call(
 
 
 async def _mcp_tool_names(mcp_server: Any) -> set[str]:
+    raw_list_tools = getattr(mcp_server, "_list_tools", None)
+    if raw_list_tools is not None:
+        return {tool.name for tool in await raw_list_tools()}
+
     get_tools = getattr(mcp_server, "get_tools", None)
     if get_tools is not None:
         return set((await get_tools()).keys())
@@ -114,8 +118,8 @@ def test_build_agenticqueue_mcp_registers_every_canonical_tool(session_factory) 
     canonical_tools = canonical_surface_tool_names()
     server_tools = asyncio.run(_mcp_tool_names(app.state.mcp_server))
 
-    assert len(canonical_tools) >= 48
-    assert set(canonical_tools).issubset(server_tools)
+    assert len(canonical_tools) == 62
+    assert server_tools == set(canonical_tools)
 
 
 def test_create_app_succeeds_inside_running_event_loop(session_factory) -> None:

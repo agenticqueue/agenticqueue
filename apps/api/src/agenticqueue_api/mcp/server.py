@@ -15,10 +15,9 @@ from agenticqueue_api.mcp.common import (
     default_session_factory,
 )
 from agenticqueue_api.mcp.health_tools import register_health_tools
-from agenticqueue_api.mcp.learnings_tools import build_learnings_mcp
-from agenticqueue_api.mcp.memory_tools import build_memory_mcp
 from agenticqueue_api.mcp.packet_tools import build_packets_mcp
 from agenticqueue_api.mcp.submit_tools import register_submit_tools
+from agenticqueue_api.mcp.visibility import AgenticQueueToolVisibilityMiddleware
 from agenticqueue_api.task_type_registry import TaskTypeRegistry
 
 
@@ -49,11 +48,8 @@ def build_agenticqueue_mcp(
     registered: set[str] = set()
 
     packet_server = build_packets_mcp(session_factory=resolved_session_factory)
-    learnings_server = build_learnings_mcp(session_factory=resolved_session_factory)
-    memory_server = build_memory_mcp(session_factory=resolved_session_factory)
-    for child in (packet_server, learnings_server, memory_server):
-        mcp.mount(child)
-        registered.update(_mounted_tool_names(child))
+    mcp.mount(packet_server)
+    registered.update(_mounted_tool_names(packet_server))
 
     registered.update(
         register_submit_tools(
@@ -90,6 +86,7 @@ def build_agenticqueue_mcp(
             "Unified MCP server is missing canonical tools: " + ", ".join(missing)
         )
 
+    mcp.add_middleware(AgenticQueueToolVisibilityMiddleware())
     setattr(mcp, "agenticqueue_registered_tools", frozenset(registered))
     return mcp
 

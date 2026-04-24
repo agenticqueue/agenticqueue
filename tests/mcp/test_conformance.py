@@ -5,7 +5,7 @@ from typing import Any
 from jsonschema import Draft202012Validator, validate  # type: ignore[import-untyped]
 import pytest
 
-from agenticqueue_api.mcp.common import canonical_surface_tool_names
+from agenticqueue_api.mcp.common import canonical_surface_tool_names, worker_visible_tool_names
 from tests.mcp.conftest import SeededTask, run_transport, tool_result_payload
 
 
@@ -26,9 +26,19 @@ def test_tool_listing_matches_canonical_surface(
     )
 
     listed_tools = {tool.name for tool in result.tools}
-    expected_tools = set(canonical_surface_tool_names())
+    canonical_tools = set(canonical_surface_tool_names())
+    worker_tools = set(worker_visible_tool_names())
 
-    assert expected_tools.issubset(listed_tools)
+    assert listed_tools == worker_tools
+    assert listed_tools.issubset(canonical_tools)
+
+
+def test_worker_visibility_is_a_strict_subset_of_canonical_surface() -> None:
+    canonical_tools = set(canonical_surface_tool_names())
+    worker_tools = set(worker_visible_tool_names())
+
+    assert worker_tools
+    assert worker_tools < canonical_tools
 
 
 def test_tool_schemas_are_valid_json_schema(

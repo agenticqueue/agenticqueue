@@ -517,6 +517,34 @@ def register_submit_tools(
     registered.add("submit_learning")
 
     @mcp.tool(
+        name="search_learnings",
+        annotations={"readOnlyHint": True, "openWorldHint": False},
+    )
+    def search_learnings(
+        query: str,
+        token: str | None = None,
+        project: uuid.UUID | None = None,
+        task_type: str | None = None,
+        repo_scope: str | None = None,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        return call_internal_api(
+            app,
+            method="GET",
+            path="/v1/learnings/search",
+            token=token,
+            params={
+                "q": query,
+                "project": None if project is None else str(project),
+                "task_type": task_type,
+                "repo_scope": repo_scope,
+                "limit": limit,
+            },
+        )
+
+    registered.add("search_learnings")
+
+    @mcp.tool(
         name="expire_learning",
         annotations={"readOnlyHint": False, "openWorldHint": False},
     )
@@ -533,6 +561,48 @@ def register_submit_tools(
         )
 
     registered.add("expire_learning")
+
+    @mcp.tool(
+        name="promote_learning",
+        annotations={"readOnlyHint": False, "openWorldHint": False},
+    )
+    def promote_learning(
+        learning_id: uuid.UUID,
+        target_scope: str,
+        token: str | None = None,
+    ) -> dict[str, Any]:
+        return call_internal_api(
+            app,
+            method="POST",
+            path=f"/v1/learnings/{learning_id}/promote",
+            token=token,
+            json_body={"target_scope": target_scope},
+        )
+
+    registered.add("promote_learning")
+
+    @mcp.tool(
+        name="supersede_learning",
+        annotations={"readOnlyHint": False, "openWorldHint": False},
+    )
+    def supersede_learning(
+        learning_id: uuid.UUID,
+        replaced_by: uuid.UUID,
+        token: str | None = None,
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"replaced_by": str(replaced_by)}
+        if reason is not None:
+            payload["reason"] = reason
+        return call_internal_api(
+            app,
+            method="POST",
+            path=f"/v1/learnings/{learning_id}/supersede",
+            token=token,
+            json_body=payload,
+        )
+
+    registered.add("supersede_learning")
 
     @mcp.tool(
         name="load_policy_pack",
