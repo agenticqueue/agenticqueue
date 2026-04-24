@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import os
 
 from fastmcp.server.dependencies import get_http_request
@@ -43,8 +44,8 @@ class AgenticQueueToolVisibilityMiddleware(Middleware):
     async def on_list_tools(
         self,
         context: MiddlewareContext[mt.ListToolsRequest],
-        call_next: CallNext[mt.ListToolsRequest, list[Tool]],
-    ) -> list[Tool]:
+        call_next: CallNext[mt.ListToolsRequest, Sequence[Tool]],
+    ) -> Sequence[Tool]:
         tools = await call_next(context)
         allowed = set(visible_tool_names(_requested_profile(context)))
         return [tool for tool in tools if tool.name in allowed]
