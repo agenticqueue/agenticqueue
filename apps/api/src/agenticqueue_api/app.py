@@ -25,10 +25,7 @@ from agenticqueue_api.auth import (
 )
 from agenticqueue_api.capabilities import (
     ensure_actor_has_capability,
-    grant_capability,
-    list_capabilities_for_actor,
     require_capability,
-    revoke_capability_grant,
 )
 from agenticqueue_api.config import (
     get_auto_setup_enabled,
@@ -67,7 +64,6 @@ from agenticqueue_api.middleware import (
 )
 from agenticqueue_api.models import (
     ActorModel,
-    ActorRecord,
     ApiTokenModel,
     AuditLogRecord,
     CapabilityGrantModel,
@@ -83,9 +79,7 @@ from agenticqueue_api.models import (
 from agenticqueue_api.models.shared import SchemaModel
 from agenticqueue_api.packet_cache import PacketCache
 from agenticqueue_api.pagination import (
-    DEFAULT_LIST_LIMIT,
     LIMIT_HEADER,
-    MAX_LIST_LIMIT,
     NEXT_CURSOR_HEADER,
     coerce_cursor_value,
     decode_cursor,
@@ -101,15 +95,10 @@ from agenticqueue_api.routers import (
     build_memory_router,
     build_operational_router,
     build_packets_router,
+    build_rbac_router,
     build_task_types_router,
 )
 from agenticqueue_api.repo import claim_next, claim_task, release_claim
-from agenticqueue_api.roles import (
-    assign_role,
-    list_role_assignments_for_actor,
-    list_roles,
-    revoke_role_assignment,
-)
 from agenticqueue_api.task_type_registry import TaskTypeDefinition, TaskTypeRegistry
 from agenticqueue_api.task_actions import (
     TaskDecisionRequest,
@@ -724,183 +713,7 @@ def create_app(
 
     app.include_router(build_task_types_router(get_db_session))
     app.include_router(build_auth_tokens_router(get_db_session))
-
-    @app.post(
-        "/v1/capabilities/grant",
-        response_model=CapabilityGrantView,
-        status_code=status.HTTP_201_CREATED,
-    )
-    def grant_capability_endpoint(
-        payload: GrantCapabilityRequest,
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> CapabilityGrantView:
-        with write_timeout(session, endpoint="v1.capabilities.grant"):
-            admin_actor = _require_admin_actor(request)
-            actor_exists = session.get(ActorRecord, payload.actor_id)
-            if actor_exists is None:
-                raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
-
-            try:
-                grant = grant_capability(
-                    session,
-                    actor_id=payload.actor_id,
-                    capability=payload.capability,
-                    scope=payload.scope,
-                    granted_by_actor_id=admin_actor.id,
-                    expires_at=payload.expires_at,
-                )
-            except ValueError as error:
-                raise_api_error(status.HTTP_404_NOT_FOUND, str(error))
-            return _capability_grant_view(grant)
-
-    @app.post("/v1/capabilities/revoke", response_model=CapabilityGrantView)
-    def revoke_capability_endpoint(
-        payload: RevokeCapabilityRequest,
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> CapabilityGrantView:
-        with write_timeout(session, endpoint="v1.capabilities.revoke"):
-            _require_admin_actor(request)
-            revoked_grant = revoke_capability_grant(session, payload.grant_id)
-            if revoked_grant is None:
-                raise_api_error(
-                    status.HTTP_404_NOT_FOUND,
-                    "Capability grant not found",
-                )
-            return _capability_grant_view(revoked_grant)
-
-    @app.get(
-        "/v1/actors/{actor_id}/capabilities",
-        response_model=ActorCapabilityListResponse,
-    )
-    def list_capability_grants(
-        actor_id: uuid.UUID,
-        request: Request,
-        response: Response,
-        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
-        cursor: str | None = Query(default=None),
-        session: Session = Depends(get_db_session),
-    ) -> ActorCapabilityListResponse:
-        requesting_actor = _require_actor(request)
-        if requesting_actor.actor_type != "admin" and requesting_actor.id != actor_id:
-            raise_api_error(status.HTTP_403_FORBIDDEN, "Admin actor required")
-
-        target_actor = session.get(ActorRecord, actor_id)
-        if target_actor is None:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
-
-        grants = list_capabilities_for_actor(session, actor_id)
-        page = _paginate_sequence(
-            grants,
-            response=response,
-            limit=limit,
-            cursor=cursor,
-            key_types=[str, str],
-            key_fn=lambda grant: [grant.created_at.isoformat(), str(grant.id)],
-        )
-        return ActorCapabilityListResponse(
-            actor=_actor_summary(ActorModel.model_validate(target_actor)),
-            capabilities=[_capability_grant_view(grant) for grant in page],
-        )
-
-    @app.get("/v1/roles", response_model=RoleListResponse)
-    def list_roles_endpoint(
-        request: Request,
-        response: Response,
-        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
-        cursor: str | None = Query(default=None),
-        session: Session = Depends(get_db_session),
-    ) -> RoleListResponse:
-        _require_admin_actor(request)
-        roles = sorted(
-            list_roles(session),
-            key=lambda role: (role.created_at.isoformat(), str(role.id)),
-        )
-        page = _paginate_sequence(
-            roles,
-            response=response,
-            limit=limit,
-            cursor=cursor,
-            key_types=[str, str],
-            key_fn=lambda role: [role.created_at.isoformat(), str(role.id)],
-        )
-        return RoleListResponse(roles=[_role_view(role) for role in page])
-
-    @app.post(
-        "/v1/roles/assign",
-        response_model=RoleAssignmentView,
-        status_code=status.HTTP_201_CREATED,
-    )
-    def assign_role_endpoint(
-        payload: AssignRoleRequest,
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> RoleAssignmentView:
-        with write_timeout(session, endpoint="v1.roles.assign"):
-            admin_actor = _require_admin_actor(request)
-            actor_exists = session.get(ActorRecord, payload.actor_id)
-            if actor_exists is None:
-                raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
-
-            try:
-                assignment = assign_role(
-                    session,
-                    actor_id=payload.actor_id,
-                    role_name=payload.role_name,
-                    granted_by_actor_id=admin_actor.id,
-                    expires_at=payload.expires_at,
-                )
-            except ValueError as error:
-                raise_api_error(status.HTTP_404_NOT_FOUND, str(error))
-            return _role_assignment_view(assignment)
-
-    @app.post("/v1/roles/revoke", response_model=RoleAssignmentView)
-    def revoke_role_endpoint(
-        payload: RevokeRoleRequest,
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> RoleAssignmentView:
-        with write_timeout(session, endpoint="v1.roles.revoke"):
-            _require_admin_actor(request)
-            assignment = revoke_role_assignment(session, payload.assignment_id)
-            if assignment is None:
-                raise_api_error(status.HTTP_404_NOT_FOUND, "Role assignment not found")
-            return _role_assignment_view(assignment)
-
-    @app.get("/v1/actors/{actor_id}/roles", response_model=ActorRoleListResponse)
-    def list_actor_roles(
-        actor_id: uuid.UUID,
-        request: Request,
-        response: Response,
-        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
-        cursor: str | None = Query(default=None),
-        session: Session = Depends(get_db_session),
-    ) -> ActorRoleListResponse:
-        requesting_actor = _require_actor(request)
-        if requesting_actor.actor_type != "admin" and requesting_actor.id != actor_id:
-            raise_api_error(status.HTTP_403_FORBIDDEN, "Admin actor required")
-
-        target_actor = session.get(ActorRecord, actor_id)
-        if target_actor is None:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
-
-        assignments = list_role_assignments_for_actor(session, actor_id)
-        page = _paginate_sequence(
-            assignments,
-            response=response,
-            limit=limit,
-            cursor=cursor,
-            key_types=[str, str],
-            key_fn=lambda assignment: [
-                assignment.created_at.isoformat(),
-                str(assignment.id),
-            ],
-        )
-        return ActorRoleListResponse(
-            actor=_actor_summary(ActorModel.model_validate(target_actor)),
-            roles=[_role_assignment_view(assignment) for assignment in page],
-        )
+    app.include_router(build_rbac_router(get_db_session))
 
     @app.post(
         "/v1/tasks/claim",

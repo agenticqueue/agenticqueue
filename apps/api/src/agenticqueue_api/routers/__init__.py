@@ -9,6 +9,7 @@ from agenticqueue_api.routers.learnings import build_learnings_router
 from agenticqueue_api.routers.memory import build_memory_router
 from agenticqueue_api.routers.operational import build_operational_router
 from agenticqueue_api.routers.packets import build_packets_router
+from agenticqueue_api.routers.rbac import build_rbac_router
 from agenticqueue_api.routers.task_types import build_task_types_router
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     "build_memory_router",
     "build_operational_router",
     "build_packets_router",
+    "build_rbac_router",
     "build_task_types_router",
 ]
