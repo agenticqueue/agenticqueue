@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.AQ_API_URL ??
-  process.env.AGENTICQUEUE_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_AGENTICQUEUE_API_BASE_URL ??
-  "http://127.0.0.1:8010";
+import { getApiBaseUrl } from "@/lib/api-base-url";
+
+const API_BASE_URL = getApiBaseUrl();
 
 const WEB_VERSION = "0.1.0";
 

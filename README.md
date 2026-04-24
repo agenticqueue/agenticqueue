@@ -22,6 +22,11 @@ statements via `prepare_threshold=None` and asyncpg paths use
 tickets, but `docker-compose.yml` now defines an `api` service that is gated on
 PgBouncer health for future containerized smoke tests.
 
+The Phase 7 web proxy uses `AQ_API_BASE_URL` as its canonical upstream target
+setting. `AQ_API_URL`, `AGENTICQUEUE_API_BASE_URL`, and
+`NEXT_PUBLIC_AGENTICQUEUE_API_BASE_URL` remain deprecated read-only aliases for
+one minor release while existing local setups roll forward.
+
 ## Repo Map
 
 - `README.md` - project overview and quick start

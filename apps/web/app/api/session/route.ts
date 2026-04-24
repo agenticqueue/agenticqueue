@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { getApiBaseUrl } from "@/lib/api-base-url";
+
 type AuthSessionResponse = {
   actor: {
     id: string;
@@ -10,10 +12,7 @@ type AuthSessionResponse = {
   tokens: unknown[];
 };
 
-const API_BASE_URL =
-  process.env.AGENTICQUEUE_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_AGENTICQUEUE_API_BASE_URL ??
-  "http://127.0.0.1:8010";
+const API_BASE_URL = getApiBaseUrl();
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as

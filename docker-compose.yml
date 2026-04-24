@@ -79,8 +79,7 @@ services:
       api:
         condition: service_healthy
     environment:
-      AQ_API_URL: http://api:8000
-      AGENTICQUEUE_API_BASE_URL: http://api:8000
+      AQ_API_BASE_URL: http://api:8000
     healthcheck:
       test:
         [

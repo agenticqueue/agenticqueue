@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.AGENTICQUEUE_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_AGENTICQUEUE_API_BASE_URL ??
-  "http://127.0.0.1:8010";
+import { getApiBaseUrl } from "@/lib/api-base-url";
+
+const API_BASE_URL = getApiBaseUrl();
 
 export async function GET(request: NextRequest) {
   const authorization = request.headers.get("authorization")?.trim();

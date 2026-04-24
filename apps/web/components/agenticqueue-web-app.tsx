@@ -10,6 +10,7 @@ import { GraphView } from "@/components/graph-view";
 import { LearningsView } from "@/components/learnings-view";
 import { PipelinesView } from "@/components/pipelines-view";
 import { WorkView } from "@/components/work-view";
+import { DEFAULT_API_BASE_URL } from "@/lib/api-base-url";
 
 type ViewKey =
   | "pipelines"
@@ -275,7 +276,7 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
   );
   const [actor, setActor] = useState<AuthActor | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [apiBaseUrl, setApiBaseUrl] = useState("http://127.0.0.1:8010");
+  const [apiBaseUrl, setApiBaseUrl] = useState(DEFAULT_API_BASE_URL);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [navCounts, setNavCounts] = useState<NavCounts | null>(null);
 

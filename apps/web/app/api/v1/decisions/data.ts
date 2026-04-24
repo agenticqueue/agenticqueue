@@ -1,7 +1,6 @@
-const API_BASE_URL =
-  process.env.AGENTICQUEUE_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_AGENTICQUEUE_API_BASE_URL ??
-  "http://127.0.0.1:8010";
+import { getApiBaseUrl } from "@/lib/api-base-url";
+
+const API_BASE_URL = getApiBaseUrl();
 
 const PAGE_LIMIT = 200;
 
