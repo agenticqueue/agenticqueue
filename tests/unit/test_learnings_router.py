@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from fastapi.routing import APIRoute
+
 from agenticqueue_api.routers.learnings import build_learnings_router
 
 
@@ -10,7 +12,7 @@ def _unused_db_session() -> None:
 def test_learnings_router_exposes_learning_draft_mutation_routes() -> None:
     router = build_learnings_router(_unused_db_session)
 
-    paths = {route.path for route in router.routes}
+    paths = {route.path for route in router.routes if isinstance(route, APIRoute)}
 
     assert {
         "/learnings/drafts/{draft_id}/edit",
