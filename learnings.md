@@ -2,6 +2,26 @@
 
 ## 2026-04-24
 
+### AQ-271: Tuple-style None guards do not narrow constructor arguments for mypy
+
+```yaml
+title: "Tuple-style None guards need explicit asserts before typed constructor calls"
+type: "tooling"
+what_happened: "AQ-271 introduced `resolve_contract_dod_items()` in `apps/api/src/agenticqueue_api/dod.py` and locally passed the focused pytest + pre-commit slice, but GitHub Actions `lint` on `b75076c1ed15106a231100c94225204e7691ea02` failed in mypy because the `if None in (...)` guard did not narrow the local `str | None` variables before they were passed into the `ContractDodItem` dataclass constructor."
+what_learned: "In this repo's typed Python surface, tuple-style `None` guards are not strong enough for mypy to prove constructor arguments are non-optional; explicit `assert value is not None` (or equivalent per-variable narrowing) is required, and the touched-file pre-commit slice does not catch that because mypy runs separately in CI."
+action_rule: "When optional locals feed a typed dataclass or model constructor, run `uv run --with mypy mypy .` (or at least the touched module) before pushing and add explicit per-variable narrowing after any tuple-style or aggregate `None` guard."
+applies_when: "A typed AgenticQueue module filters `str | None` or similar optionals and then passes those values into a dataclass, Pydantic model, or other constructor that expects concrete types."
+does_not_apply_when: "The values are already non-optional at declaration time or each variable is narrowed through a direct `if value is None: continue` branch that mypy can follow."
+evidence:
+  - "GitHub Actions run `24881227546` on `b75076c1ed15106a231100c94225204e7691ea02` failed with five mypy `arg-type` errors in `apps/api/src/agenticqueue_api/dod.py`."
+  - "`uv run --with mypy mypy .` passed on 2026-04-24 after commit `6ef21a83c90b60a903e36e3d4a37a694c474aa5e` added explicit asserts before constructing `ContractDodItem`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ### AQ-266: Direct-to-main formatter jobs can surface untouched repo drift
 
 ```yaml
