@@ -343,7 +343,8 @@ def test_packet_cache_expires_and_handles_global_invalidations(
     cache = PacketCache(
         session_factory=session_factory,
         ttl_seconds=1,
-        max_entries=2,
+        # Prefetch can fill the tiny LRU before this test inspects the expired entry.
+        max_entries=4,
         prefetch_width=1,
     )
 

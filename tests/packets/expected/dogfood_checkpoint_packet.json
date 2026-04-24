@@ -53,7 +53,7 @@
   "open_questions": [
     "Which mmmmm project should enter observer mode first?"
   ],
-  "packet_version_id": "49de66ce-7e65-5238-b674-108666bd4abf",
+  "packet_version_id": "040fc379-b9b0-5573-802b-96dd7aaf791c",
   "permissions": {
     "autonomy_tier": 3,
     "capabilities": [
@@ -110,7 +110,7 @@
   ],
   "repo_scope": {
     "branch": "main",
-    "estimated_token_count": 2316,
+    "estimated_token_count": 2911,
     "file_scope": [
       "examples/tasks/coding/01-add-endpoint.json",
       "task_types/coding-task.policy.yaml",
@@ -158,6 +158,29 @@
           "path": "artifacts/diffs/aq-52.patch",
           "pattern": "/v1/tasks/\\{id\\}",
           "type": "grep_present"
+        }
+      ],
+      "dod_items": [
+        {
+          "acceptance_threshold": "The proof payload maps dod-1 to a passed result with at least one evidence pointer.",
+          "evidence_required": "Pytest output proving the endpoint returns the task payload.",
+          "id": "dod-1",
+          "statement": "GET /v1/tasks/{id} returns 200 with the task payload.",
+          "verification_method": "test"
+        },
+        {
+          "acceptance_threshold": "The proof payload maps dod-2 to a passed result with at least one evidence pointer.",
+          "evidence_required": "Pytest output proving the missing-task path returns 404.",
+          "id": "dod-2",
+          "statement": "Missing task id returns 404.",
+          "verification_method": "test"
+        },
+        {
+          "acceptance_threshold": "The proof payload maps dod-3 to a passed result with an artifact or code-inspection pointer.",
+          "evidence_required": "A diff or schema artifact showing the OpenAPI route exists.",
+          "id": "dod-3",
+          "statement": "OpenAPI includes the route.",
+          "verification_method": "code_inspection"
         }
       ],
       "file_scope": [
@@ -259,6 +282,29 @@
         "path": "artifacts/diffs/aq-52.patch",
         "pattern": "/v1/tasks/\\{id\\}",
         "type": "grep_present"
+      }
+    ],
+    "dod_items": [
+      {
+        "acceptance_threshold": "The proof payload maps dod-1 to a passed result with at least one evidence pointer.",
+        "evidence_required": "Pytest output proving the endpoint returns the task payload.",
+        "id": "dod-1",
+        "statement": "GET /v1/tasks/{id} returns 200 with the task payload.",
+        "verification_method": "test"
+      },
+      {
+        "acceptance_threshold": "The proof payload maps dod-2 to a passed result with at least one evidence pointer.",
+        "evidence_required": "Pytest output proving the missing-task path returns 404.",
+        "id": "dod-2",
+        "statement": "Missing task id returns 404.",
+        "verification_method": "test"
+      },
+      {
+        "acceptance_threshold": "The proof payload maps dod-3 to a passed result with an artifact or code-inspection pointer.",
+        "evidence_required": "A diff or schema artifact showing the OpenAPI route exists.",
+        "id": "dod-3",
+        "statement": "OpenAPI includes the route.",
+        "verification_method": "code_inspection"
       }
     ],
     "file_scope": [
