@@ -170,3 +170,36 @@ def test_rate_limit_returns_structured_429(
     assert second.headers["X-Request-Id"]
     assert second.json()["error_code"] == "rate_limited"
     assert second.json()["message"] == "Rate limit exceeded"
+
+
+def test_authenticated_read_reuses_one_request_db_session(
+    session_factory: sessionmaker[Session],
+) -> None:
+    class CountingSessionFactory:
+        def __init__(self, delegate: sessionmaker[Session]) -> None:
+            self._delegate = delegate
+            self.call_count = 0
+
+        def __call__(self) -> Session:
+            self.call_count += 1
+            return self._delegate()
+
+    actor = seed_actor(
+        session_factory,
+        handle="workspace-session-admin",
+        actor_type="admin",
+        display_name="Workspace Session Admin",
+    )
+    token = seed_token(
+        session_factory,
+        actor_id=actor.id,
+        scopes=["workspace:read"],
+    )
+    counting_factory = CountingSessionFactory(session_factory)
+
+    app = create_app(session_factory=counting_factory)  # type: ignore[arg-type]
+    with TestClient(app) as test_client:
+        response = test_client.get("/v1/workspaces", headers=auth_headers(token))
+
+    assert response.status_code == 200
+    assert counting_factory.call_count == 1

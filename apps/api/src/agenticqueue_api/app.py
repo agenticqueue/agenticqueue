@@ -682,7 +682,11 @@ _require_learning_promotion_capability = require_capability(
 
 
 def get_db_session(request: Request) -> Iterator[Session]:
-    session = request.app.state.session_factory()
+    session = getattr(request.state, "db_session", None)
+    created_here = session is None
+    if session is None:
+        session = request.app.state.session_factory()
+        request.state.db_session = session
     actor = getattr(request.state, "actor", None)
     request_id = (
         getattr(request.state, "request_id", None)
@@ -701,12 +705,16 @@ def get_db_session(request: Request) -> Iterator[Session]:
     set_session_redaction_context(session, redaction=redaction)
     try:
         yield session
-        session.commit()
+        if created_here:
+            session.commit()
     except Exception:
-        session.rollback()
+        if created_here:
+            session.rollback()
         raise
     finally:
-        session.close()
+        if created_here:
+            request.state.db_session = None
+            session.close()
 
 
 def get_task_type_registry(request: Request) -> TaskTypeRegistry:

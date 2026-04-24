@@ -225,16 +225,25 @@ class AgenticQueueAuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         session = request.app.state.session_factory()
+        request.state.db_session = session
         try:
             bearer_token = extract_bearer_token(request.headers.get("Authorization"))
             authenticated = authenticate_api_token(session, bearer_token)
             if authenticated is None:
+                session.rollback()
                 return _unauthorized_response("Invalid bearer token")
 
             request.state.actor = authenticated.actor
             request.state.api_token = authenticated.api_token
-            return await call_next(request)
+            response = await call_next(request)
+            session.commit()
+            return response
         except AuthenticationError as error:
+            session.rollback()
             return _unauthorized_response(str(error))
+        except Exception:
+            session.rollback()
+            raise
         finally:
+            request.state.db_session = None
             session.close()
