@@ -37,7 +37,7 @@ def test_app_includes_task_type_router_without_local_task_type_decorators() -> N
     ).read_text(encoding="utf-8")
 
     assert "build_task_types_router" in app_source
-    assert 'app.include_router(build_task_types_router(get_db_session))' in app_source
+    assert "app.include_router(build_task_types_router(get_db_session))" in app_source
     assert '@app.get("/v1/task-types"' not in app_source
     assert '@app.post("/v1/task-types"' not in app_source
     assert '@app.patch("/v1/task-types/{task_type_name}"' not in app_source

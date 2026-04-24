@@ -132,9 +132,7 @@ def build_task_types_router(get_db_session: Callable[..., Session]) -> APIRouter
             entity_id=None,
         )
 
-    _update_task_type_route_capability.__name__ = (
-        update_task_type_capability.__name__
-    )
+    _update_task_type_route_capability.__name__ = update_task_type_capability.__name__
 
     @router.get(
         "/task-types",
