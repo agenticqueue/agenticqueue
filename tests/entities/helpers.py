@@ -647,9 +647,9 @@ def core_specs_by_resource() -> dict[str, CrudSpec]:
                 "updated_at": "2026-04-20T00:00:00+00:00",
             },
             filter_params=lambda created, deps: {"title": created["title"]},
-            update_payload={"state": "in_progress"},
-            updated_field="state",
-            updated_value="in_progress",
+            update_payload={"description": "Task Alpha Updated"},
+            updated_field="description",
+            updated_value="Task Alpha Updated",
             seed_sibling=lambda sf, deps: seed_task(
                 sf,
                 project_id=seed_project(
