@@ -28,3 +28,7 @@ test-results/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Local scratch / validation worktrees / coverage
+.tmp/
+.coverage
