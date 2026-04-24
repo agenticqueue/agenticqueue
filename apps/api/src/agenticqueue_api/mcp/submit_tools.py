@@ -295,11 +295,22 @@ def register_submit_tools(
         policy: dict[str, Any],
         token: str | None = None,
     ) -> dict[str, Any]:
+        idempotency_key = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                json.dumps(
+                    {"name": name, "schema": schema, "policy": policy},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+            )
+        )
         return call_internal_api(
             app,
             method="POST",
             path="/v1/task-types",
             token=token,
+            headers={"Idempotency-Key": idempotency_key},
             json_body={"name": name, "schema": schema, "policy": policy},
         )
 
@@ -313,25 +324,11 @@ def register_submit_tools(
         name: str,
         token: str | None = None,
     ) -> dict[str, Any]:
-        def _callback(session: Session, authenticated) -> dict[str, Any]:
-            del session, authenticated
-            try:
-                definition = task_type_registry.get(name)
-            except ValueError as error:
-                raise surface_error(404, str(error)) from error
-            return {
-                "name": definition.name,
-                "schema": definition.schema,
-                "policy": definition.policy,
-                "schema_path": str(definition.schema_path),
-                "policy_path": str(definition.policy_path),
-            }
-
-        return run_session_tool(
-            session_factory,
+        return call_internal_api(
+            app,
+            method="GET",
+            path=f"/v1/task-types/{name}",
             token=token,
-            trace_name="get-task-type",
-            callback=_callback,
         )
 
     registered.add("get_task_type")
@@ -346,29 +343,23 @@ def register_submit_tools(
         policy: dict[str, Any],
         token: str | None = None,
     ) -> dict[str, Any]:
-        def _callback(session: Session, authenticated) -> dict[str, Any]:
-            del session
-            if authenticated.actor.actor_type != "admin":
-                raise surface_error(403, "Admin actor required")
-            definition = task_type_registry.register(
-                name=name,
-                schema=schema,
-                policy=policy,
+        idempotency_key = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                json.dumps(
+                    {"name": name, "schema": schema, "policy": policy},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
             )
-            return {
-                "name": definition.name,
-                "schema": definition.schema,
-                "policy": definition.policy,
-                "schema_path": str(definition.schema_path),
-                "policy_path": str(definition.policy_path),
-            }
-
-        return run_session_tool(
-            session_factory,
+        )
+        return call_internal_api(
+            app,
+            method="PATCH",
+            path=f"/v1/task-types/{name}",
             token=token,
-            trace_name="update-task-type",
-            callback=_callback,
-            mutation=True,
+            headers={"Idempotency-Key": idempotency_key},
+            json_body={"schema": schema, "policy": policy},
         )
 
     registered.add("update_task_type")
