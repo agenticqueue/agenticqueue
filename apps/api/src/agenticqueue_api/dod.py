@@ -76,6 +76,11 @@ def resolve_contract_dod_items(task: TaskModel) -> tuple[ContractDodItem, ...]:
                 acceptance_threshold,
             ):
                 continue
+            assert dod_id is not None
+            assert statement is not None
+            assert verification_method is not None
+            assert evidence_required is not None
+            assert acceptance_threshold is not None
             structured_items.append(
                 ContractDodItem(
                     dod_id=dod_id,
