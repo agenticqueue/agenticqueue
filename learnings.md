@@ -1,5 +1,47 @@
 # AgenticQueue Learnings
 
+## 2026-04-23
+
+### AQ-294: Authenticated requests must not open a second ORM session
+
+```yaml
+title: "Authenticated request middleware must share the route's DB session"
+type: "repo-behavior"
+what_happened: "The REST hardening soak on main timed out `GET /v1/workspaces?limit=1` under the CI profile because bearer-authenticated requests opened one ORM session in auth middleware and a second session in the route dependency."
+what_learned: "Under load, that double-session pattern inflates pool usage above actor count and can turn a healthy read path into request-budget timeouts even when query latency looks normal."
+action_rule: "For authenticated API requests, create one request-scoped ORM session in middleware and reuse it from downstream dependencies instead of opening a second session per route."
+applies_when: "A middleware layer authenticates or annotates requests using database access before FastAPI dependencies run."
+does_not_apply_when: "The middleware is fully stateless or the downstream path never opens another ORM session."
+evidence:
+  - "`SOAK_CI_MODE=true uv run python scripts/audit_rest_hardening.py --output-json dist/rest-hardening-matrix.json --soak-output-json dist/rest-hardening-soak.json --soak-seconds 300 --actors 100 --rps-per-actor 10 --max-read-p99-ms 200` passed on 2026-04-23 after the session-sharing fix with `request_count=1180`, `sample_exceptions=[]`, `timed_out_actors=0`, `peak_checked_out=10`, and `p99_ms=207.77`."
+  - "GitHub Actions run `24870712151` on `93862a80b43ba9c53572f5e886da37f0a18ded4c` failed before the fix with 10 request-budget timeout exceptions on `/v1/workspaces?limit=1`."
+scope: "project"
+confidence: "validated"
+status: "active"
+owner: "codex"
+review_date: "2026-05-23"
+```
+
+### AQ-294: Shared auth sessions must rollback handled flush failures
+
+```yaml
+title: "Shared auth sessions must rollback before middleware closeout after handled write errors"
+type: "pitfall"
+what_happened: "The first AQ-294 fix-forward made the `test` workflow red because duplicate-create API paths now reused the auth session; when a route handled a `UniqueViolation` and returned a structured error, middleware still tried to `commit()` the session and raised `PendingRollbackError`."
+what_learned: "When middleware owns the request-scoped session, a handled flush failure can leave that session in partial-rollback state even though the HTTP response is already the correct structured 4xx."
+action_rule: "After `call_next`, middleware that owns the shared ORM session must check whether the session is still active; commit only on a healthy transaction and rollback otherwise."
+applies_when: "A request-scoped session is created in middleware and reused by handlers that may catch database write errors and convert them into API responses."
+does_not_apply_when: "The route dependency owns commit/rollback itself or the request path is read-only and never reaches a handled flush error."
+evidence:
+  - "`uv run pytest tests/entities/test_router_contract.py::test_duplicate_create_invalid_filter_invalid_value_invalid_payload_and_immutable_patch_are_structured -q` failed locally on `ac0812992547ff35236b892eb397bc006d252544` and passed after the rollback-on-inactive-session fix on 2026-04-23."
+  - "GitHub Actions run `24872146073` on `31caaf247d3f4bba7136a75f63f466de959f31ae` passed the full `test` workflow after the follow-up fix."
+scope: "project"
+confidence: "validated"
+status: "active"
+owner: "codex"
+review_date: "2026-05-23"
+```
+
 ## 2026-04-21
 
 ### AQ-137: Shared test DB modules must run sequentially
