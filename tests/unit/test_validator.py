@@ -8,7 +8,10 @@ from pathlib import Path
 from typing import Any
 
 from agenticqueue_api.config import get_task_types_dir
-from agenticqueue_api.schemas.submit import MAX_SUBMISSION_DEPTH
+from agenticqueue_api.schemas.submit import (
+    MAX_SUBMISSION_DEPTH,
+    validate_task_completion_submission,
+)
 from agenticqueue_api.models.task import TaskModel
 from agenticqueue_api.task_type_registry import TaskTypeRegistry
 from agenticqueue_api.validator import SubmissionValidator
@@ -24,12 +27,33 @@ def _example_contract() -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _structured_dod_items(contract: dict[str, Any]) -> list[dict[str, str]]:
+    verification_methods = ("test", "test", "code_inspection")
+    return [
+        {
+            "id": f"dod-{index + 1}",
+            "statement": item,
+            "verification_method": (
+                verification_methods[index]
+                if index < len(verification_methods)
+                else "artifact"
+            ),
+            "evidence_required": f"Evidence proving: {item}",
+            "acceptance_threshold": f"Proof for '{item}' is present and valid.",
+        }
+        for index, item in enumerate(contract["dod_checklist"])
+    ]
+
+
 def _make_task(
     *,
     task_type: str = "coding-task",
     declarative_dod: bool = False,
+    structured_dod: bool = False,
 ) -> TaskModel:
     contract = _example_contract()
+    if structured_dod:
+        contract["dod_items"] = _structured_dod_items(contract)
     if not declarative_dod:
         contract.pop("dod_checks", None)
     return TaskModel.model_validate(
@@ -72,8 +96,31 @@ def _make_submission(tmp_path: Path | None = None) -> dict[str, Any]:
     return {
         "output": output,
         "dod_results": [
-            {"item": contract["dod_checklist"][0], "checked": True},
-            {"item": contract["dod_checklist"][1], "checked": False},
+            {"item": item, "checked": True} for item in contract["dod_checklist"]
+        ],
+        "had_failure": False,
+        "had_block": False,
+        "had_retry": False,
+    }
+
+
+def _make_structured_submission() -> dict[str, Any]:
+    contract = _example_contract()
+    contract["dod_items"] = _structured_dod_items(contract)
+    output = copy.deepcopy(contract["output"])
+    evidence_uri = output["artifacts"][0]["uri"]
+    return {
+        "output": output,
+        "dod_results": [
+            {
+                "dod_id": item["id"],
+                "status": "passed",
+                "evidence": [evidence_uri],
+                "summary": item["statement"],
+                "failure_reason": None,
+                "next_action": None,
+            }
+            for item in contract["dod_items"]
         ],
         "had_failure": False,
         "had_block": False,
@@ -93,6 +140,103 @@ def test_validate_submission_accepts_valid_payload() -> None:
     assert result.is_valid is True
     assert result.errors == ()
     assert result.dod_report is None
+
+
+def test_validate_task_completion_submission_adapts_legacy_dod_results() -> None:
+    submission = _make_submission()
+    submission["dod_results"][1]["checked"] = False
+    normalized = validate_task_completion_submission(submission).model_dump(mode="json")
+
+    assert normalized["dod_results"] == [
+        {
+            "dod_id": _example_contract()["dod_checklist"][0],
+            "status": "passed",
+            "evidence": ["legacy-adapter://checked"],
+            "summary": "Legacy DoD item marked checked.",
+            "failure_reason": None,
+            "next_action": None,
+        },
+        {
+            "dod_id": _example_contract()["dod_checklist"][1],
+            "status": "failed",
+            "evidence": [],
+            "summary": "Legacy DoD item was left unchecked.",
+            "failure_reason": "Legacy DoD item was not checked in the submission.",
+            "next_action": "Provide proof for the DoD item or resubmit with the correct status.",
+        },
+        {
+            "dod_id": _example_contract()["dod_checklist"][2],
+            "status": "passed",
+            "evidence": ["legacy-adapter://checked"],
+            "summary": "Legacy DoD item marked checked.",
+            "failure_reason": None,
+            "next_action": None,
+        },
+    ]
+
+
+def test_validate_submission_accepts_structured_dod_results() -> None:
+    result = _validator().validate_submission(
+        _make_task(structured_dod=True),
+        _make_structured_submission(),
+    )
+
+    assert result.is_valid is True
+    assert result.errors == ()
+    assert result.dod_report is None
+
+
+def test_validate_submission_rejects_missing_structured_dod_result() -> None:
+    submission = _make_structured_submission()
+    submission["dod_results"] = submission["dod_results"][:-1]
+
+    result = _validator().validate_submission(
+        _make_task(structured_dod=True),
+        submission,
+    )
+
+    assert result.is_valid is False
+    assert [error.rule for error in result.errors] == ["dod_result_missing"]
+
+
+def test_validate_submission_rejects_unknown_structured_dod_id() -> None:
+    submission = _make_structured_submission()
+    submission["dod_results"][0]["dod_id"] = "dod-404"
+
+    result = _validator().validate_submission(
+        _make_task(structured_dod=True),
+        submission,
+    )
+
+    assert result.is_valid is False
+    assert [error.rule for error in result.errors] == ["dod_result_unknown_id"]
+
+
+def test_validate_submission_rejects_failed_structured_dod_without_reason() -> None:
+    submission = _make_structured_submission()
+    submission["dod_results"][0]["status"] = "failed"
+    submission["dod_results"][0]["failure_reason"] = None
+
+    result = _validator().validate_submission(
+        _make_task(structured_dod=True),
+        submission,
+    )
+
+    assert result.is_valid is False
+    assert [error.rule for error in result.errors] == ["dod_result_reason_required"]
+
+
+def test_validate_submission_rejects_passed_structured_dod_without_evidence() -> None:
+    submission = _make_structured_submission()
+    submission["dod_results"][0]["evidence"] = []
+
+    result = _validator().validate_submission(
+        _make_task(structured_dod=True),
+        submission,
+    )
+
+    assert result.is_valid is False
+    assert [error.rule for error in result.errors] == ["dod_result_evidence_required"]
 
 
 def test_validate_submission_returns_declarative_dod_report(tmp_path: Path) -> None:
@@ -184,7 +328,8 @@ def test_validate_submission_rejects_bad_dod_shapes() -> None:
     rules = {error.rule for error in result.errors}
     assert "submission.model_type" in rules
     assert "submission.string_too_short" in rules
-    assert "submission.bool_type" in rules
+    assert "submission.missing" in rules
+    assert "submission.extra_forbidden" in rules
 
 
 def test_validate_submission_rejects_missing_output_and_dod_results() -> None:
@@ -261,9 +406,7 @@ def test_validate_submission_rejects_overlong_strings_from_strict_schema() -> No
     assert [error.rule for error in result.errors] == ["submission.string_too_long"]
 
 
-def test_validate_submission_rejects_unknown_dod_items_and_requires_one_checked() -> (
-    None
-):
+def test_validate_submission_rejects_unknown_dod_ids() -> None:
     submission = _make_submission()
     submission["dod_results"] = [{"item": "Unknown DoD", "checked": False}]
 
@@ -271,8 +414,7 @@ def test_validate_submission_rejects_unknown_dod_items_and_requires_one_checked(
 
     assert result.is_valid is False
     rules = {error.rule for error in result.errors}
-    assert "dod_result_unknown_item" in rules
-    assert "dod_checked_required" in rules
+    assert "dod_result_unknown_id" in rules
 
 
 def test_validator_helper_maps_required_schema_errors() -> None:

@@ -47,6 +47,21 @@ def _example_contract() -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _structured_contract() -> dict[str, Any]:
+    contract = _example_contract()
+    contract["dod_items"] = [
+        {
+            "id": f"dod-{index + 1}",
+            "statement": item,
+            "verification_method": "test",
+            "evidence_required": f"Evidence proving: {item}",
+            "acceptance_threshold": f"Proof for '{item}' is present and valid.",
+        }
+        for index, item in enumerate(contract["dod_checklist"])
+    ]
+    return contract
+
+
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -69,6 +84,29 @@ def _valid_submission() -> dict[str, Any]:
         "output": copy.deepcopy(contract["output"]),
         "dod_results": [
             {"item": item, "checked": True} for item in contract["dod_checklist"]
+        ],
+        "had_failure": False,
+        "had_block": False,
+        "had_retry": False,
+    }
+
+
+def _structured_submission() -> dict[str, Any]:
+    contract = _structured_contract()
+    output = copy.deepcopy(contract["output"])
+    evidence_uri = output["artifacts"][0]["uri"]
+    return {
+        "output": output,
+        "dod_results": [
+            {
+                "dod_id": item["id"],
+                "status": "passed",
+                "evidence": [evidence_uri],
+                "summary": item["statement"],
+                "failure_reason": None,
+                "next_action": None,
+            }
+            for item in contract["dod_items"]
         ],
         "had_failure": False,
         "had_block": False,
@@ -277,6 +315,59 @@ def test_submit_route_persists_artifacts_and_replays_idempotently(
             "learning_draft_count": 1,
             "next_action": "await_human_approval",
         }
+
+
+def test_submit_route_persists_structured_dod_proof_payload(
+    tmp_path: Path,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _write_submission_artifacts(tmp_path)
+    contract = _structured_contract()
+    app = create_app(session_factory=session_factory, artifact_root=tmp_path)
+    _, _, task_id, token = _seed_task_with_token(
+        session_factory,
+        handle="submission-structured-dod",
+        grant_capabilities=(
+            CapabilityKey.RUN_TESTS,
+            CapabilityKey.CREATE_ARTIFACT,
+            CapabilityKey.UPDATE_TASK,
+        ),
+        task_state="in_progress",
+        claimed_by_seed_actor=True,
+        contract=contract,
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            f"/v1/tasks/{task_id}/submit",
+            headers=_headers(token),
+            json=_structured_submission(),
+        )
+
+    assert response.status_code == 200
+
+    with session_factory() as session:
+        run = session.scalar(
+            sa.select(RunRecord)
+            .where(RunRecord.task_id == task_id)
+            .order_by(RunRecord.created_at.desc(), RunRecord.id.desc())
+            .limit(1)
+        )
+
+        assert run is not None
+        assert isinstance(run.details, dict)
+        submission = cast(dict[str, Any], run.details["submission"])
+        assert submission["dod_results"] == [
+            {
+                "dod_id": item["id"],
+                "status": "passed",
+                "evidence": [contract["output"]["artifacts"][0]["uri"]],
+                "summary": item["statement"],
+                "failure_reason": None,
+                "next_action": None,
+            }
+            for item in contract["dod_items"]
+        ]
 
 
 def test_escrow_unlock_route_releases_claim_and_records_reason(

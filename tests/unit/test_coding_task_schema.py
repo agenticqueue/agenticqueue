@@ -51,6 +51,19 @@ def _example_contract() -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _structured_dod_items(contract: dict[str, Any]) -> list[dict[str, str]]:
+    return [
+        {
+            "id": f"dod-{index + 1}",
+            "statement": item,
+            "verification_method": "test",
+            "evidence_required": f"Evidence proving: {item}",
+            "acceptance_threshold": f"Proof for '{item}' is present and valid.",
+        }
+        for index, item in enumerate(contract["dod_checklist"])
+    ]
+
+
 def _seed_capabilities(engine: Engine) -> None:
     with engine.begin() as connection:
         connection.execute(
@@ -288,3 +301,26 @@ def test_coding_task_rejects_malformed_dod_checks_payload(
 
     with pytest.raises(ValidationError, match="is not of type 'array'"):
         registry.validate_contract("coding-task", invalid)
+
+
+def test_coding_task_accepts_structured_dod_items(
+    registry: TaskTypeRegistry,
+) -> None:
+    contract = _example_contract()
+    contract["dod_items"] = _structured_dod_items(contract)
+
+    registry.validate_contract("coding-task", contract)
+
+
+def test_coding_task_rejects_dod_items_missing_required_fields(
+    registry: TaskTypeRegistry,
+) -> None:
+    contract = _example_contract()
+    contract["dod_items"] = _structured_dod_items(contract)
+    contract["dod_items"][0].pop("acceptance_threshold")
+
+    with pytest.raises(
+        ValidationError,
+        match="'acceptance_threshold' is a required property",
+    ):
+        registry.validate_contract("coding-task", contract)

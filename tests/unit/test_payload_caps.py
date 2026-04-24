@@ -53,8 +53,12 @@ def _submission_payload() -> dict[str, Any]:
         },
         "dod_results": [
             {
-                "item": "Payload caps reject oversized request bodies.",
-                "checked": True,
+                "dod_id": "dod-1",
+                "status": "passed",
+                "evidence": ["artifacts/diffs/aq-176.patch"],
+                "summary": "Payload caps reject oversized request bodies.",
+                "failure_reason": None,
+                "next_action": None,
             }
         ],
         "had_failure": False,
