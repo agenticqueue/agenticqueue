@@ -34,8 +34,7 @@ def upgrade() -> None:
         unique=False,
         schema="agenticqueue",
     )
-    op.execute(
-        """
+    op.execute("""
         UPDATE agenticqueue.actor AS actor_row
         SET workspace_id = first_workspace.id
         FROM (
@@ -45,8 +44,7 @@ def upgrade() -> None:
             LIMIT 1
         ) AS first_workspace
         WHERE actor_row.workspace_id IS NULL
-        """
-    )
+        """)
 
 
 def downgrade() -> None:
