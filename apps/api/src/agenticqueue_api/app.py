@@ -21,10 +21,6 @@ from agenticqueue_api.audit import (
 )
 from agenticqueue_api.auth import (
     AgenticQueueAuthMiddleware,
-    get_api_token,
-    issue_api_token,
-    list_api_tokens_for_actor,
-    revoke_api_token,
     token_display_prefix,
 )
 from agenticqueue_api.capabilities import (
@@ -97,6 +93,7 @@ from agenticqueue_api.pagination import (
 )
 from agenticqueue_api.routers import (
     build_analytics_router,
+    build_auth_tokens_router,
     build_audit_router,
     build_decisions_router,
     build_graph_router,
@@ -726,103 +723,7 @@ def create_app(
             session.close()
 
     app.include_router(build_task_types_router(get_db_session))
-
-    @app.get("/v1/auth/tokens", response_model=ApiTokenListResponse)
-    def list_tokens(
-        request: Request,
-        response: Response,
-        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
-        cursor: str | None = Query(default=None),
-        session: Session = Depends(get_db_session),
-    ) -> ApiTokenListResponse:
-        actor = _require_actor(request)
-        tokens = list_api_tokens_for_actor(session, actor.id)
-        page = _paginate_sequence(
-            tokens,
-            response=response,
-            limit=limit,
-            cursor=cursor,
-            key_types=[str, str],
-            key_fn=lambda token: [token.created_at.isoformat(), str(token.id)],
-        )
-        return ApiTokenListResponse(
-            actor=_actor_summary(actor),
-            tokens=[_token_view(token) for token in page],
-        )
-
-    @app.post(
-        "/v1/auth/tokens",
-        response_model=ProvisionApiTokenResponse,
-        status_code=status.HTTP_201_CREATED,
-    )
-    def provision_token(
-        payload: ProvisionApiTokenRequest,
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> ProvisionApiTokenResponse:
-        with write_timeout(session, endpoint="v1.auth.tokens.provision"):
-            _require_admin_actor(request)
-            actor_exists = session.get(ActorRecord, payload.actor_id)
-            if actor_exists is None:
-                raise_api_error(status.HTTP_404_NOT_FOUND, "Actor not found")
-
-            api_token, raw_token = issue_api_token(
-                session,
-                actor_id=payload.actor_id,
-                scopes=payload.scopes,
-                expires_at=payload.expires_at,
-            )
-            return ProvisionApiTokenResponse(
-                token=raw_token,
-                api_token=_token_view(api_token),
-            )
-
-    @app.post(
-        "/v1/actors/me/rotate-key",
-        response_model=ProvisionApiTokenResponse,
-    )
-    def rotate_own_key_endpoint(
-        request: Request,
-        session: Session = Depends(get_db_session),
-        payload: RotateOwnKeyRequest | None = Body(default=None),
-    ) -> ProvisionApiTokenResponse:
-        with write_timeout(session, endpoint="v1.actors.me.rotate_key"):
-            actor = _require_actor(request)
-            current_api_token = _require_api_token(request)
-            revoke_api_token(session, current_api_token.id)
-            api_token, raw_token = issue_api_token(
-                session,
-                actor_id=actor.id,
-                scopes=(
-                    current_api_token.scopes
-                    if payload is None or payload.scopes is None
-                    else payload.scopes
-                ),
-                expires_at=None if payload is None else payload.expires_at,
-            )
-            return ProvisionApiTokenResponse(
-                token=raw_token,
-                api_token=_token_view(api_token),
-            )
-
-    @app.post("/v1/auth/tokens/{token_id}/revoke", response_model=ApiTokenView)
-    def revoke_token(
-        token_id: uuid.UUID,
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> ApiTokenView:
-        with write_timeout(session, endpoint="v1.auth.tokens.revoke"):
-            actor = _require_actor(request)
-            existing = get_api_token(session, token_id)
-            if existing is None:
-                raise_api_error(status.HTTP_404_NOT_FOUND, "Token not found")
-            if actor.actor_type != "admin" and existing.actor_id != actor.id:
-                raise_api_error(status.HTTP_404_NOT_FOUND, "Token not found")
-
-            revoked = revoke_api_token(session, token_id)
-            if revoked is None:
-                raise_api_error(status.HTTP_404_NOT_FOUND, "Token not found")
-            return _token_view(revoked)
+    app.include_router(build_auth_tokens_router(get_db_session))
 
     @app.post(
         "/v1/capabilities/grant",

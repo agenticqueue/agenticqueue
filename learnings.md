@@ -2,6 +2,26 @@
 
 ## 2026-04-24
 
+### AQ-264: Lazy router extraction needs module-global model rebinding
+
+```yaml
+title: "Lazily extracted FastAPI routers must rebind imported model classes into module globals"
+type: "tooling"
+what_happened: "AQ-264 moved the auth/token endpoints into `routers/auth_tokens.py` and initially referenced request/response models as `app_module.*` inside the builder. FastAPI accepted the route definitions, but request parsing and OpenAPI generation failed because Pydantic could not fully resolve those builder-local forward references."
+what_learned: "For builder-style router extraction in this repo, lazy imports from `agenticqueue_api.app` are safe only if the route model names are rebound into the router module's global namespace before defining the endpoints."
+action_rule: "When extracting FastAPI routes into a builder that lazily imports schema classes from another module, inject the imported classes into `globals()` before declaring the route functions so FastAPI and Pydantic can resolve annotations at runtime and during OpenAPI generation."
+applies_when: "A dedicated router module imports request or response models lazily from `agenticqueue_api.app` or another module at builder-call time."
+does_not_apply_when: "The router owns its schema classes directly or imports them normally at module import time without circular-import risk."
+evidence:
+  - "`uv run pytest tests/unit/test_auth.py tests/unit/test_auth_token_router_structure.py tests/api/test_surface_parity.py -q` failed on 2026-04-24 with a 422 on `/v1/auth/tokens` and a `PydanticUserError` for `app_module.RotateOwnKeyRequest | None` before the global rebinding fix."
+  - "The same pytest command and `uv run --with mypy mypy apps/api/src/agenticqueue_api/app.py apps/api/src/agenticqueue_api/routers/auth_tokens.py tests/unit/test_auth.py tests/unit/test_auth_token_router_structure.py` both passed on 2026-04-24 after rebinding the lazy-imported classes into `routers/auth_tokens.py` globals."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ### AQ-263: Alias regression tests for stateful POST routes need reset state
 
 ```yaml

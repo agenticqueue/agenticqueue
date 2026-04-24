@@ -358,6 +358,48 @@ def test_revoke_endpoint_marks_token_and_blocks_future_use(
     assert body["details"] is None
 
 
+def test_non_admin_cannot_revoke_another_actors_token(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    seed_actor(
+        session_factory,
+        make_actor_payload(
+            handle="revoke-owner",
+            actor_type="agent",
+            display_name="Revoke Owner",
+        ),
+    )
+    owner_id = actor_id_for("revoke-owner")
+    owner_token, _ = seed_token(
+        session_factory, actor_id=owner_id, scopes=["read:tokens"]
+    )
+
+    seed_actor(
+        session_factory,
+        make_actor_payload(
+            handle="revoke-target",
+            actor_type="agent",
+            display_name="Revoke Target",
+        ),
+    )
+    target_id = actor_id_for("revoke-target")
+    _, target_token_id = seed_token(
+        session_factory, actor_id=target_id, scopes=["read:tokens"]
+    )
+
+    response = client.post(
+        f"/v1/auth/tokens/{target_token_id}/revoke",
+        headers={
+            "Authorization": f"Bearer {owner_token}",
+            "Idempotency-Key": str(uuid.uuid4()),
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["message"] == "Token not found"
+
+
 def test_list_endpoint_returns_only_requesting_actor_tokens_without_raw_values(
     client: TestClient,
     session_factory: sessionmaker[Session],
