@@ -11,7 +11,7 @@ from jsonschema import ValidationError as JsonSchemaValidationError  # type: ign
 from jsonschema.validators import Draft202012Validator  # type: ignore[import-untyped]
 from pydantic import ValidationError as PydanticValidationError
 
-from agenticqueue_api.dod import DodReport, run_dod_checks
+from agenticqueue_api.dod import DodReport, resolve_contract_dod_items, run_dod_checks
 from agenticqueue_api.dod_checks.common import (
     DodCheckValidationError,
     DodItemState,
@@ -113,6 +113,8 @@ class SubmissionValidator:
                     hint="Add at least one learning when the task had a failure, block, or retry.",
                 )
             )
+        issues.extend(self._dod_issues(task, normalized_output.get("dod_results")))
+
         if "dod_checks" in task.contract:
             try:
                 dod_report = run_dod_checks(
@@ -133,8 +135,6 @@ class SubmissionValidator:
             else:
                 issues.extend(self._dod_report_issues(dod_report))
 
-        if "dod_checks" not in task.contract:
-            issues.extend(self._dod_issues(task, normalized_output.get("dod_results")))
         return ValidationResult(errors=tuple(issues), dod_report=dod_report)
 
     def _schema_issues(
@@ -169,31 +169,70 @@ class SubmissionValidator:
         task: TaskModel,
         dod_results: Any,
     ) -> list[ValidationIssue]:
-        expected_items = set(task.definition_of_done)
-        checked_any = False
+        expected_items = resolve_contract_dod_items(task)
+        if not expected_items:
+            return []
+
+        by_id = {item.dod_id: item for item in expected_items}
+        by_statement = {item.statement: item for item in expected_items}
         issues: list[ValidationIssue] = []
-        for index, result in enumerate(dod_results):
+        seen_ids: set[str] = set()
+        unknown_id_seen = False
+        for index, result in enumerate(dod_results or []):
             field_prefix = f"dod_results.{index}"
-            item = result.get("item")
-            checked = result.get("checked")
-            if expected_items and item not in expected_items:
+            dod_id = result.get("dod_id")
+            matched = by_id.get(dod_id) or by_statement.get(dod_id)
+            if matched is None:
+                unknown_id_seen = True
                 issues.append(
                     ValidationIssue(
-                        rule="dod_result_unknown_item",
-                        offending_field=f"{field_prefix}.item",
-                        hint="Reference one of the task's definition_of_done entries.",
+                        rule="dod_result_unknown_id",
+                        offending_field=f"{field_prefix}.dod_id",
+                        hint="Reference one of the task's structured DoD ids or compatibility statements.",
                     )
                 )
                 continue
-            if checked:
-                checked_any = True
 
-        if expected_items and not checked_any:
+            seen_ids.add(matched.dod_id)
+            status = result.get("status")
+            evidence = result.get("evidence")
+            failure_reason = result.get("failure_reason")
+            if status == "passed" and (
+                not isinstance(evidence, list) or len(evidence) == 0
+            ):
+                issues.append(
+                    ValidationIssue(
+                        rule="dod_result_evidence_required",
+                        offending_field=f"{field_prefix}.evidence",
+                        hint=f"Add at least one evidence pointer for '{matched.statement}'.",
+                    )
+                )
+            if status in {"failed", "blocked", "not_applicable"} and not (
+                isinstance(failure_reason, str) and failure_reason.strip()
+            ):
+                issues.append(
+                    ValidationIssue(
+                        rule="dod_result_reason_required",
+                        offending_field=f"{field_prefix}.failure_reason",
+                        hint=(
+                            f"Explain why '{matched.statement}' did not pass before completing the task."
+                        ),
+                    )
+                )
+
+        if not unknown_id_seen:
+            missing_items = [
+                item for item in expected_items if item.dod_id not in seen_ids
+            ]
+        else:
+            missing_items = []
+
+        for item in missing_items:
             issues.append(
                 ValidationIssue(
-                    rule="dod_checked_required",
+                    rule="dod_result_missing",
                     offending_field="dod_results",
-                    hint="Mark at least one DoD item as checked before submitting.",
+                    hint=f"Provide a terminal DoD result for '{item.statement}' ({item.dod_id}).",
                 )
             )
         return issues

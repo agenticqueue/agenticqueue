@@ -17,6 +17,29 @@
     "Missing task id returns 404.",
     "OpenAPI includes the route."
   ],
+  "dod_items": [
+    {
+      "id": "dod-1",
+      "statement": "GET /v1/tasks/{id} returns 200 with the task payload.",
+      "verification_method": "test",
+      "evidence_required": "Pytest output proving the endpoint returns the task payload.",
+      "acceptance_threshold": "The proof payload maps dod-1 to a passed result with at least one evidence pointer."
+    },
+    {
+      "id": "dod-2",
+      "statement": "Missing task id returns 404.",
+      "verification_method": "test",
+      "evidence_required": "Pytest output proving the missing-task path returns 404.",
+      "acceptance_threshold": "The proof payload maps dod-2 to a passed result with at least one evidence pointer."
+    },
+    {
+      "id": "dod-3",
+      "statement": "OpenAPI includes the route.",
+      "verification_method": "code_inspection",
+      "evidence_required": "A diff or schema artifact showing the OpenAPI route exists.",
+      "acceptance_threshold": "The proof payload maps dod-3 to a passed result with an artifact or code-inspection pointer."
+    }
+  ],
   "dod_checks": [
     {
       "item": "GET /v1/tasks/{id} returns 200 with the task payload.",

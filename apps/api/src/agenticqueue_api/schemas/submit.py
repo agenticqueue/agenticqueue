@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, Final, TypeAlias
+from typing import Annotated, Any, Final, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from pydantic import model_validator
@@ -65,11 +65,55 @@ class SubmitOutputModel(StrictSchemaModel):
     learnings: list[SubmitLearningModel] = Field(default_factory=list, max_length=16)
 
 
+SubmitDodStatus: TypeAlias = Literal[
+    "passed",
+    "failed",
+    "blocked",
+    "not_applicable",
+]
+
+
 class SubmitDodResultModel(StrictSchemaModel):
     """One submitted DoD checklist result."""
 
-    item: MediumText
-    checked: bool
+    dod_id: MediumText
+    status: SubmitDodStatus
+    evidence: list[PathText] = Field(max_length=16)
+    summary: MediumText
+    failure_reason: MediumText | None = None
+    next_action: MediumText | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_shape(cls, value: Any) -> Any:
+        if not isinstance(value, Mapping):
+            return value
+        if "dod_id" in value:
+            return value
+
+        item = value.get("item")
+        checked = value.get("checked")
+        if not isinstance(item, str) or not isinstance(checked, bool):
+            return value
+        if checked:
+            return {
+                "dod_id": item,
+                "status": "passed",
+                "evidence": ["legacy-adapter://checked"],
+                "summary": "Legacy DoD item marked checked.",
+                "failure_reason": None,
+                "next_action": None,
+            }
+        return {
+            "dod_id": item,
+            "status": "failed",
+            "evidence": [],
+            "summary": "Legacy DoD item was left unchecked.",
+            "failure_reason": "Legacy DoD item was not checked in the submission.",
+            "next_action": (
+                "Provide proof for the DoD item or resubmit with the correct status."
+            ),
+        }
 
 
 class TaskCompletionSubmission(StrictSchemaModel):

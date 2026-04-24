@@ -32,6 +32,18 @@ class DodChecklistResult:
 
 
 @dataclass(frozen=True)
+class ContractDodItem:
+    """Structured DoD proof metadata resolved for one task."""
+
+    dod_id: str
+    statement: str
+    verification_method: str
+    evidence_required: str
+    acceptance_threshold: str
+    is_legacy_adapter: bool = False
+
+
+@dataclass(frozen=True)
 class DodReport:
     """Structured report returned from a declarative DoD run."""
 
@@ -40,6 +52,64 @@ class DodReport:
     partial_count: int
     unchecked_blocked_count: int
     unchecked_unmet_count: int
+
+
+def resolve_contract_dod_items(task: TaskModel) -> tuple[ContractDodItem, ...]:
+    """Return the canonical DoD proof items for one task."""
+
+    raw_items = task.contract.get("dod_items")
+    if isinstance(raw_items, list):
+        structured_items: list[ContractDodItem] = []
+        for raw_item in raw_items:
+            if not isinstance(raw_item, Mapping):
+                continue
+            dod_id = _non_empty_text(raw_item.get("id"))
+            statement = _non_empty_text(raw_item.get("statement"))
+            verification_method = _non_empty_text(raw_item.get("verification_method"))
+            evidence_required = _non_empty_text(raw_item.get("evidence_required"))
+            acceptance_threshold = _non_empty_text(raw_item.get("acceptance_threshold"))
+            if None in (
+                dod_id,
+                statement,
+                verification_method,
+                evidence_required,
+                acceptance_threshold,
+            ):
+                continue
+            structured_items.append(
+                ContractDodItem(
+                    dod_id=dod_id,
+                    statement=statement,
+                    verification_method=verification_method,
+                    evidence_required=evidence_required,
+                    acceptance_threshold=acceptance_threshold,
+                )
+            )
+        if structured_items:
+            return tuple(structured_items)
+
+    statements = list(task.definition_of_done)
+    if not statements:
+        raw_checklist = task.contract.get("dod_checklist")
+        if isinstance(raw_checklist, list):
+            statements = [
+                statement
+                for raw_item in raw_checklist
+                if isinstance(raw_item, str) and raw_item.strip()
+                for statement in [raw_item.strip()]
+            ]
+
+    return tuple(
+        ContractDodItem(
+            dod_id=f"legacy-{index + 1}",
+            statement=statement,
+            verification_method="reviewer_check",
+            evidence_required="Compatibility proof supplied at submission time.",
+            acceptance_threshold="A terminal DoD result exists for this legacy item.",
+            is_legacy_adapter=True,
+        )
+        for index, statement in enumerate(statements)
+    )
 
 
 def run_dod_checks(
@@ -79,7 +149,7 @@ def run_dod_checks(
             seen_order.append(definition.item)
         grouped_results[definition.item].append(handler(definition, context))
 
-    ordered_items = list(task.definition_of_done)
+    ordered_items = [item.statement for item in resolve_contract_dod_items(task)]
     for item in seen_order:
         if item not in ordered_items:
             ordered_items.append(item)
@@ -123,3 +193,10 @@ def _aggregate_item(item: str, results: list[DodCheckResult]) -> DodChecklistRes
     summary = f"{checked}/{len(results)} checks passed"
     notes = "; ".join(result.note for result in results)
     return DodChecklistResult(item=item, state=state, note=f"{summary}. {notes}")
+
+
+def _non_empty_text(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped or None

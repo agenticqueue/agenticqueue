@@ -27,6 +27,43 @@
       },
       "additionalProperties": false
     },
+    "dodVerificationMethod": {
+      "enum": [
+        "test",
+        "command",
+        "code_inspection",
+        "artifact",
+        "reviewer_check"
+      ]
+    },
+    "dodItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "statement",
+        "verification_method",
+        "evidence_required",
+        "acceptance_threshold"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "statement": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "verification_method": {
+          "$ref": "#/$defs/dodVerificationMethod"
+        },
+        "evidence_required": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "acceptance_threshold": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      },
+      "additionalProperties": false
+    },
     "learning": {
       "type": "object",
       "required": [
@@ -150,9 +187,18 @@
       "contentMediaType": "text/markdown"
     },
     "dod_checklist": {
+      "description": "Compatibility projection of the human-readable DoD statements persisted to task.definition_of_done until the structured proof path fully takes over.",
       "type": "array",
       "items": {
         "$ref": "#/$defs/nonEmptyString"
+      },
+      "minItems": 1
+    },
+    "dod_items": {
+      "description": "Structured DoD proof items backing ADR-AQ-030. When present, these are the canonical proof records and dod_checklist remains the compatibility projection.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dodItem"
       },
       "minItems": 1
     },
