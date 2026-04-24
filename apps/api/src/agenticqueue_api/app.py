@@ -117,6 +117,7 @@ from agenticqueue_api.routers import (
     build_learnings_router,
     build_memory_router,
     build_packets_router,
+    build_task_types_router,
 )
 from agenticqueue_api.repo import claim_next, claim_task, create_edge, release_claim
 from agenticqueue_api.roles import (
@@ -901,112 +902,7 @@ def create_app(
         report = session.execute(query).mappings().one()
         return AuditVerifyResponse.model_validate(dict(report))
 
-    @app.get("/task-types", include_in_schema=False, response_model=list[TaskTypeView])
-    @app.get("/v1/task-types", response_model=list[TaskTypeView])
-    def list_task_types(
-        request: Request,
-        response: Response,
-        limit: int = Query(default=DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
-        cursor: str | None = Query(default=None),
-    ) -> list[TaskTypeView]:
-        _require_actor(request)
-        registry = get_task_type_registry(request)
-        definitions = sorted(registry.list(), key=lambda definition: definition.name)
-        page = _paginate_sequence(
-            definitions,
-            response=response,
-            limit=limit,
-            cursor=cursor,
-            key_types=[str],
-            key_fn=lambda definition: [definition.name],
-        )
-        return [_task_type_view(definition) for definition in page]
-
-    @app.post(
-        "/task-types",
-        include_in_schema=False,
-        response_model=TaskTypeView,
-        status_code=status.HTTP_201_CREATED,
-    )
-    @app.post(
-        "/v1/task-types",
-        response_model=TaskTypeView,
-        status_code=status.HTTP_201_CREATED,
-    )
-    def register_task_type(
-        payload: RegisterTaskTypeRequest,
-        request: Request,
-    ) -> TaskTypeView:
-        _require_admin_actor(request)
-        registry = get_task_type_registry(request)
-        try:
-            definition = registry.register(
-                name=payload.name,
-                schema=payload.schema_document,
-                policy=payload.policy,
-            )
-        except ValueError as error:
-            raise_api_error(status.HTTP_400_BAD_REQUEST, str(error))
-        return _task_type_view(definition)
-
-    @app.get(
-        "/task-types/{task_type_name}",
-        include_in_schema=False,
-        response_model=TaskTypeView,
-    )
-    @app.get("/v1/task-types/{task_type_name}", response_model=TaskTypeView)
-    def get_task_type_endpoint(
-        task_type_name: str,
-        request: Request,
-    ) -> TaskTypeView:
-        _require_actor(request)
-        registry = get_task_type_registry(request)
-        try:
-            definition = registry.get(task_type_name)
-        except ValueError:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "Task type not found")
-        return _task_type_view(definition)
-
-    _update_task_type_capability = require_capability(
-        CapabilityKey.UPDATE_TASK,
-        entity_type="task",
-    )
-
-    def _update_task_type_route_capability(
-        request: Request,
-        payload: dict[str, Any] | None = Body(default=None),
-        session: Session = Depends(get_db_session),
-    ) -> None:
-        _update_task_type_capability(
-            request=request,
-            session=session,
-            payload=payload,
-            entity_id=None,
-        )
-
-    _update_task_type_route_capability.__name__ = _update_task_type_capability.__name__
-
-    @app.patch(
-        "/v1/task-types/{task_type_name}",
-        response_model=TaskTypeView,
-        dependencies=[Depends(_update_task_type_route_capability)],
-    )
-    def update_task_type_endpoint(
-        task_type_name: str,
-        payload: UpdateTaskTypeRequest,
-        request: Request,
-    ) -> TaskTypeView:
-        _require_admin_actor(request)
-        registry = get_task_type_registry(request)
-        try:
-            definition = registry.register(
-                name=task_type_name,
-                schema=payload.schema_document,
-                policy=payload.policy,
-            )
-        except ValueError as error:
-            raise_api_error(status.HTTP_400_BAD_REQUEST, str(error))
-        return _task_type_view(definition)
+    app.include_router(build_task_types_router(get_db_session))
 
     @app.get("/v1/auth/tokens", response_model=ApiTokenListResponse)
     def list_tokens(
