@@ -23,6 +23,35 @@ model:
 - CLI `job` commands map to `/v1/tasks...`
 - `aq whoami` reads `/v1/auth/tokens` and emits the `actor` subpayload
 
+## Unified MCP listing
+
+The unified `AgenticQueue` MCP server only exposes the canonical public surface
+listed in this document.
+
+- Canonical MCP count: 62 tools.
+- `aq setup` / `POST /setup` is intentionally REST/CLI-only and does not have a
+  unified MCP tool.
+- The standalone learnings and memory helpers
+  (`get_relevant_learnings`, `submit_task_learning`, `search_memory`,
+  `sync_memory`, `memory_stats`) are not mounted into the unified server
+  because they are adapter-specific helpers, not part of the 1.0 public
+  transport contract.
+
+## MCP discoverability profiles
+
+The unified MCP `tools/list` response is profile-filtered. Discoverability is
+separate from authorization: visible tools still enforce the normal
+capability/token checks at execution time.
+
+- `worker`: 30 tools, default public listing
+- `reviewer`: 38 tools
+- `supervisor`: 45 tools
+- `admin`: 62 tools
+
+Workers do not see actor/capability mutation, task-type mutation, policy
+mutation, audit query, or first-run bootstrap operations in the unified MCP
+catalog.
+
 ## Operations
 
 Legend:
@@ -157,13 +186,15 @@ Legend:
 
 ## Coverage audit
 
-The table maps 48 canonical operations across the public surfaces. Small scope
-additions were still required when the table was first assembled, but no new
-transport families were introduced beyond CLI, REST, and MCP.
+The table maps 63 canonical transport operations across the public surfaces.
+There are 62 canonical MCP tools because first-run setup remains intentionally
+REST/CLI-only. No transport families were introduced beyond CLI, REST, and MCP.
 
 ## Counts
 
-- Total operations: 48
-- Mutations: 27
-- Reads: 21
-- Capability gates: `admin`, `supervisor`, `read`, `approve`, `write:*`
+- Total operations: 63
+- Mutations: 35
+- Reads: 28
+- Canonical MCP tools: 62
+- Unified MCP profile counts: `worker` 30, `reviewer` 38, `supervisor` 45, `admin` 62
+- Capability gates: `admin`, `supervisor`, `approve`, `read`, `write:decision`, `write:job`, `write:learning`, `write:pipeline`, `capability-matched`, `claimant`, `self`, `initial`
