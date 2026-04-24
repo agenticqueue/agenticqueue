@@ -43,9 +43,7 @@ def build_rbac_router(get_db_session: Any) -> APIRouter:
 
     from agenticqueue_api import app as app_module
 
-    globals()["ActorCapabilityListResponse"] = (
-        app_module.ActorCapabilityListResponse
-    )
+    globals()["ActorCapabilityListResponse"] = app_module.ActorCapabilityListResponse
     globals()["ActorRoleListResponse"] = app_module.ActorRoleListResponse
     globals()["AssignRoleRequest"] = app_module.AssignRoleRequest
     globals()["CapabilityGrantView"] = app_module.CapabilityGrantView
@@ -135,9 +133,7 @@ def build_rbac_router(get_db_session: Any) -> APIRouter:
             actor=app_module._actor_summary(
                 app_module.ActorModel.model_validate(target_actor)
             ),
-            capabilities=[
-                app_module._capability_grant_view(grant) for grant in page
-            ],
+            capabilities=[app_module._capability_grant_view(grant) for grant in page],
         )
 
     @router.get("/v1/roles", response_model=RoleListResponse)
