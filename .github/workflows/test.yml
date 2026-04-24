@@ -162,7 +162,12 @@ jobs:
 
       - name: Run firewall fuzz suite
         shell: bash
-        run: uv run pytest tests/security/firewall/ --cov-fail-under=100
+        run: |
+          set -euo pipefail
+          uv run pytest \
+            tests/security/firewall/ \
+            tests/unit/test_secret_redaction.py \
+            --cov-fail-under=100
 
       - name: Stop Postgres
         if: ${{ always() }}
