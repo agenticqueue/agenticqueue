@@ -45,6 +45,26 @@ owner: "codex"
 review_date: "2026-05-24"
 ```
 
+### AQ-298: pnpm verification needs explicit workspace metadata in this npm-root repo
+
+```yaml
+title: "Add pnpm workspace metadata before making pnpm gates authoritative"
+type: "tooling"
+what_happened: "`pnpm typecheck` initially failed because `pnpm` was not on the Windows PATH; Corepack could run pnpm, but pnpm warned that the repo's npm-style `workspaces` field is not enough without `pnpm-workspace.yaml`."
+what_learned: "When a DoD names a pnpm gate in this repo, Corepack may be the pnpm entrypoint and the repo still needs pnpm-native workspace metadata for clean output."
+action_rule: "If a frontend ticket introduces or relies on a pnpm verification gate, confirm pnpm through Corepack, keep `pnpm-workspace.yaml` in sync with npm workspaces, and run the final gate as `pnpm <script>` once the shim is enabled."
+applies_when: "A ticket requires `pnpm` verification in AgenticQueue's root workspace."
+does_not_apply_when: "The repo has switched fully to another package manager and the ticket's DoD names that manager instead."
+evidence:
+  - "`pnpm typecheck` first failed on 2026-04-24 with `The term 'pnpm' is not recognized`."
+  - "`corepack pnpm --version` returned `10.33.2`, and `pnpm typecheck` ran clean after enabling the shim and adding `pnpm-workspace.yaml`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ### AQ-297: SQL text call shapes must be stable under both ruff-format and Black
 
 ```yaml

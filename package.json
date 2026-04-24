@@ -9,6 +9,7 @@
     "dev": "npm --workspace @agenticqueue/web run dev",
     "build": "npm --workspace @agenticqueue/web run build",
     "lint": "npm --workspace @agenticqueue/web run lint",
+    "typecheck": "tsc -p apps/web/tsconfig.json --noEmit",
     "test:e2e": "playwright test"
   },
   "devDependencies": {

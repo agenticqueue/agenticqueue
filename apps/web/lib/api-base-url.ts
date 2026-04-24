@@ -6,7 +6,7 @@ export const DEPRECATED_API_BASE_URL_ENV_VARS = [
   "NEXT_PUBLIC_AGENTICQUEUE_API_BASE_URL",
 ] as const;
 
-type ApiBaseUrlEnv = NodeJS.ProcessEnv & {
+type ApiBaseUrlEnv = Record<string, string | undefined> & {
   AQ_API_BASE_URL?: string;
   AQ_API_URL?: string;
   AGENTICQUEUE_API_BASE_URL?: string;

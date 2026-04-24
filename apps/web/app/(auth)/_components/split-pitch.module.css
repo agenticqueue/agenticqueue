@@ -1,0 +1,136 @@
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.splitLeft {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 48px 56px;
+}
+
+.splitLeft::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+}
+
+.splitLeft > * {
+  position: relative;
+  z-index: 1;
+}
+
+.splitRight {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  background: var(--bg);
+  padding: 64px 56px;
+}
+
+.splitRightInner {
+  width: 100%;
+  max-width: 420px;
+}
+
+.pitchBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.brandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.brandName {
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.pitch h2 {
+  max-width: 20ch;
+  margin: 18px 0 14px;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.pitch p {
+  max-width: 32ch;
+  margin: 0;
+  color: rgba(250, 248, 244, 0.65);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.pitchFeats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 28px 0 0;
+  padding: 0;
+  color: rgba(250, 248, 244, 0.5);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  list-style: none;
+}
+
+.pitchFeats li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.dot {
+  color: var(--bg);
+}
+
+.pitchFoot {
+  color: rgba(250, 248, 244, 0.35);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 780px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  .splitLeft {
+    min-height: 360px;
+    padding: 36px 32px;
+  }
+
+  .splitRight {
+    padding: 36px 32px;
+  }
+}
