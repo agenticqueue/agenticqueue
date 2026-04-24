@@ -24,6 +24,46 @@ owner: "codex"
 review_date: "2026-05-24"
 ```
 
+### AQ-209: Auth pages outside a route group need their own scoped layout wrapper
+
+```yaml
+title: "Do not assume a URL belongs to the `(auth)` route group just because it is an auth page"
+type: "frontend-routing"
+what_happened: "AQ-209 required the concrete route file `apps/web/app/login/page.tsx`, but the shared auth fonts/tokens/grid from AQ-298 lived under `apps/web/app/(auth)/layout.tsx`, which route siblings do not inherit."
+what_learned: "Next.js route groups are filesystem-only layout boundaries. A URL like `/login` can share auth visuals only if the file lives under that route group or gets an explicit route-local wrapper that imports the same scoped CSS/fonts."
+action_rule: "When an auth ticket names a route outside `app/(auth)`, add a route-local layout that reuses the auth-scoped font variables and token/grid CSS, then test that the grid is present on the auth route and absent from shell routes like `/pipelines`."
+applies_when: "Implementing setup, login, password reset, or other auth surfaces in the Next app."
+does_not_apply_when: "The route file already lives under `app/(auth)` and inherits the auth layout directly."
+evidence:
+  - "`apps/web/app/login/layout.tsx` reuses the AQ-298 auth layout tokens/fonts for `/login` without touching the global app shell."
+  - "`npx playwright test apps/web/e2e/login.spec.ts --project=chromium` passed with a grid-scope assertion on `/login` and `/pipelines`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
+### AQ-209: DoD screenshots need explicit files, not only Playwright attachments
+
+```yaml
+title: "Write Playwright screenshots to deterministic files when Plane closeout needs artifacts"
+type: "verification"
+what_happened: "The first AQ-209 Playwright helper used `testInfo.attach()` with only an in-memory screenshot body. The list reporter completed green but did not leave durable PNG files in `test-results/` for Plane closeout evidence."
+what_learned: "A passing Playwright run may not preserve attachment bodies as browseable files unless the test also writes screenshots to an explicit path."
+action_rule: "When a ticket DoD asks for screenshots or attachable artifacts, save them under a deterministic ignored directory such as `test-results/<ticket>/` and attach that path to the Playwright test info."
+applies_when: "A frontend ticket requires screenshot, trace, video, or other visual artifacts as closeout evidence."
+does_not_apply_when: "The DoD only requires a pass/fail smoke result and no artifact URLs or files."
+evidence:
+  - "`apps/web/e2e/login.spec.ts` now writes `test-results/aq209/aq209-login-empty.png`, `aq209-login-error.png`, and `aq209-login-mid-submit.png`."
+  - "`npx playwright test apps/web/e2e/login.spec.ts --project=chromium` regenerated the three PNGs after the helper change."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ### AQ-297: Ticket-local pytest paths can collide with existing basenames
 
 ```yaml
