@@ -11,6 +11,7 @@ import { LearningsView } from "@/components/learnings-view";
 import { PipelinesView } from "@/components/pipelines-view";
 import { WorkView } from "@/components/work-view";
 import { DEFAULT_API_BASE_URL } from "@/lib/api-base-url";
+import { AQ_BUILD_VERSION } from "@/lib/build-version";
 
 type ViewKey =
   | "pipelines"
@@ -32,6 +33,26 @@ type SessionPayload = {
   actor: AuthActor;
   tokenCount: number;
   apiBaseUrl: string;
+};
+
+type FooterHealthTone = "ok" | "warn" | "danger";
+
+type FooterHealthLabel = "ok" | "degraded" | "unreachable";
+
+type FooterHealthState = {
+  label: FooterHealthLabel;
+  tone: FooterHealthTone;
+  detail: string | null;
+};
+
+type HealthResponsePayload = {
+  status?: string;
+  deps?: {
+    api?: {
+      status?: string;
+      http_status?: number;
+    };
+  };
 };
 
 type NavView = Exclude<ViewKey, "settings">;
@@ -60,6 +81,12 @@ type AgenticQueueWebAppProps = {
 
 const SESSION_TOKEN_KEY = "aq:web:api-token";
 const PERSIST_TOKEN_KEY = "aq:web:remember-token";
+const HEALTH_POLL_INTERVAL_MS = 30_000;
+const DEFAULT_FOOTER_HEALTH: FooterHealthState = {
+  label: "degraded",
+  tone: "warn",
+  detail: "api: checking",
+};
 
 const NAV_ITEMS = [
   { href: "/pipelines", label: "Pipelines", view: "pipelines" },
@@ -279,6 +306,8 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
   const [apiBaseUrl, setApiBaseUrl] = useState(DEFAULT_API_BASE_URL);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [navCounts, setNavCounts] = useState<NavCounts | null>(null);
+  const [footerHealth, setFooterHealth] =
+    useState<FooterHealthState>(DEFAULT_FOOTER_HEALTH);
 
   useEffect(() => {
     const token = getStoredToken();
@@ -418,6 +447,59 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
     };
   }, [authToken]);
 
+  useEffect(() => {
+    if (!actor) {
+      setFooterHealth(DEFAULT_FOOTER_HEALTH);
+      return;
+    }
+
+    let cancelled = false;
+    let activeController: AbortController | null = null;
+
+    async function loadFooterHealth() {
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+
+      try {
+        const response = await fetch("/api/health", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = (await response.json().catch(() => null)) as
+          | HealthResponsePayload
+          | null;
+
+        if (cancelled || controller.signal.aborted) {
+          return;
+        }
+
+        setFooterHealth(resolveFooterHealth(payload));
+      } catch {
+        if (cancelled || activeController?.signal.aborted) {
+          return;
+        }
+
+        setFooterHealth({
+          label: "unreachable",
+          tone: "danger",
+          detail: "api: unreachable",
+        });
+      }
+    }
+
+    void loadFooterHealth();
+    const interval = window.setInterval(() => {
+      void loadFooterHealth();
+    }, HEALTH_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      activeController?.abort();
+      window.clearInterval(interval);
+    };
+  }, [actor]);
+
   if (status !== "ready") {
     return (
       <main className="aq-auth-shell">
@@ -530,10 +612,10 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
 
       <footer className="aq-footer">
         <div className="aq-footer-health">
-          <span>api proxy ok</span>
+          <FooterHealthPill health={footerHealth} />
           <span>auth actor {actor.actor_type}</span>
           <span>target {apiBaseUrl.replace(/^https?:\/\//, "")}</span>
-          <span>build v0.1.0-alpha</span>
+          <span>build v{AQ_BUILD_VERSION}</span>
         </div>
         <Link className="aq-settings-link" href="/settings">
           Settings
@@ -665,6 +747,19 @@ export function PrimaryNav({
   );
 }
 
+export function FooterHealthPill({
+  health,
+}: {
+  health: FooterHealthState;
+}) {
+  return (
+    <>
+      <span className={`aq-tone aq-tone-${health.tone}`}>{health.label}</span>
+      {health.detail ? <span>{health.detail}</span> : null}
+    </>
+  );
+}
+
 async function validateToken(token: string): Promise<SessionPayload> {
   const response = await fetch("/api/session", {
     method: "POST",
@@ -737,4 +832,47 @@ function isNavCountsPayload(payload: unknown): payload is Required<NavCounts> {
 
   const record = payload as Record<string, unknown>;
   return NAV_ITEMS.every((item) => typeof record[item.view] === "number");
+}
+
+function resolveFooterHealth(
+  payload: HealthResponsePayload | null,
+): FooterHealthState {
+  const apiDependency = payload?.deps?.api;
+
+  if (apiDependency?.status === "unreachable") {
+    return {
+      label: "unreachable",
+      tone: "danger",
+      detail: "api: unreachable",
+    };
+  }
+
+  if (apiDependency?.status === "error") {
+    return {
+      label: "degraded",
+      tone: "warn",
+      detail:
+        typeof apiDependency.http_status === "number"
+          ? `api: error ${apiDependency.http_status}`
+          : "api: error",
+    };
+  }
+
+  if (payload?.status === "ok") {
+    return {
+      label: "ok",
+      tone: "ok",
+      detail: null,
+    };
+  }
+
+  if (payload?.status === "degraded" || apiDependency?.status === "degraded") {
+    return {
+      label: "degraded",
+      tone: "warn",
+      detail: "api: degraded",
+    };
+  }
+
+  return DEFAULT_FOOTER_HEALTH;
 }

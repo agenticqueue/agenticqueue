@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
+  FooterHealthPill,
   LoginScreen,
   PrimaryNav,
   type NavCounts,
@@ -55,5 +56,39 @@ describe("PrimaryNav", () => {
     expect(markup).toContain(">2<");
     expect(markup).toContain(">Learnings<");
     expect(markup).not.toContain(">0<");
+  });
+});
+
+describe("FooterHealthPill", () => {
+  it("renders an ok health state with the green tone class", () => {
+    const markup = renderToStaticMarkup(
+      createElement(FooterHealthPill, {
+        health: {
+          label: "ok",
+          tone: "ok",
+          detail: null,
+        },
+      }),
+    );
+
+    expect(markup).toContain("aq-tone aq-tone-ok");
+    expect(markup).toContain(">ok<");
+    expect(markup).not.toContain("api:");
+  });
+
+  it("renders degraded health with the amber tone class and dependency detail", () => {
+    const markup = renderToStaticMarkup(
+      createElement(FooterHealthPill, {
+        health: {
+          label: "degraded",
+          tone: "warn",
+          detail: "api: error 502",
+        },
+      }),
+    );
+
+    expect(markup).toContain("aq-tone aq-tone-warn");
+    expect(markup).toContain(">degraded<");
+    expect(markup).toContain(">api: error 502<");
   });
 });
