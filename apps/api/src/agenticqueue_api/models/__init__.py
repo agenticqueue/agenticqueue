@@ -30,6 +30,7 @@ from agenticqueue_api.models.role import (
 )
 from agenticqueue_api.models.run import RunModel, RunRecord
 from agenticqueue_api.models.task import TaskModel, TaskRecord
+from agenticqueue_api.models.user import UserModel, UserRecord
 from agenticqueue_api.models.workspace import WorkspaceModel, WorkspaceRecord
 
 __all__ = [
@@ -69,6 +70,8 @@ __all__ = [
     "RunRecord",
     "TaskModel",
     "TaskRecord",
+    "UserModel",
+    "UserRecord",
     "WorkspaceModel",
     "WorkspaceRecord",
 ]

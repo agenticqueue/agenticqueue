@@ -1,0 +1,218 @@
+"""Local email/password auth helpers for human users."""
+
+from __future__ import annotations
+
+import datetime as dt
+import hashlib
+import hmac
+import json
+import secrets
+import uuid
+from typing import Any
+
+import sqlalchemy as sa
+from sqlalchemy.orm import Session
+
+from agenticqueue_api.config import get_admin_email, get_admin_passcode
+from agenticqueue_api.models import ActorRecord, UserRecord
+
+SESSION_COOKIE_NAME = "aq_session"
+CSRF_COOKIE_NAME = "csrf-token"
+SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
+PASSWORD_HASH_SCHEME = "pbkdf2_sha256"
+PASSWORD_HASH_ITERATIONS = 200_000
+
+
+class AdminPasscodeMissingError(RuntimeError):
+    """Raised when admin seed is requested without an admin passcode."""
+
+
+def normalize_email(email: str) -> str:
+    """Normalize email identifiers before storage and comparison."""
+
+    return email.strip().lower()
+
+
+def hash_password(password: str) -> str:
+    """Hash a local user password/passcode with stdlib PBKDF2-SHA256."""
+
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        bytes.fromhex(salt),
+        PASSWORD_HASH_ITERATIONS,
+    )
+    return f"{PASSWORD_HASH_SCHEME}${PASSWORD_HASH_ITERATIONS}${salt}${digest.hex()}"
+
+
+def verify_password(password: str, encoded_hash: str) -> bool:
+    """Return whether a password matches a stored local user hash."""
+
+    try:
+        scheme, iterations_text, salt_hex, digest_hex = encoded_hash.split("$", 3)
+        iterations = int(iterations_text)
+    except ValueError:
+        return False
+    if scheme != PASSWORD_HASH_SCHEME or iterations < 1:
+        return False
+    try:
+        salt = bytes.fromhex(salt_hex)
+    except ValueError:
+        return False
+
+    actual = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        iterations,
+    ).hex()
+    return hmac.compare_digest(actual, digest_hex)
+
+
+def _hash_session_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def _write_auth_audit(
+    session: Session,
+    *,
+    action: str,
+    user_id: uuid.UUID | None = None,
+    actor_id: uuid.UUID | None = None,
+    ip_address: str | None = None,
+    details: dict[str, Any] | None = None,
+) -> None:
+    session.execute(
+        sa.text("""
+            INSERT INTO agenticqueue.auth_audit_log
+                (user_id, actor_id, action, ip_address, details)
+            VALUES
+                (:user_id, :actor_id, :action, :ip_address, CAST(:details AS jsonb))
+            """),
+        {
+            "user_id": user_id,
+            "actor_id": actor_id,
+            "action": action,
+            "ip_address": ip_address,
+            "details": json.dumps(details or {}),
+        },
+    )
+
+
+def ensure_admin_seed(session: Session) -> UserRecord:
+    """Seed the first local admin user from AQ_ADMIN_* env vars."""
+
+    existing_user = session.scalar(
+        sa.select(UserRecord).order_by(UserRecord.created_at.asc(), UserRecord.id.asc())
+    )
+    if existing_user is not None:
+        return existing_user
+
+    passcode = get_admin_passcode()
+    if passcode is None:
+        raise AdminPasscodeMissingError(
+            "AQ_ADMIN_PASSCODE is required before seeding the first local admin"
+        )
+
+    email = normalize_email(get_admin_email())
+    actor = session.scalar(sa.select(ActorRecord).where(ActorRecord.handle == "admin"))
+    if actor is None:
+        actor = ActorRecord(
+            handle="admin",
+            actor_type="admin",
+            display_name="Admin",
+            auth_subject=f"local:{email}",
+            is_active=True,
+        )
+        session.add(actor)
+        session.flush()
+
+    user = UserRecord(
+        email=email,
+        passcode_hash=hash_password(passcode),
+        actor_id=actor.id,
+        is_admin=True,
+        is_active=True,
+    )
+    session.add(user)
+    session.flush()
+    _write_auth_audit(
+        session,
+        action="ADMIN_SEEDED",
+        user_id=user.id,
+        details={"email": user.email},
+    )
+    return user
+
+
+def authenticate_email_password(
+    session: Session,
+    *,
+    email: str,
+    password: str,
+) -> UserRecord | None:
+    """Return an active local user if the supplied password is valid."""
+
+    user = session.scalar(
+        sa.select(UserRecord).where(
+            UserRecord.email == normalize_email(email),
+            UserRecord.is_active.is_(True),
+        )
+    )
+    if user is None:
+        return None
+    if not verify_password(password, user.passcode_hash):
+        return None
+    return user
+
+
+def create_browser_session(
+    session: Session,
+    *,
+    user: UserRecord,
+    ip_address: str | None,
+) -> tuple[str, str]:
+    """Create a local browser session and return raw session and CSRF tokens once."""
+
+    raw_session_token = secrets.token_urlsafe(48)
+    raw_csrf_token = secrets.token_urlsafe(32)
+    now = dt.datetime.now(dt.UTC)
+    expires_at = now + dt.timedelta(seconds=SESSION_MAX_AGE_SECONDS)
+    session.execute(
+        sa.text("""
+            INSERT INTO agenticqueue.auth_sessions
+                (
+                    user_id,
+                    session_token_hash,
+                    csrf_token_hash,
+                    expires_at,
+                    revoked_at,
+                    last_seen_at
+                )
+            VALUES
+                (
+                    :user_id,
+                    :session_token_hash,
+                    :csrf_token_hash,
+                    :expires_at,
+                    NULL,
+                    :last_seen_at
+                )
+            """),
+        {
+            "user_id": user.id,
+            "session_token_hash": _hash_session_token(raw_session_token),
+            "csrf_token_hash": _hash_session_token(raw_csrf_token),
+            "expires_at": expires_at,
+            "last_seen_at": now,
+        },
+    )
+    _write_auth_audit(
+        session,
+        action="LOGIN_SUCCEEDED",
+        user_id=user.id,
+        ip_address=ip_address,
+        details={"email": user.email},
+    )
+    return raw_session_token, raw_csrf_token

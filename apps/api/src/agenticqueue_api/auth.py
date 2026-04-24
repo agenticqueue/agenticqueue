@@ -30,6 +30,8 @@ TOKEN_HASH_PREFIX_LENGTH = 16
 TOKEN_SEPARATOR = "_"
 WWW_AUTHENTICATE_HEADER = {"WWW-Authenticate": "Bearer"}
 ANONYMOUS_PATHS = {
+    "/api/session",
+    "/api/healthz",
     "/health",
     "/healthz",
     "/setup",

@@ -54,6 +54,13 @@ from agenticqueue_api.init_wizard import (
     emit_bootstrap_message,
     run_first_run_setup,
 )
+from agenticqueue_api.local_auth import (
+    CSRF_COOKIE_NAME,
+    SESSION_COOKIE_NAME,
+    SESSION_MAX_AGE_SECONDS,
+    authenticate_email_password,
+    create_browser_session,
+)
 from agenticqueue_api.middleware import (
     ActorRateLimitMiddleware,
     ContentSizeLimitMiddleware,
@@ -286,6 +293,26 @@ class RotateOwnKeyRequest(SchemaModel):
 
     scopes: list[str] | None = None
     expires_at: dt.datetime | None = None
+
+
+class LocalSessionRequest(SchemaModel):
+    """Local email/password session creation payload."""
+
+    email: str = Field(min_length=3, max_length=320, pattern=r"^[^@\s]+@[^@\s]+$")
+    password: str = Field(min_length=1)
+
+
+class LocalSessionUser(SchemaModel):
+    """Local user fields returned after session creation."""
+
+    email: str
+    is_admin: bool
+
+
+class LocalSessionResponse(SchemaModel):
+    """Successful local browser session response."""
+
+    user: LocalSessionUser
 
 
 class TaskCommentRequest(SchemaModel):
@@ -525,6 +552,15 @@ def _require_token_scope(request: Request, required_scope: str) -> None:
     )
 
 
+def _client_ip(request: Request) -> str | None:
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+    if request.client is None:
+        return None
+    return request.client.host
+
+
 def _learning_promotion_capability_scope(
     request: Request,
     session: Session,
@@ -679,6 +715,55 @@ def create_app(
     app.include_router(build_operational_router(app, get_db_session))
     app.include_router(build_packets_router(get_db_session))
     app.include_router(build_crud_router(get_db_session))
+
+    @app.post("/api/session", response_model=LocalSessionResponse)
+    def create_local_session(
+        payload: LocalSessionRequest,
+        request: Request,
+        response: Response,
+        session: Session = Depends(get_db_session),
+    ) -> LocalSessionResponse:
+        user = authenticate_email_password(
+            session,
+            email=str(payload.email),
+            password=payload.password,
+        )
+        if user is None:
+            raise_api_error(
+                status.HTTP_401_UNAUTHORIZED,
+                "Invalid email or password",
+                error_code="auth_failed",
+            )
+
+        session_token, csrf_token = create_browser_session(
+            session,
+            user=user,
+            ip_address=_client_ip(request),
+        )
+        response.set_cookie(
+            SESSION_COOKIE_NAME,
+            session_token,
+            max_age=SESSION_MAX_AGE_SECONDS,
+            path="/",
+            secure=True,
+            httponly=True,
+            samesite="lax",
+        )
+        response.set_cookie(
+            CSRF_COOKIE_NAME,
+            csrf_token,
+            max_age=SESSION_MAX_AGE_SECONDS,
+            path="/",
+            secure=True,
+            httponly=False,
+            samesite="lax",
+        )
+        return LocalSessionResponse(
+            user=LocalSessionUser(
+                email=user.email,
+                is_admin=user.is_admin,
+            )
+        )
 
     @app.post(
         "/setup",

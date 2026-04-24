@@ -10,6 +10,7 @@ DEFAULT_DATABASE_URL = (
     "postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:64329/agenticqueue"
 )
 DEFAULT_TOKEN_SIGNING_SECRET = "agenticqueue-dev-token-signing-secret"
+DEFAULT_ADMIN_EMAIL = "admin@localhost"
 DEFAULT_AUTO_SETUP_ENABLED = False
 DEFAULT_EMBEDDING_DIMENSION = 768
 DEFAULT_VECTOR_IVFFLAT_LISTS = 100
@@ -159,6 +160,26 @@ def get_token_signing_secret() -> str:
         or os.getenv("TOKEN_SIGNING_SECRET")
         or DEFAULT_TOKEN_SIGNING_SECRET
     )
+
+
+def get_admin_email() -> str:
+    """Return the first local admin email identifier."""
+
+    configured = os.getenv("AQ_ADMIN_EMAIL") or os.getenv("AGENTICQUEUE_ADMIN_EMAIL")
+    if configured and configured.strip():
+        return configured.strip()
+    return DEFAULT_ADMIN_EMAIL
+
+
+def get_admin_passcode() -> str | None:
+    """Return the first local admin bootstrap passcode when configured."""
+
+    configured = os.getenv("AQ_ADMIN_PASSCODE") or os.getenv(
+        "AGENTICQUEUE_ADMIN_PASSCODE"
+    )
+    if configured and configured.strip():
+        return configured.strip()
+    return None
 
 
 def get_auto_setup_enabled() -> bool:

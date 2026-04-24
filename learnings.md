@@ -24,6 +24,27 @@ owner: "codex"
 review_date: "2026-05-24"
 ```
 
+### AQ-297: Ticket-local pytest paths can collide with existing basenames
+
+```yaml
+title: "DoD-specific test paths should not be added to global pytest discovery when basenames collide"
+type: "tooling"
+what_happened: "AQ-297 added required DoD tests at `apps/api/tests/test_auth.py` while the repo already had `tests/unit/test_auth.py`. Adding `apps/api/tests` to global `testpaths` produced an import-file mismatch under default pytest import mode; switching the whole repo to `--import-mode=importlib` avoided that mismatch but broke fixture discovery for existing suites."
+what_learned: "Ticket-specific DoD test locations can be correct without being safe to add to the repo-wide pytest collection. Global pytest import-mode changes are a high-blast-radius workaround because they can alter fixture and package resolution across unrelated tests."
+action_rule: "When a ticket mandates a test path outside the configured `testpaths`, run that path explicitly for DoD evidence; only add it to global discovery after checking for duplicate basenames and rerunning the full pytest collection without changing import mode."
+applies_when: "A new AgenticQueue test file is created outside `tests/`, especially with a basename already present under the main test tree."
+does_not_apply_when: "The new tests live under the existing `tests/` package with unique module names or the repo has already standardized on package-safe discovery for the extra path."
+evidence:
+  - "`uv run pytest --no-cov apps/api/tests/test_auth.py::test_session_rejects_username_field -q` first supplied the required AQ-297 red test evidence."
+  - "A global `testpaths = [\"tests\", \"apps/api/tests\"]` plus `--import-mode=importlib` made the focused duplicate-basename case pass but caused broader fixture-resolution failures; reverting the global pytest change restored the suite."
+  - "`uv run pytest --no-cov apps/api/tests/test_auth.py apps/api/tests/test_seed.py -q` and final `uv run pytest --no-cov -q` both passed on 2026-04-24 after keeping the DoD path explicit."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ### AQ-271: Tuple-style None guards do not narrow constructor arguments for mypy
 
 ```yaml

@@ -3,35 +3,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApiBaseUrl } from "@/lib/api-base-url";
 
 type AuthSessionResponse = {
-  actor: {
-    id: string;
-    handle: string;
-    actor_type: string;
-    display_name: string;
+  user: {
+    email: string;
+    is_admin: boolean;
   };
-  tokens: unknown[];
 };
 
 const API_BASE_URL = getApiBaseUrl();
 
 export async function POST(request: NextRequest) {
-  const body = (await request.json().catch(() => null)) as
-    | { token?: string }
-    | null;
+  const body = (await request.json().catch(() => null)) as unknown;
 
-  const token = body?.token?.trim();
-
-  if (!token) {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json(
-      { error: "API token is required." },
+      { error: "Session payload is required." },
       { status: 400 },
     );
   }
 
-  const upstream = await fetch(`${API_BASE_URL}/v1/auth/tokens`, {
+  const upstream = await fetch(`${API_BASE_URL}/api/session`, {
+    method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify(body),
     cache: "no-store",
   });
 
@@ -40,11 +35,11 @@ export async function POST(request: NextRequest) {
     | { message?: string }
     | null;
 
-  if (!upstream.ok || payload === null || !("actor" in payload)) {
+  if (!upstream.ok || payload === null || !("user" in payload)) {
     const message =
       payload && "message" in payload && typeof payload.message === "string"
         ? payload.message
-        : "Token validation failed.";
+        : "Session creation failed.";
 
     return NextResponse.json(
       { error: message, status: upstream.status },
@@ -52,9 +47,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({
-    actor: payload.actor,
-    tokenCount: payload.tokens.length,
+  const response = NextResponse.json({
+    user: payload.user,
     apiBaseUrl: API_BASE_URL,
   });
+  const setCookie = upstream.headers.get("set-cookie");
+  if (setCookie) {
+    response.headers.set("set-cookie", setCookie);
+  }
+  return response;
 }

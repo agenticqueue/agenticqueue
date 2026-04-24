@@ -104,6 +104,7 @@ def build_operational_router(app: FastAPI, get_db_session: Any) -> APIRouter:
     router = APIRouter()
 
     @router.get("/healthz")
+    @router.get("/api/healthz", include_in_schema=False)
     @router.get("/health", include_in_schema=False)
     @router.get("/v1/health", include_in_schema=False)
     def health() -> dict[str, str]:
