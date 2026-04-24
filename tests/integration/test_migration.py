@@ -18,6 +18,9 @@ ENTITY_TABLES = {
     "api_token",
     "actor",
     "artifact",
+    "auth_audit_log",
+    "auth_rate_limit",
+    "auth_sessions",
     "audit_log",
     "capability",
     "capability_grant",
@@ -29,17 +32,19 @@ ENTITY_TABLES = {
     "memory_item",
     "packet_version",
     "policy",
+    "project_members",
     "project",
     "role",
     "run",
     "task",
+    "users",
     "workspace",
 }
 PRE_CAPABILITY_GRANT_TABLES = ENTITY_TABLES - {"capability_grant"}
 EDGE_REVISION = "20260419_02"
 PRE_IDEMPOTENCY_TABLES = ENTITY_TABLES - {"idempotency_key"}
 PRE_LATEST_ENTITY_TABLES = ENTITY_TABLES
-PRE_LATEST_REVISION = "20260421_21"
+PRE_MERGE_REVISIONS = {"20260423_26", "20260423_27"}
 LEARNING_COLUMNS = {
     "action_rule",
     "applies_when",
@@ -76,6 +81,13 @@ def current_revision() -> str:
             row = cursor.fetchone()
     assert row is not None
     return row[0]
+
+
+def current_revisions() -> set[str]:
+    with psycopg.connect(get_sync_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT version_num FROM alembic_version")
+            return {row[0] for row in cursor.fetchall()}
 
 
 def assert_foundation_state(expected_revision: str) -> None:
@@ -425,9 +437,8 @@ def test_migration_reaches_head_with_extensions() -> None:
 
 def test_latest_migration_is_reversible() -> None:
     config = alembic_config()
-    downgrade(config, "-1")
-    assert current_revision() == PRE_LATEST_REVISION
-    assert_foundation_state(PRE_LATEST_REVISION)
+    downgrade(config, "20260423_27")
+    assert current_revisions() == PRE_MERGE_REVISIONS
     assert_entity_tables(PRE_LATEST_ENTITY_TABLES)
     assert_memory_item_indexes(expected_present=True)
     assert_learning_columns(LEARNING_COLUMNS_WITH_SEARCH)
