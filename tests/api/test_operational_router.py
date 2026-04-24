@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from fastapi.routing import APIRoute
+import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from agenticqueue_api.app import create_app
-from tests.entities import helpers as entity_helpers
+from agenticqueue_api.config import get_sqlalchemy_sync_database_url
 
 
 def _endpoint_module_by_path() -> dict[str, str]:
     session_factory: sessionmaker[Session] = sessionmaker(
-        bind=entity_helpers.engine,
+        bind=sa.create_engine(get_sqlalchemy_sync_database_url(), future=True),
         expire_on_commit=False,
     )
     app = create_app(session_factory=session_factory)
