@@ -35,7 +35,6 @@ from agenticqueue_api.capabilities import (
     revoke_capability_grant,
 )
 from agenticqueue_api.config import (
-    get_mcp_http_port,
     get_auto_setup_enabled,
     get_max_body_bytes,
     get_mcp_transports,
@@ -71,7 +70,6 @@ from agenticqueue_api.middleware import (
     REQUEST_ID_HEADER,
     SecretRedactionMiddleware,
 )
-from agenticqueue_api.middleware.idempotency import get_idempotency_stats
 from agenticqueue_api.learnings import (
     ConfirmLearningDraftRequest,
     ConfirmedDraftLearningView,
@@ -116,6 +114,7 @@ from agenticqueue_api.routers import (
     build_graph_router,
     build_learnings_router,
     build_memory_router,
+    build_operational_router,
     build_packets_router,
     build_task_types_router,
 )
@@ -277,14 +276,6 @@ class RevokeRoleRequest(SchemaModel):
     assignment_id: uuid.UUID
 
 
-class AuditVerifyResponse(SchemaModel):
-    """Verification result for the append-only audit ledger."""
-
-    chain_length: int
-    verified_count: int
-    first_break_id_or_null: uuid.UUID | None = None
-
-
 class TaskTypeView(SchemaModel):
     """Task type registry entry exposed over the API."""
 
@@ -347,43 +338,6 @@ class DecisionLinkRequest(SchemaModel):
 
     job_id: uuid.UUID
     relation: EdgeRelation = EdgeRelation.INFORMED_BY
-
-
-class IdempotencyStatsResponse(SchemaModel):
-    """Current idempotency cache counters."""
-
-    hit_count: int
-    row_count: int
-    expired_count: int
-    active_count: int
-
-
-class PacketCacheStatsResponse(SchemaModel):
-    """Current compiled-packet cache counters."""
-
-    enabled: bool
-    hits: int | None = None
-    misses: int | None = None
-    hit_rate: float | None = None
-    miss_reasons: dict[str, int] = Field(default_factory=dict)
-    invalidations: int | None = None
-    listener_error: str | None = None
-
-
-class McpStatsResponse(SchemaModel):
-    """Current MCP transport statistics."""
-
-    tool_count: int | None = None
-    transports: list[str] = Field(default_factory=list)
-    http_port: int | None = None
-
-
-class StatsResponse(SchemaModel):
-    """System stats exposed over the REST surface."""
-
-    idempotency: IdempotencyStatsResponse
-    packet_cache: PacketCacheStatsResponse
-    mcp: McpStatsResponse
 
 
 def _default_session_factory() -> sessionmaker[Session]:
@@ -539,27 +493,6 @@ def _task_audit(
             trace_id=session.info.get("agenticqueue_audit_trace_id"),
             redaction=session.info.get("agenticqueue_audit_redaction"),
         )
-    )
-
-
-def _packet_cache_stats_response(app: FastAPI) -> PacketCacheStatsResponse:
-    packet_cache = getattr(app.state, "packet_cache", None)
-    if packet_cache is None:
-        return PacketCacheStatsResponse(enabled=False)
-
-    stats = packet_cache.stats()
-    return PacketCacheStatsResponse(
-        enabled=True,
-        hits=stats.hits,
-        misses=stats.misses,
-        hit_rate=stats.hit_rate,
-        miss_reasons=stats.miss_reasons,
-        invalidations=stats.invalidations,
-        listener_error=(
-            None
-            if packet_cache.listener_error is None
-            else str(packet_cache.listener_error)
-        ),
     )
 
 
@@ -808,47 +741,9 @@ def create_app(
     app.include_router(build_graph_router(get_db_session))
     app.include_router(build_learnings_router(get_db_session))
     app.include_router(build_memory_router(get_db_session))
+    app.include_router(build_operational_router(app, get_db_session))
     app.include_router(build_packets_router(get_db_session))
     app.include_router(build_crud_router(get_db_session))
-
-    @app.get("/healthz")
-    @app.get("/health", include_in_schema=False)
-    @app.get("/v1/health", include_in_schema=False)
-    def health() -> dict[str, str]:
-        return {
-            "status": "ok",
-            "version": app.version,
-        }
-
-    @app.get("/stats", response_model=StatsResponse)
-    def stats(
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> StatsResponse:
-        _require_actor(request)
-        idempotency = get_idempotency_stats(session)
-        mcp_server = getattr(app.state, "mcp_server", None)
-        registered_tools = (
-            None
-            if mcp_server is None
-            else getattr(mcp_server, "agenticqueue_registered_tools", None)
-        )
-        return StatsResponse(
-            idempotency=IdempotencyStatsResponse(
-                hit_count=idempotency.hit_count,
-                row_count=idempotency.row_count,
-                expired_count=idempotency.expired_count,
-                active_count=idempotency.active_count,
-            ),
-            packet_cache=_packet_cache_stats_response(app),
-            mcp=McpStatsResponse(
-                tool_count=(
-                    None if registered_tools is None else len(registered_tools)
-                ),
-                transports=list(get_mcp_transports()),
-                http_port=get_mcp_http_port(),
-            ),
-        )
 
     @app.post(
         "/setup",
@@ -880,27 +775,6 @@ def create_app(
             raise
         finally:
             session.close()
-
-    @app.get(
-        "/audit/verify",
-        include_in_schema=False,
-        response_model=AuditVerifyResponse,
-    )
-    @app.get("/v1/audit/verify", response_model=AuditVerifyResponse)
-    def verify_audit_log_chain(
-        request: Request,
-        session: Session = Depends(get_db_session),
-    ) -> AuditVerifyResponse:
-        _require_admin_actor(request)
-        query = sa.text("""
-            SELECT
-              chain_length,
-              verified_count,
-              first_break_id_or_null
-            FROM agenticqueue.verify_audit_log_chain()
-            """)
-        report = session.execute(query).mappings().one()
-        return AuditVerifyResponse.model_validate(dict(report))
 
     app.include_router(build_task_types_router(get_db_session))
 
