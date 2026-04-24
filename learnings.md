@@ -165,3 +165,23 @@ status: "active"
 owner: "codex"
 review_date: "2026-05-21"
 ```
+
+### AQ-265: Verify API router tickets against a fresh migrated temp database when the shared local DB drifts
+
+```yaml
+title: "Fresh migrated temp databases are safer than the long-lived local dev DB for API verification"
+type: "tooling"
+what_happened: "The first AQ-265 verification run failed on `tests/api/test_roles.py` with an empty `/v1/roles` result because the shared local `agenticqueue` database had drifted to an invalid Alembic head (`20260423_26`) and no seeded `role` rows."
+what_learned: "A long-lived local verification database can silently diverge from `main`, so a focused API/router ticket can look broken when the actual issue is stale schema state rather than the code diff."
+action_rule: "If AgenticQueue API verification fails on missing seeded data or an invalid Alembic revision in the shared local DB, create a fresh temporary Postgres database, run `uv run alembic -c apps/api/alembic.ini upgrade head`, point `AGENTICQUEUE_DATABASE_URL` at that database, and rerun the required pytest command there."
+applies_when: "You are verifying FastAPI/API-route changes locally and the default `agenticqueue` database shows migration drift, missing seed rows, or other stale-schema symptoms."
+does_not_apply_when: "The shared local database is already at the current Alembic head and the failure reproduces on a freshly migrated database."
+evidence:
+  - "`uv run pytest tests/api/test_roles.py tests/unit/test_capability_crud.py tests/unit/test_capability_enforcement.py tests/api/test_surface_parity.py -q` failed on 2026-04-24 against the shared local DB with an empty `/v1/roles` response."
+  - "`uv run alembic -c apps/api/alembic.ini upgrade head` succeeded against temp database `aq_rbac_verify_1777024515`, and the same pytest command then passed (`71 passed`) with `AGENTICQUEUE_DATABASE_URL=postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:54329/aq_rbac_verify_1777024515?prepared_statement_cache_size=0`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
