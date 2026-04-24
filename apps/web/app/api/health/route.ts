@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { getApiBaseUrl } from "@/lib/api-base-url";
+import { AQ_BUILD_VERSION } from "@/lib/build-version";
 
 const API_BASE_URL = getApiBaseUrl();
-
-const WEB_VERSION = "0.1.0";
 
 export async function GET() {
   try {
@@ -19,7 +18,7 @@ export async function GET() {
       return NextResponse.json(
         {
           status: "degraded",
-          version: WEB_VERSION,
+          version: AQ_BUILD_VERSION,
           deps: {
             api: {
               status: "error",
@@ -36,15 +35,15 @@ export async function GET() {
       );
     }
 
+    const apiStatus =
+      payload && typeof payload.status === "string" ? payload.status : "ok";
+
     return NextResponse.json({
-      status: "ok",
-      version: WEB_VERSION,
+      status: apiStatus,
+      version: AQ_BUILD_VERSION,
       deps: {
         api: {
-          status:
-            payload && typeof payload.status === "string"
-              ? payload.status
-              : "ok",
+          status: apiStatus,
           url: API_BASE_URL,
           version:
             payload && typeof payload.version === "string"
@@ -57,7 +56,7 @@ export async function GET() {
     return NextResponse.json(
       {
         status: "degraded",
-        version: WEB_VERSION,
+        version: AQ_BUILD_VERSION,
         deps: {
           api: {
             status: "unreachable",
