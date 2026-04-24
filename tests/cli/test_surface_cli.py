@@ -8,6 +8,7 @@ from typing import Any
 from typer.testing import CliRunner
 
 from agenticqueue_cli.catalog import SURFACE_COMMANDS, VISIBLE_GROUPS
+from agenticqueue_cli.client import CliError
 from agenticqueue_cli.client import CliState, OutputFormat
 from agenticqueue_cli.main import app
 
@@ -222,3 +223,39 @@ def test_health_command_uses_live_http_server() -> None:
 
     assert result.exit_code == 0
     assert json.loads(result.stdout) == {"status": "ok"}
+
+
+def test_job_update_surfaces_lifecycle_patch_rejection() -> None:
+    class RejectingClient(FakeClient):
+        def request_json(self, **kwargs: Any) -> Any:  # type: ignore[override]
+            self.calls.append(kwargs)
+            raise CliError(
+                message="Lifecycle-owned task fields cannot be updated via generic patch",
+                exit_code=1,
+                payload={
+                    "status_code": 400,
+                    "response": {
+                        "message": "Lifecycle-owned task fields cannot be updated via generic patch",
+                        "details": {"fields": ["state"]},
+                    },
+                },
+            )
+
+    runner = CliRunner()
+    client = RejectingClient()
+
+    result = runner.invoke(
+        app,
+        ["job", "update", "job-123", "--body", '{"state":"claimed"}'],
+        obj=build_state(client),
+    )
+
+    assert result.exit_code == 1
+    assert client.calls[0]["method"] == "PATCH"
+    assert client.calls[0]["path"] == "/v1/tasks/job-123"
+    payload = json.loads(result.stdout)
+    assert payload["status_code"] == 400
+    assert payload["response"]["message"] == (
+        "Lifecycle-owned task fields cannot be updated via generic patch"
+    )
+    assert payload["response"]["details"]["fields"] == ["state"]

@@ -284,6 +284,51 @@ def test_task_action_parity_routes_claim_release_comment_and_reset(
     assert [row.action for row in audit_rows] == ["JOB_COMMENTED", "JOB_RESET"]
 
 
+def test_task_patch_allows_metadata_updates_but_rejects_lifecycle_fields(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor_id, _, task_id, token = _seed_task_with_token(
+        session_factory,
+        handle="surface-patch-agent",
+        grant_capabilities=(CapabilityKey.WRITE_BRANCH,),
+        token_scopes=("task:write",),
+    )
+
+    metadata_response = client.patch(
+        f"/v1/tasks/{task_id}",
+        headers=entity_helpers.auth_headers(token),
+        json={"title": "Metadata update still allowed"},
+    )
+    assert metadata_response.status_code == 200
+    assert metadata_response.json()["title"] == "Metadata update still allowed"
+
+    lifecycle_response = client.patch(
+        f"/v1/tasks/{task_id}",
+        headers=entity_helpers.auth_headers(token),
+        json={
+            "state": "claimed",
+            "claimed_by_actor_id": str(actor_id),
+            "claimed_at": "2026-04-23T12:00:00+00:00",
+        },
+    )
+    assert lifecycle_response.status_code == 400
+    assert lifecycle_response.json()["message"] == (
+        "Lifecycle-owned task fields cannot be updated via generic patch"
+    )
+    assert lifecycle_response.json()["details"] == {
+        "fields": ["claimed_at", "claimed_by_actor_id", "state"]
+    }
+
+    with session_factory() as session:
+        task = session.get(TaskRecord, task_id)
+        assert task is not None
+        assert task.title == "Metadata update still allowed"
+        assert task.state == "queued"
+        assert task.claimed_by_actor_id is None
+        assert task.claimed_at is None
+
+
 def test_graph_and_decision_helper_routes_work(
     client: TestClient,
     session_factory: sessionmaker[Session],

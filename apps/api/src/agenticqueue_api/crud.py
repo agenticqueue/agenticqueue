@@ -60,6 +60,7 @@ from agenticqueue_api.task_retry import with_retry_fields
 from agenticqueue_api.task_type_registry import SchemaLoadError, TaskTypeRegistry
 
 IMMUTABLE_FIELDS = frozenset({"id", "created_at", "updated_at"})
+LIFECYCLE_OWNED_TASK_FIELDS = frozenset({"state", "claimed_by_actor_id", "claimed_at"})
 SYSTEM_MANAGED_FIELDS_BY_RESOURCE = {
     "learnings": frozenset({"promotion_eligible"}),
     "tasks": frozenset(
@@ -475,6 +476,17 @@ def _validate_patch(
     existing: SchemaModel,
     patch: dict[str, Any],
 ) -> SchemaModel:
+    if config.resource_name == "tasks":
+        lifecycle_owned_fields = sorted(
+            LIFECYCLE_OWNED_TASK_FIELDS.intersection(patch.keys())
+        )
+        if lifecycle_owned_fields:
+            raise_api_error(
+                status.HTTP_400_BAD_REQUEST,
+                "Lifecycle-owned task fields cannot be updated via generic patch",
+                details={"fields": lifecycle_owned_fields},
+            )
+
     managed_fields = SYSTEM_MANAGED_FIELDS_BY_RESOURCE.get(
         config.resource_name, frozenset()
     )
