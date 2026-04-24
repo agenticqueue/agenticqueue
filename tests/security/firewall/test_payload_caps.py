@@ -42,7 +42,7 @@ def _submission_payload() -> dict[str, Any]:
                     "action_rule": "Validate completion envelopes with strict Pydantic models first.",
                     "applies_when": "Submission payloads feed task closeout or validator logic.",
                     "does_not_apply_when": "The route is read-only and carries no JSON body.",
-                    "evidence": ["tests/unit/test_payload_caps.py"],
+                    "evidence": ["tests/security/firewall/test_payload_caps.py"],
                     "scope": "project",
                     "confidence": "confirmed",
                     "status": "active",
