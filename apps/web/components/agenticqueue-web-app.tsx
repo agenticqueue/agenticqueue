@@ -33,6 +33,10 @@ type SessionPayload = {
   apiBaseUrl: string;
 };
 
+type NavView = Exclude<ViewKey, "settings">;
+
+export type NavCounts = Partial<Record<NavView, number>>;
+
 type ViewDefinition = {
   title: string;
   eyebrow: string;
@@ -57,12 +61,12 @@ const SESSION_TOKEN_KEY = "aq:web:api-token";
 const PERSIST_TOKEN_KEY = "aq:web:remember-token";
 
 const NAV_ITEMS = [
-  { href: "/pipelines", label: "Pipelines", count: "12", view: "pipelines" },
-  { href: "/work", label: "Work", count: "41", view: "work" },
-  { href: "/analytics", label: "Analytics", count: "6", view: "analytics" },
-  { href: "/graph", label: "Graph", count: "9", view: "graph" },
-  { href: "/decisions", label: "Decisions", count: "18", view: "decisions" },
-  { href: "/learnings", label: "Learnings", count: "47", view: "learnings" },
+  { href: "/pipelines", label: "Pipelines", view: "pipelines" },
+  { href: "/work", label: "Work", view: "work" },
+  { href: "/analytics", label: "Analytics", view: "analytics" },
+  { href: "/graph", label: "Graph", view: "graph" },
+  { href: "/decisions", label: "Decisions", view: "decisions" },
+  { href: "/learnings", label: "Learnings", view: "learnings" },
 ] as const;
 
 const VIEW_CONTENT: Record<ViewKey, ViewDefinition> = {
@@ -273,6 +277,7 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [apiBaseUrl, setApiBaseUrl] = useState("http://127.0.0.1:8010");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [navCounts, setNavCounts] = useState<NavCounts | null>(null);
 
   useEffect(() => {
     const token = getStoredToken();
@@ -308,6 +313,7 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
         clearStoredToken();
         setActor(null);
         setAuthToken(null);
+        setNavCounts(null);
         setStatus("ready");
         setErrorMessage(errorMessageFrom(error));
       });
@@ -332,6 +338,7 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
     } catch (error: unknown) {
       setActor(null);
       setAuthToken(null);
+      setNavCounts(null);
       setStatus("ready");
       setErrorMessage(errorMessageFrom(error));
     }
@@ -341,8 +348,74 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
     clearStoredToken();
     setActor(null);
     setAuthToken(null);
+    setNavCounts(null);
     setErrorMessage(null);
   }
+
+  useEffect(() => {
+    if (!authToken) {
+      setNavCounts(null);
+      return;
+    }
+
+    let cancelled = false;
+    let activeController: AbortController | null = null;
+
+    async function loadNavCounts() {
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+
+      try {
+        const response = await fetch("/api/v1/nav-counts", {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        const payload = (await response.json().catch(() => null)) as
+          | NavCounts
+          | { error?: string }
+          | null;
+
+        if (!response.ok || !isNavCountsPayload(payload)) {
+          throw new Error(
+            payload && "error" in payload && typeof payload.error === "string"
+              ? payload.error
+              : "Nav counts request failed.",
+          );
+        }
+
+        if (cancelled || controller.signal.aborted) {
+          return;
+        }
+
+        setNavCounts(payload);
+      } catch {
+        if (cancelled || controller.signal.aborted) {
+          return;
+        }
+
+        setNavCounts(null);
+      }
+    }
+
+    void loadNavCounts();
+
+    const handleFocus = () => {
+      void loadNavCounts();
+    };
+
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      cancelled = true;
+      activeController?.abort();
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [authToken]);
 
   if (status !== "ready") {
     return (
@@ -400,25 +473,7 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
         </div>
       </header>
 
-      <nav className="aq-nav" aria-label="Primary">
-        {NAV_ITEMS.map((item) => {
-          const isActive =
-            (item.href === "/pipelines" && pathname === "/") ||
-            pathname === item.href ||
-            pathname.startsWith(`${item.href}/`);
-
-          return (
-            <Link
-              key={item.href}
-              className={isActive ? "aq-nav-link is-active" : "aq-nav-link"}
-              href={item.href}
-            >
-              <span>{item.label}</span>
-              <span className="aq-nav-count">{item.count}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      <PrimaryNav counts={navCounts} pathname={pathname} />
 
       <section className="aq-content">
         {view === "pipelines" && authToken ? (
@@ -576,6 +631,39 @@ export function LoginScreen({ errorMessage, onLogin }: LoginScreenProps) {
   );
 }
 
+export function PrimaryNav({
+  counts,
+  pathname,
+}: {
+  counts: NavCounts | null;
+  pathname: string;
+}) {
+  return (
+    <nav className="aq-nav" aria-label="Primary">
+      {NAV_ITEMS.map((item) => {
+        const isActive =
+          (item.href === "/pipelines" && pathname === "/") ||
+          pathname === item.href ||
+          pathname.startsWith(`${item.href}/`);
+        const count = counts?.[item.view];
+
+        return (
+          <Link
+            key={item.href}
+            className={isActive ? "aq-nav-link is-active" : "aq-nav-link"}
+            href={item.href}
+          >
+            <span>{item.label}</span>
+            {typeof count === "number" ? (
+              <span className="aq-nav-count">{count}</span>
+            ) : null}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 async function validateToken(token: string): Promise<SessionPayload> {
   const response = await fetch("/api/session", {
     method: "POST",
@@ -639,4 +727,13 @@ function toneLabel(tone: "info" | "ok" | "warn") {
 
 function errorMessageFrom(error: unknown) {
   return error instanceof Error ? error.message : "Unexpected auth failure.";
+}
+
+function isNavCountsPayload(payload: unknown): payload is Required<NavCounts> {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+
+  const record = payload as Record<string, unknown>;
+  return NAV_ITEMS.every((item) => typeof record[item.view] === "number");
 }
