@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any, cast
 
 from fastapi import APIRouter, Body, Depends, Query, Request, Response, status
@@ -111,7 +111,7 @@ def _paginate_definitions(
     return page
 
 
-def build_task_types_router(get_db_session: Callable[..., Session]) -> APIRouter:
+def build_task_types_router(get_db_session: Any) -> APIRouter:
     """Build the dedicated task-type registry router."""
 
     router = APIRouter()

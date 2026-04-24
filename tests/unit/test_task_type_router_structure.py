@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from fastapi.routing import APIRoute
+
 from agenticqueue_api.routers.task_types import build_task_types_router
 
 
@@ -11,6 +13,7 @@ def test_task_type_routes_live_in_dedicated_router() -> None:
     route_specs = {
         (route.path, method)
         for route in router.routes
+        if isinstance(route, APIRoute)
         for method in route.methods or set()
         if method != "HEAD"
     }
