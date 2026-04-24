@@ -85,7 +85,11 @@ def requires_idempotency(request: Request) -> bool:
         return False
 
     path = request.url.path
-    if path in {"/v1/auth/login", "/v1/auth/logout"}:
+    if path in {
+        "/v1/auth/login",
+        "/v1/auth/logout",
+        "/v1/auth/reset-passcode",
+    }:
         return False
     if request.method == "DELETE" and path.startswith("/v1/auth/tokens/"):
         return False

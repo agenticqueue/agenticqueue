@@ -29,6 +29,7 @@ dependencies = [
 aq = "agenticqueue_cli.main:app"
 aq-local = "agenticqueue_api.cli:app"
 aq-mcp = "agenticqueue_cli.mcp:main"
+agenticqueue = "agenticqueue_api.cli:app"
 
 [build-system]
 requires = ["hatchling>=1.27.0"]

@@ -24,6 +24,11 @@ from agenticqueue_api.auth.local import (
     revoke_agent_token_audit,
     revoke_browser_session,
 )
+from agenticqueue_api.auth.reset import (
+    LastAdminResetRequiresForceError,
+    UnknownUserError,
+    reset_user_passcode,
+)
 from agenticqueue_api.errors import raise_api_error
 from agenticqueue_api.middleware.csrf import CSRF_COOKIE_NAME
 from agenticqueue_api.models import (
@@ -46,6 +51,22 @@ class LoginResponse(SchemaModel):
     """Successful local login response."""
 
     user: dict[str, Any]
+
+
+class ResetPasscodeRequest(SchemaModel):
+    """Admin passcode reset payload."""
+
+    username: str = Field(min_length=1, max_length=120)
+    force: bool = False
+
+
+class ResetPasscodeResponse(SchemaModel):
+    """One-time passcode reset response."""
+
+    username: str
+    user_id: uuid.UUID
+    passcode: str
+    sessions_deleted: int
 
 
 class ProjectMemberRequest(SchemaModel):
@@ -179,6 +200,32 @@ def build_auth_router(get_db_session: Any) -> APIRouter:
         response.delete_cookie(SESSION_COOKIE_NAME, path="/")
         response.delete_cookie(CSRF_COOKIE_NAME, path="/")
         return {"ok": True}
+
+    @router.post("/auth/reset-passcode", response_model=ResetPasscodeResponse)
+    def reset_passcode(
+        payload: ResetPasscodeRequest,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> ResetPasscodeResponse:
+        admin_user = _require_admin_user(request)
+        if admin_user.actor_id is None:
+            raise_api_error(
+                status.HTTP_403_FORBIDDEN,
+                "Admin actor link required",
+            )
+        try:
+            result = reset_user_passcode(
+                session,
+                username=payload.username,
+                actor_id=admin_user.actor_id,
+                method="api",
+                force=payload.force,
+            )
+        except UnknownUserError as error:
+            raise_api_error(status.HTTP_404_NOT_FOUND, str(error))
+        except LastAdminResetRequiresForceError as error:
+            raise_api_error(status.HTTP_409_CONFLICT, str(error))
+        return ResetPasscodeResponse(**result.to_public_dict())
 
     @router.get("/projects/mine", response_model=MyProjectsResponse)
     def list_my_projects(

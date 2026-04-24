@@ -14,6 +14,11 @@ from agenticqueue_cli.commands.memory import build_memory_app
 from agenticqueue_cli.commands.packet import register_packet_command
 from agenticqueue_cli.commands.roles import build_roles_app
 from agenticqueue_api.audit import set_session_audit_context
+from agenticqueue_api.auth.reset import (
+    LastAdminResetRequiresForceError,
+    UnknownUserError,
+    reset_user_passcode,
+)
 from agenticqueue_api.config import (
     get_psycopg_connect_args,
     get_sqlalchemy_sync_database_url,
@@ -85,6 +90,40 @@ def init_command() -> None:
         session.commit()
 
     typer.echo(json.dumps(result.model_dump(mode="json"), sort_keys=True))
+
+
+@app.command("reset-passcode")
+def reset_passcode_command(
+    username: str = typer.Option(
+        ...,
+        "--username",
+        help="Local username whose passcode should be reset.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Allow reset when the target is the last active admin.",
+    ),
+) -> None:
+    """Reset a local user's passcode and print the new value once."""
+
+    session_factory = _default_session_factory()
+    with session_factory() as session:
+        try:
+            result = reset_user_passcode(
+                session,
+                username=username,
+                actor_id=None,
+                method="cli",
+                force=force,
+            )
+        except (UnknownUserError, LastAdminResetRequiresForceError) as error:
+            session.rollback()
+            typer.echo(str(error), err=True)
+            raise typer.Exit(code=2) from error
+        session.commit()
+
+    typer.echo(json.dumps(result.to_public_dict(), sort_keys=True))
 
 
 @idempotency_app.command("stats")
