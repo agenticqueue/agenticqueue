@@ -2,6 +2,27 @@
 
 ## 2026-04-25
 
+### AQ-309: Run fixed-port Playwright grep checks serially
+
+```yaml
+title: "Do not parallelize Playwright commands that share fixed e2e ports"
+type: "testing"
+what_happened: "AQ-309 verification initially launched two focused Playwright grep commands at the same time. Both commands use the same configured Next and auth-api webServer ports, so one process hit an EADDRINUSE port conflict instead of exercising the setup warning behavior."
+what_learned: "Focused Playwright grep checks can still be suite-level integration commands when the Playwright config starts shared fixed-port servers. Running those commands in parallel creates environment failures that are not product regressions."
+action_rule: "When verifying AgenticQueue web e2e specs that use the shared Playwright webServer config, run separate `pnpm --filter web test:e2e --grep ...` commands serially unless each command has isolated ports."
+applies_when: "Running multiple focused Playwright commands locally or in CI against apps/web/playwright.config.ts with the default 3005/3127 server ports."
+does_not_apply_when: "A single Playwright invocation selects multiple tests with one worker pool, or the test run explicitly assigns separate server ports per process."
+evidence:
+  - "AQ-309 parallel verification produced an EADDRINUSE conflict on the shared e2e ports."
+  - "`pnpm --filter web test:e2e --grep setup-warning-non-blocking` passed when rerun by itself."
+  - "`pnpm --filter web test:e2e --grep setup-first-run-warning` passed when rerun by itself."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-324: Do not update token usage with a blocking per-request row write
 
 ```yaml
