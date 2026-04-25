@@ -20,9 +20,11 @@ from agenticqueue_api.models.shared import (
 class ApiTokenModel(TimestampedSchema):
     """Pydantic schema for an API token row."""
 
+    name: str
     token_hash: str
     actor_id: uuid.UUID
     scopes: list[str]
+    last_used_at: dt.datetime | None = None
     expires_at: dt.datetime | None = None
     revoked_at: dt.datetime | None = None
 
@@ -32,6 +34,7 @@ class ApiTokenRecord(IdentifiedTable, TimestampedTable, Base):
 
     __tablename__ = "api_token"
 
+    name: Mapped[str] = mapped_column(sa.String(120), nullable=False)
     token_hash: Mapped[str] = mapped_column(sa.String(64), nullable=False, unique=True)
     actor_id: Mapped[uuid.UUID] = mapped_column(
         sa.ForeignKey("agenticqueue.actor.id", ondelete="CASCADE"),
@@ -39,6 +42,10 @@ class ApiTokenRecord(IdentifiedTable, TimestampedTable, Base):
         index=True,
     )
     scopes: Mapped[list[str]] = jsonb_list_column()
+    last_used_at: Mapped[dt.datetime | None] = mapped_column(
+        sa.DateTime(timezone=True),
+        nullable=True,
+    )
     expires_at: Mapped[dt.datetime | None] = mapped_column(
         sa.DateTime(timezone=True),
         nullable=True,

@@ -78,7 +78,9 @@ class SeedToken(TimestampedSchema):
     """API token fixture loaded from examples/seed.yaml."""
 
     raw_secret: str
+    name: str = "seed"
     scopes: list[str] = Field(default_factory=list)
+    last_used_at: dt.datetime | None = None
     expires_at: dt.datetime | None = None
     revoked_at: dt.datetime | None = None
 
