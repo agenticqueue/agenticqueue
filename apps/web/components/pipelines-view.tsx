@@ -94,6 +94,11 @@ type JobLayout = {
   height: number;
 };
 
+type CachedPipelinesResponse = {
+  expiresAt: number;
+  payload: PipelinesResponse;
+};
+
 const TONE_ACCENT: Record<PipelineTone, string> = {
   ok: "var(--tone-ok-fg)",
   info: "var(--tone-info-fg)",
@@ -110,6 +115,10 @@ const JOB_ICON: Record<PipelineJobState, string> = {
   blocked: "⊘",
   done: "✓",
 };
+
+const PIPELINES_CACHE_TTL_MS = 10_000;
+const PIPELINES_CACHE_MAX_ENTRIES = 16;
+const pipelinesResponseCache = new Map<string, CachedPipelinesResponse>();
 
 export function PipelinesView({ authToken }: PipelinesViewProps) {
   const [loading, setLoading] = useState(true);
@@ -758,11 +767,16 @@ async function fetchPipelines(
   authToken: string,
   signal: AbortSignal,
 ) {
+  const cacheKey = `${state}:${authToken}`;
+  const cachedPayload = readCachedPipelines(cacheKey);
+  if (cachedPayload) {
+    return cachedPayload;
+  }
+
   const response = await fetch(`/api/v1/pipelines?state=${state}`, {
     headers: {
       Authorization: `Bearer ${authToken}`,
     },
-    cache: "no-store",
     signal,
   });
 
@@ -779,7 +793,40 @@ async function fetchPipelines(
     );
   }
 
+  writeCachedPipelines(cacheKey, payload);
   return payload;
+}
+
+function readCachedPipelines(cacheKey: string) {
+  const entry = pipelinesResponseCache.get(cacheKey);
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.expiresAt <= Date.now()) {
+    pipelinesResponseCache.delete(cacheKey);
+    return null;
+  }
+
+  pipelinesResponseCache.delete(cacheKey);
+  pipelinesResponseCache.set(cacheKey, entry);
+  return entry.payload;
+}
+
+function writeCachedPipelines(cacheKey: string, payload: PipelinesResponse) {
+  pipelinesResponseCache.delete(cacheKey);
+  pipelinesResponseCache.set(cacheKey, {
+    expiresAt: Date.now() + PIPELINES_CACHE_TTL_MS,
+    payload,
+  });
+
+  while (pipelinesResponseCache.size > PIPELINES_CACHE_MAX_ENTRIES) {
+    const oldestKey = pipelinesResponseCache.keys().next().value;
+    if (!oldestKey) {
+      return;
+    }
+    pipelinesResponseCache.delete(oldestKey);
+  }
 }
 
 function buildAttentionChips(pipeline: PipelineSummary) {

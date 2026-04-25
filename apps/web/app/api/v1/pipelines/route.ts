@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { NextRequest, NextResponse } from "next/server";
 
 import { getApiBaseUrl } from "@/lib/api-base-url";
@@ -5,6 +7,15 @@ import { getApiBaseUrl } from "@/lib/api-base-url";
 const API_BASE_URL = getApiBaseUrl();
 
 const PAGE_LIMIT = 200;
+const PIPELINES_CACHE_TTL_MS = 10_000;
+const PIPELINES_CACHE_MAX_ENTRIES = 64;
+const PIPELINES_CACHE_CONTROL =
+  "private, max-age=10, stale-while-revalidate=10";
+
+type PipelinesCacheEntry = {
+  expiresAt: number;
+  payload: PipelinesResponse;
+};
 
 type PipelineSectionState = "in_progress" | "done";
 type PipelineJobState =
@@ -154,6 +165,8 @@ class UpstreamError extends Error {
   }
 }
 
+const pipelinesCache = new Map<string, PipelinesCacheEntry>();
+
 export async function GET(request: NextRequest) {
   const requestedState = request.nextUrl.searchParams.get("state");
   if (requestedState !== "in_progress" && requestedState !== "done") {
@@ -172,6 +185,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const cacheKey = pipelineCacheKey(authorization, requestedState);
+    const cachedPayload = readCachedPipelines(cacheKey);
+    if (cachedPayload) {
+      return pipelinesJson(cachedPayload);
+    }
+
     const [projects, tasks, policies, edges] = await Promise.all([
       fetchAllPages<ProjectEntity>({
         path: "/v1/projects",
@@ -199,12 +218,15 @@ export async function GET(request: NextRequest) {
       (pipeline) => pipeline.state === requestedState,
     );
 
-    return NextResponse.json<PipelinesResponse>({
+    const payload: PipelinesResponse = {
       state: requestedState,
       count: pipelines.length,
       generated_at: new Date().toISOString(),
       pipelines,
-    });
+    };
+
+    writeCachedPipelines(cacheKey, payload);
+    return pipelinesJson(payload);
   } catch (error: unknown) {
     if (error instanceof UpstreamError) {
       return NextResponse.json(
@@ -223,6 +245,58 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+function pipelineCacheKey(
+  authorization: string,
+  requestedState: PipelineSectionState,
+) {
+  const tokenHash = createHash("sha256").update(authorization).digest("hex");
+  return `${requestedState}:${tokenHash}`;
+}
+
+function readCachedPipelines(cacheKey: string) {
+  const entry = pipelinesCache.get(cacheKey);
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.expiresAt <= Date.now()) {
+    pipelinesCache.delete(cacheKey);
+    return null;
+  }
+
+  // Refresh insertion order so the Map acts as a lightweight LRU.
+  pipelinesCache.delete(cacheKey);
+  pipelinesCache.set(cacheKey, entry);
+  return entry.payload;
+}
+
+function writeCachedPipelines(
+  cacheKey: string,
+  payload: PipelinesResponse,
+) {
+  pipelinesCache.delete(cacheKey);
+  pipelinesCache.set(cacheKey, {
+    expiresAt: Date.now() + PIPELINES_CACHE_TTL_MS,
+    payload,
+  });
+
+  while (pipelinesCache.size > PIPELINES_CACHE_MAX_ENTRIES) {
+    const oldestKey = pipelinesCache.keys().next().value;
+    if (!oldestKey) {
+      return;
+    }
+    pipelinesCache.delete(oldestKey);
+  }
+}
+
+function pipelinesJson(payload: PipelinesResponse) {
+  return NextResponse.json(payload, {
+    headers: {
+      "Cache-Control": PIPELINES_CACHE_CONTROL,
+    },
+  });
 }
 
 async function fetchAllPages<T>({
