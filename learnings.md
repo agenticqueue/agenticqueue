@@ -2,6 +2,26 @@
 
 ## 2026-04-25
 
+### AQ-310: Gate dev cache cleanup behind explicit dev mode
+
+```yaml
+title: "Bind-mounted Next dev caches need an explicit dev-only startup cleanup"
+type: "operational"
+what_happened: "After git pulls, the bind-mounted `apps/web/.next/` directory could keep stale webpack chunk references and make local dev routes return 500 until the directory was manually removed."
+what_learned: "A bind-mounted framework build cache is part of local runtime state, not source truth. Cleanup belongs in the dev startup path, but it needs an explicit dev-mode guard so production images and CI test runs keep their build artifacts."
+action_rule: "When adding cache cleanup for AgenticQueue local-dev containers, gate it with `AQ_DEV_MODE=1` plus `NODE_ENV=development`, preserve `node_modules`, and verify production runner images start without touching `.next`."
+applies_when: "Changing docker-compose override commands, Next.js dev startup, or any bind-mounted generated cache under `apps/web`."
+does_not_apply_when: "The image is a production runner, the path is not bind-mounted, or the cache belongs to an isolated CI test workspace."
+evidence:
+  - "`bash apps/web/scripts/test-cache-bust.sh` passed after the dev startup hook removed a planted `.next` sentinel and `GET /` returned 307."
+  - "Production restart check on `agenticqueue-web` kept `/app/apps/web/.next/build-manifest.json` mtime unchanged before and after restart."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-309: Run fixed-port Playwright grep checks serially
 
 ```yaml
