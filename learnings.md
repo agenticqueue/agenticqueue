@@ -2,6 +2,26 @@
 
 ## 2026-04-25
 
+### AQ-322: Do not assume uv exists in GitHub Playwright jobs
+
+```yaml
+title: "Playwright global setup should use the CI Python before falling back to uv"
+type: "tooling"
+what_happened: "AQ-311's first CI hotfix still failed in the GitHub `test (3.12, 22)` job because Playwright global setup spawned `uv run python`, but the smoke job had Python available without `uv` on PATH."
+what_learned: "The local developer toolchain is wider than the GitHub Playwright job environment. A global setup script can pass locally and still fail in CI if it assumes `uv` instead of the runner's active Python."
+action_rule: "For AgenticQueue Playwright global setup helpers that invoke Python, call `python` or `AQ_E2E_PYTHON` first and reserve `uv run python` as a local fallback; inside Python helpers, run Alembic with `sys.executable -m alembic` so child commands stay in the same interpreter."
+applies_when: "A Playwright setup or teardown script shells out to Python during GitHub Actions, especially in smoke tests or database preparation."
+does_not_apply_when: "`uv` is installed and intentionally provisioned as part of the specific CI job contract, or the helper is not run by GitHub Actions."
+evidence:
+  - "GitHub Actions test run `24940295234` failed with `e2e test DB setup failed with exit null` in `Run Playwright smoke suite` after AQ-311."
+  - "GitHub Actions test run `24940641133` passed on commit `b1847aa` after global setup tried Python first and the DB helper ran Alembic through `sys.executable`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-311: Run Playwright e2e against a disposable database
 
 ```yaml
