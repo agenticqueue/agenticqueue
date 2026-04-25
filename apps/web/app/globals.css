@@ -1851,6 +1851,12 @@ input {
     flex-direction: column;
   }
 
+  .aq-analytics-hero,
+  .aq-analytics-grid,
+  .aq-analytics-actor-strip {
+    grid-template-columns: 1fr;
+  }
+
   .aq-section-right,
   .aq-pipe-chips {
     justify-content: flex-start;

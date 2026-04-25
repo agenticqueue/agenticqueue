@@ -1,5 +1,27 @@
 # AgenticQueue Learnings
 
+## 2026-04-25
+
+### AQ-295: Grid-based mobile layouts need explicit track overrides
+
+```yaml
+title: "Grid layouts need explicit mobile track overrides"
+type: "pitfall"
+what_happened: "AQ-295 traced the analytics overflow at `375x667` to `.aq-analytics-hero`, `.aq-analytics-grid`, and `.aq-analytics-actor-strip` staying multi-column on phones. The mobile breakpoint already set `flex-direction: column`, but those containers use `display: grid`, so the rule never changed their track layout."
+what_learned: "When a responsive shell section is built with CSS grid, mobile stacking requires an explicit `grid-template-columns` override; flexbox-only breakpoint rules do not collapse grid tracks."
+action_rule: "If an AgenticQueue Phase 7 view uses grid-based KPI or panel rows that should stack on phones, add a mobile `grid-template-columns: 1fr` override and verify it with the responsive Playwright audit for that view."
+applies_when: "A web shell section uses CSS grid for KPI cards, analytics panels, or similar dashboard rows that should become single-column at narrow breakpoints."
+does_not_apply_when: "The container already changes its display mode at the breakpoint or the design intentionally preserves multiple tracks on small screens."
+evidence:
+  - "`npx playwright test apps/web/e2e/responsive-audit.spec.ts` failed before the fix with analytics `overflowX: true` at `iphone-se` and passed after the mobile grid override."
+  - "`apps/web/app/globals.css` now sets `grid-template-columns: 1fr` for `.aq-analytics-hero`, `.aq-analytics-grid`, and `.aq-analytics-actor-strip` inside the mobile media query."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ## 2026-04-24
 
 ### AQ-304: Compose smoke should follow auth-entry redirects instead of changing bootstrap semantics

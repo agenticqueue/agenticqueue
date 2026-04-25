@@ -329,10 +329,25 @@ test("captures the responsive baseline for every shell view", async ({ page }) =
       result.consoleErrors.length > 0 ||
       result.pageErrors.length > 0,
   );
+  const analyticsOverflowFailures = results
+    .filter((result) => result.view === "analytics" && result.overflowX)
+    .map((result) => ({
+      breakpoint: result.breakpoint,
+      viewport: result.viewport,
+      rightOverflowSelectors: result.rightOverflowSelectors,
+    }));
 
   expect(
     failures,
     `responsive audit hit console/page errors: ${JSON.stringify(failures, null, 2)}`,
+  ).toEqual([]);
+  expect(
+    analyticsOverflowFailures,
+    `analytics should not overflow horizontally at audited breakpoints: ${JSON.stringify(
+      analyticsOverflowFailures,
+      null,
+      2,
+    )}`,
   ).toEqual([]);
 });
 
