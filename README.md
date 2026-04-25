@@ -15,6 +15,12 @@ docker compose up -d db pgbouncer
 uv run alembic -c apps/api/alembic.ini upgrade head
 ```
 
+## First-run security
+
+AgenticQueue uses the standard first-user-wins bootstrap pattern. Complete
+`/setup` from a trusted network before exposing the URL publicly; the first
+successful setup creates the admin account and locks the bootstrap flow.
+
 Phase 1 starts with a minimal Postgres + PgBouncer foundation in `apps/api/`.
 The pooler runs in transaction mode, so psycopg paths disable prepared
 statements via `prepare_threshold=None` and asyncpg paths use
