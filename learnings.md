@@ -22,6 +22,26 @@ owner: "codex"
 review_date: "2026-05-25"
 ```
 
+### AQ-308: Expand Windows path globs before ripgrep evidence
+
+```yaml
+title: "Ripgrep DoD commands with path globs need explicit expansion on Windows"
+type: "tooling"
+what_happened: "The AQ-308 DoD grep commands using `docker-compose*.yml` and `ADR-AQ-026*` failed on Windows with os error 123 before content matching ran."
+what_learned: "PowerShell did not expand those native-command path globs in this environment, so the literal glob reached ripgrep as an invalid Windows path."
+action_rule: "When a ticket supplies ripgrep evidence commands with path globs, run the exact command if the shell expands it; on Windows, expand the path list first and record the equivalent command plus the shell limitation."
+applies_when: "A DoD command passes wildcard path operands to `rg` from PowerShell on Windows."
+does_not_apply_when: "The same command runs under a shell that expands path globs before invoking `rg`, or the command uses `--glob` filters instead of wildcard path operands."
+evidence:
+  - "`rg -n 'AQ_ADMIN_PASSCODE' apps/ docker-compose*.yml .env.example --glob '!*.next/**'` failed with os error 123 for literal `docker-compose*.yml` on 2026-04-25."
+  - "Expanded equivalent returned `NO_MATCHES` against `apps/`, `.env.example`, `docker-compose.yml`, and `docker-compose.override.yml`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-276: Keep temporary source-guard tests out of the Next app tree
 
 ```yaml

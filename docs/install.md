@@ -21,9 +21,6 @@ uv sync --frozen
 docker compose up -d
 ```
 
-Before first boot, set `AQ_ADMIN_PASSCODE` in `.env`. The setup page uses that
-passcode to claim the first local owner account.
-
 The compose stack defaults to:
 
 - API: `http://127.0.0.1:8000`
@@ -44,7 +41,6 @@ Open the web UI at `http://127.0.0.1:3000` and follow the first-run setup flow.
 The setup form asks for:
 
 - email
-- `AQ_ADMIN_PASSCODE`
 - password
 - password confirmation
 
@@ -76,7 +72,7 @@ once the API is healthy:
 BOOTSTRAP_JSON="$(
   curl -fsS http://127.0.0.1:8000/api/auth/bootstrap_admin \
     -H 'Content-Type: application/json' \
-    -d '{"email":"admin@localhost","passcode":"'"$AQ_ADMIN_PASSCODE"'","password":"CorrectHorse12!"}'
+    -d '{"email":"admin@localhost","password":"CorrectHorse12!"}'
 )"
 export AGENTICQUEUE_TOKEN="$(
   printf '%s' "$BOOTSTRAP_JSON" \

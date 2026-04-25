@@ -11,7 +11,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_MIN_LENGTH = 12;
 const STRENGTH_LABELS = ["", "Weak", "Fair", "Good", "Strong"] as const;
 
-type FieldKey = "email" | "passcode" | "password" | "confirm";
+type FieldKey = "email" | "password" | "confirm";
 type FieldErrors = Partial<Record<FieldKey, string>>;
 
 type BootstrapStatusResponse = {
@@ -50,16 +50,12 @@ function scorePassword(value: string) {
 
 function validateSetupForm({
   email,
-  passcode,
   password,
   confirm,
 }: Record<FieldKey, string>) {
   const nextErrors: FieldErrors = {};
   if (!EMAIL_RE.test(email)) {
     nextErrors.email = "Enter a valid email address.";
-  }
-  if (!passcode.trim()) {
-    nextErrors.passcode = "Enter the bootstrap passcode.";
   }
   if (password.length < PASSWORD_MIN_LENGTH) {
     nextErrors.password = "Password must be at least 12 characters.";
@@ -81,7 +77,6 @@ function readErrorDetails(payload: ApiErrorPayload | null) {
 function isFieldKey(value: unknown): value is FieldKey {
   return (
     value === "email" ||
-    value === "passcode" ||
     value === "password" ||
     value === "confirm"
   );
@@ -269,7 +264,6 @@ export default function SetupPage() {
   const router = useRouter();
   const [status, setStatus] = useState<"checking" | "ready">("checking");
   const [email, setEmail] = useState("");
-  const [passcode, setPasscode] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -310,8 +304,8 @@ export default function SetupPage() {
   }, [router]);
 
   const formValues = useMemo(
-    () => ({ email, passcode, password, confirm }),
-    [confirm, email, passcode, password],
+    () => ({ email, password, confirm }),
+    [confirm, email, password],
   );
 
   const clearFieldError = (field: FieldKey) => {
@@ -336,7 +330,6 @@ export default function SetupPage() {
         },
         body: JSON.stringify({
           email,
-          passcode,
           password,
         }),
       });
@@ -363,10 +356,10 @@ export default function SetupPage() {
 
       const errorPayload = payload as ApiErrorPayload | null;
       if (response.status === 401) {
-        setErrors({ passcode: "Bootstrap passcode is incorrect." });
+        setFormError("Setup could not authenticate this request.");
         return;
       }
-      if (response.status === 404) {
+      if (response.status === 404 || response.status === 409) {
         setFormError("Setup has already been completed. Sign in instead.");
         return;
       }
@@ -383,7 +376,7 @@ export default function SetupPage() {
         return;
       }
       if (response.status === 503) {
-        setFormError("AQ_ADMIN_PASSCODE is not configured on the server.");
+        setFormError("Setup is not available on the server.");
         return;
       }
 
@@ -445,32 +438,6 @@ export default function SetupPage() {
                 spellCheck="false"
                 type="email"
                 value={email}
-              />
-            </Field>
-
-            <Field
-              error={errors.passcode}
-              hint="required"
-              id="setup-passcode"
-              label="AQ_ADMIN_PASSCODE"
-              note="Use the bootstrap passcode configured in the API environment."
-            >
-              <input
-                aria-describedby={
-                  errors.passcode ? "setup-passcode-error" : undefined
-                }
-                aria-invalid={Boolean(errors.passcode)}
-                autoCapitalize="off"
-                autoComplete="off"
-                id="setup-passcode"
-                onChange={(event) => {
-                  setPasscode(event.target.value);
-                  clearFieldError("passcode");
-                }}
-                placeholder="local bootstrap passcode"
-                spellCheck="false"
-                type="password"
-                value={passcode}
               />
             </Field>
 
