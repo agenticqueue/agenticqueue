@@ -2,6 +2,26 @@
 
 ## 2026-04-25
 
+### AQ-311: Run Playwright e2e against a disposable database
+
+```yaml
+title: "Playwright e2e must not share the developer database"
+type: "pitfall"
+what_happened: "The web Playwright setup and bootstrap specs created users and auth audit rows in the local `agenticqueue` database, which polluted Ghost's already-bootstrapped development instance."
+what_learned: "End-to-end browser tests are integration tests with real write side effects. They need their own database lifecycle, not just different test data inside the developer database."
+action_rule: "Run AgenticQueue Playwright e2e with `AGENTICQUEUE_USE_TEST_DATABASE=1` and a disposable `agenticqueue_test` database prepared by global setup and dropped by global teardown; prove isolation by checking dev auth table row counts before and after the suite."
+applies_when: "Running `pnpm --filter web test:e2e`, CI Playwright smoke tests, or any local browser test that exercises setup, login, API token, session, user, or auth audit flows."
+does_not_apply_when: "The test is a pure component/unit test with no Postgres writes, or the environment already provides an isolated database per process."
+evidence:
+  - "`uv run pytest apps/api/tests/test_e2e_dev_db_isolation.py -v` passed and asserted `users`, `auth_audit_log`, and `actor` row counts in the dev database were unchanged after the Playwright suite."
+  - "`pnpm --filter web test:e2e` passed with 26 browser tests against `agenticqueue_test`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-307: Run auth bootstrap DB tests serially
 
 ```yaml
