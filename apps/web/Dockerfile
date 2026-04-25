@@ -31,6 +31,8 @@ RUN npm ci --workspace=apps/web --include-workspace-root
 
 COPY apps/web ./apps/web
 
+RUN chmod +x apps/web/scripts/dev-start.sh
+
 EXPOSE 3000
 
 FROM node:22-alpine AS runner
