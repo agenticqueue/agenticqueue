@@ -18,9 +18,6 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!request.cookies.has(SESSION_COOKIE_NAME)) {
-    if (pathname === "/") {
-      return NextResponse.rewrite(new URL("/login", request.url));
-    }
     const next = `${pathname}${request.nextUrl.search}`;
     return redirect(request, `/login?next=${encodeURIComponent(next || "/")}`);
   }
