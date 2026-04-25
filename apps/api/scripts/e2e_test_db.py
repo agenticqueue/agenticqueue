@@ -150,7 +150,15 @@ def setup() -> None:
         "DATABASE_URL_TEST": test_url,
     }
     subprocess.run(
-        ["uv", "run", "alembic", "-c", "apps/api/alembic.ini", "upgrade", "head"],
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "-c",
+            "apps/api/alembic.ini",
+            "upgrade",
+            "head",
+        ],
         cwd=REPO_ROOT,
         env=env,
         check=True,
