@@ -8,6 +8,17 @@ the restart loop and inspect the local schema before retrying.
 The examples below assume the default Compose project names:
 `agenticqueue-db-1` for Postgres and `agenticqueue-api-1` for the API container.
 
+## Why my dev DB has weird users
+
+Playwright e2e runs must not write bootstrap users or auth audit rows into the
+dev database. The e2e config enables test DB isolation with
+`AGENTICQUEUE_USE_TEST_DATABASE=1` and points `DATABASE_URL_TEST` at
+`agenticqueue_test`; setup recreates that database, runs Alembic migrations
+against it, and teardown drops it. If `agenticqueue.users` or
+`agenticqueue.auth_audit_log` contains test accounts such as `admin@localhost`
+or `testclient` after an e2e run, treat that as dev DB pollution and check that
+the suite used `apps/web/playwright.config.ts`, not a hand-started dev server.
+
 ## Detecting partial state
 
 Start by comparing the database revision with the migration heads.
