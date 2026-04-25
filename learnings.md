@@ -2,6 +2,27 @@
 
 ## 2026-04-25
 
+### AQ-276: Keep temporary source-guard tests out of the Next app tree
+
+```yaml
+title: "Temporary source-guard tests can poison `next build` when they live under `apps/web`"
+type: "tooling"
+what_happened: "AQ-276 used a temporary Vitest source-guard file at `apps/web/components/agenticqueue-web-app.test.ts` to prove the dead `VIEW_CONTENT` marketing copy still shipped before the trim. The guard served its red/green purpose, but `npm run build` then failed on the same checkout with `PageNotFoundError: Cannot find module for page: /_document` during Next's lint/build phase. Removing the temporary test file made the exact same build pass."
+what_learned: "In this repo, ad hoc source-guard tests placed inside the Next app tree can interfere with `next build` even when the shipped app code is fine."
+action_rule: "If a Phase 7 cleanup needs a temporary source-guard or file-content regression test, keep it outside `apps/web` or delete it before the final `npm run build`; rely on the real DoD verification commands for closeout evidence."
+applies_when: "A Codex run adds a one-off Vitest or source-inspection test to guide a dead-code or copy-removal change in the AgenticQueue web shell."
+does_not_apply_when: "The test is part of the supported web test surface already covered by the repo's build path, or it lives outside the Next app tree and does not participate in `next build`."
+evidence:
+  - "`npx vitest run apps/web/components/agenticqueue-web-app.test.ts` failed before the trim because `Foundation rollout` still existed in the source and passed after the dead copy was removed."
+  - "`npm run build` failed once in AQ-276's clean worktree with `PageNotFoundError: Cannot find module for page: /_document` while the temporary test file lived under `apps/web/components/`."
+  - "Removing `apps/web/components/agenticqueue-web-app.test.ts` and rerunning `npm run build` on the same checkout passed without further code changes."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-295: Grid-based mobile layouts need explicit track overrides
 
 ```yaml
