@@ -2,6 +2,26 @@
 
 ## 2026-04-25
 
+### AQ-315: Treat bootstrap token copy as cross-surface contract
+
+```yaml
+title: "First-token setup copy must name every supported programmatic surface"
+type: "product"
+what_happened: "The `/setup` done screen called the bootstrap credential a first API token and told users to point agents at `/api`, even though the same bearer token is also used by the AQ MCP server and `aq` CLI."
+what_learned: "Post-bootstrap copy is part of the auth contract. If it names only one surface, users will assume the credential is narrower than the actual API, CLI, and MCP design."
+action_rule: "When setup, token, or onboarding copy describes AgenticQueue credentials, assert the visible text mentions MCP, CLI, and HTTP API together unless the credential is intentionally limited to one surface."
+applies_when: "Editing `/setup` success copy, `/settings/tokens`, README setup instructions, or MCP/CLI onboarding text."
+does_not_apply_when: "The text describes a surface-specific option that cannot authenticate through the other programmatic interfaces."
+evidence:
+  - "`pnpm --filter web test:e2e --grep done-screen-heading` failed before the copy change because `First access token` was absent, then passed after the change."
+  - "AQ-315 screenshot artifact `apps/web/test-results/aq315/aq315-done-screen-1280x800.png` shows the updated done-screen copy."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-310: Gate dev cache cleanup behind explicit dev mode
 
 ```yaml
