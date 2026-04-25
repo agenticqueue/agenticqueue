@@ -154,6 +154,7 @@ def build_bootstrap_router(
         _, first_token = issue_api_token(
             session,
             actor_id=user.actor_id,
+            name="bootstrap",
             scopes=["admin"],
             expires_at=None,
         )

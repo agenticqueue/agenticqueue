@@ -165,3 +165,43 @@ def create_browser_session(
         details={"email": user.email},
     )
     return raw_session_token, raw_csrf_token
+
+
+def authenticate_browser_session(
+    session: Session,
+    raw_session_token: str | None,
+    *,
+    now: dt.datetime | None = None,
+) -> UserRecord | None:
+    """Return the active local user for a browser session cookie."""
+    if not raw_session_token:
+        return None
+
+    current_time = now or dt.datetime.now(dt.UTC)
+    session_token_hash = _hash_session_token(raw_session_token)
+    row = session.execute(
+        sa.text("""
+            SELECT users.id AS user_id
+            FROM agenticqueue.auth_sessions AS auth_sessions
+            JOIN agenticqueue.users AS users
+              ON users.id = auth_sessions.user_id
+            WHERE auth_sessions.session_token_hash = :session_token_hash
+              AND auth_sessions.revoked_at IS NULL
+              AND auth_sessions.expires_at > :now
+              AND users.is_active = true
+            LIMIT 1
+            """),
+        {"session_token_hash": session_token_hash, "now": current_time},
+    ).first()
+    if row is None:
+        return None
+
+    session.execute(
+        sa.text("""
+            UPDATE agenticqueue.auth_sessions
+            SET last_seen_at = :now
+            WHERE session_token_hash = :session_token_hash
+            """),
+        {"session_token_hash": session_token_hash, "now": current_time},
+    )
+    return session.get(UserRecord, row.user_id)

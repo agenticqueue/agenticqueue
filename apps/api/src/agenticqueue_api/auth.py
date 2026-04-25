@@ -33,12 +33,14 @@ WWW_AUTHENTICATE_HEADER = {"WWW-Authenticate": "Bearer"}
 ANONYMOUS_PATHS = {
     "/api/auth/bootstrap_admin",
     "/api/auth/bootstrap_status",
+    "/api/auth/tokens",
     "/api/session",
     "/api/healthz",
     "/health",
     "/healthz",
     "/v1/health",
 }
+ANONYMOUS_PATH_PREFIXES = ("/api/auth/tokens/",)
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,13 @@ def token_display_prefix(token_hash: str) -> str:
 
 def _render_token(raw_secret: str, token_hash: str) -> str:
     return f"{TOKEN_PREFIX}{_token_prefix_from_hash(token_hash)}{raw_secret}"
+
+
+def is_anonymous_path(path: str) -> bool:
+    """Return whether the path handles its own authentication."""
+    return path in ANONYMOUS_PATHS or any(
+        path.startswith(prefix) for prefix in ANONYMOUS_PATH_PREFIXES
+    )
 
 
 def extract_bearer_token(authorization_header: str | None) -> str:
@@ -119,6 +128,7 @@ def issue_api_token(
     session: Session,
     *,
     actor_id: uuid.UUID,
+    name: str = "api-token",
     scopes: list[str],
     expires_at: dt.datetime | None,
 ) -> tuple[ApiTokenModel, str]:
@@ -131,8 +141,10 @@ def issue_api_token(
 
     record = ApiTokenRecord(
         actor_id=actor_id,
+        name=name.strip(),
         token_hash=token_hash,
         scopes=normalized_scopes,
+        last_used_at=None,
         expires_at=expires_at,
         revoked_at=None,
     )
@@ -148,7 +160,10 @@ def list_api_tokens_for_actor(
     """Return all API tokens issued for an actor."""
     statement = (
         sa.select(ApiTokenRecord)
-        .where(ApiTokenRecord.actor_id == actor_id)
+        .where(
+            ApiTokenRecord.actor_id == actor_id,
+            ApiTokenRecord.revoked_at.is_(None),
+        )
         .order_by(ApiTokenRecord.created_at.asc(), ApiTokenRecord.id.asc())
     )
     return [
@@ -178,6 +193,17 @@ def revoke_api_token(
     session.flush()
     session.refresh(record)
     return ApiTokenModel.model_validate(record)
+
+
+def delete_api_token(session: Session, token_id: uuid.UUID) -> ApiTokenModel | None:
+    """Hard-delete one API token and return its last visible metadata."""
+    record = session.get(ApiTokenRecord, token_id)
+    if record is None:
+        return None
+    model = ApiTokenModel.model_validate(record)
+    session.delete(record)
+    session.flush()
+    return model
 
 
 def authenticate_api_token(
@@ -215,6 +241,10 @@ def authenticate_api_token(
     if token_record.expires_at is not None and token_record.expires_at <= current_time:
         return None
 
+    token_record.last_used_at = current_time
+    session.flush()
+    session.refresh(token_record)
+
     return AuthenticatedRequest(
         actor=ActorModel.model_validate(actor_record),
         api_token=ApiTokenModel.model_validate(token_record),
@@ -237,7 +267,7 @@ class AgenticQueueAuthMiddleware(BaseHTTPMiddleware):
         request: Request,
         call_next: RequestResponseEndpoint,
     ) -> Response:
-        if request.url.path in ANONYMOUS_PATHS:
+        if is_anonymous_path(request.url.path):
             return await call_next(request)
 
         session = request.app.state.session_factory()

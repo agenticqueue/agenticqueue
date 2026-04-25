@@ -267,6 +267,7 @@ def register_submit_tools(
             api_token, raw_token = issue_api_token(
                 session,
                 actor_id=authenticated.actor.id,
+                name=authenticated.api_token.name,
                 scopes=scopes or authenticated.api_token.scopes,
                 expires_at=expires_at,
             )

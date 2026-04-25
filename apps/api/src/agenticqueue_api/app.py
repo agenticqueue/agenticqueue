@@ -128,8 +128,11 @@ class ApiTokenView(SchemaModel):
 
     id: uuid.UUID
     actor_id: uuid.UUID
+    name: str
     token_prefix: str
+    token_preview: str
     scopes: list[str]
+    last_used_at: dt.datetime | None = None
     expires_at: dt.datetime | None = None
     revoked_at: dt.datetime | None = None
     created_at: dt.datetime
@@ -147,6 +150,7 @@ class ProvisionApiTokenRequest(SchemaModel):
     """Payload for issuing a token to an actor."""
 
     actor_id: uuid.UUID
+    name: str = Field(default="api-token", min_length=1, max_length=120)
     scopes: list[str] = Field(default_factory=list)
     expires_at: dt.datetime | None = None
 
@@ -156,6 +160,24 @@ class ProvisionApiTokenResponse(SchemaModel):
 
     token: str
     api_token: ApiTokenView
+
+
+class BrowserTokenCreateRequest(SchemaModel):
+    """Browser-session payload for creating an admin API token."""
+
+    name: str = Field(min_length=1, max_length=120)
+
+
+class BrowserTokenListResponse(SchemaModel):
+    """Browser-session token list response."""
+
+    tokens: list[ApiTokenView]
+
+
+class BrowserTokenCreateResponse(ApiTokenView):
+    """Browser-session create response with the raw token shown once."""
+
+    token: str
 
 
 class CapabilityGrantView(SchemaModel):
@@ -350,11 +372,15 @@ def _actor_summary(actor: ActorModel) -> ActorSummary:
 
 
 def _token_view(token: ApiTokenModel) -> ApiTokenView:
+    token_prefix = token_display_prefix(token.token_hash)
     return ApiTokenView(
         id=token.id,
         actor_id=token.actor_id,
-        token_prefix=token_display_prefix(token.token_hash),
+        name=token.name,
+        token_prefix=token_prefix,
+        token_preview=f"{token_prefix[:8]}...",
         scopes=token.scopes,
+        last_used_at=token.last_used_at,
         expires_at=token.expires_at,
         revoked_at=token.revoked_at,
         created_at=token.created_at,
