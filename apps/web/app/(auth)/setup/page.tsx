@@ -4,6 +4,7 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { SplitPitch } from "../_components/split-pitch";
+import { StatusActivity } from "../_components/status-activity";
 import styles from "./setup.module.css";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -165,8 +166,16 @@ function LoadingPanel() {
     <SplitPitch variant="setup">
       <section className={styles.setupPanel} aria-busy="true">
         <div className="status-strip">
-          <span className="status-dot" />
+          <StatusActivity />
           <span>Checking setup status · <code>/setup</code></span>
+        </div>
+
+        <div className="heading">
+          <h1>Checking first-run access</h1>
+          <p className="status-copy">
+            Waiting for the API to confirm whether this instance still needs its
+            first admin account.
+          </p>
         </div>
       </section>
     </SplitPitch>

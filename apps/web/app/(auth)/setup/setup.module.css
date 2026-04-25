@@ -19,6 +19,37 @@
   letter-spacing: 0.01em;
 }
 
+.setupPanel :global(.status-activity) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.setupPanel :global(.status-activity-dot) {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 0 3px rgba(183, 129, 3, 0.12);
+  animation: auth-status-pulse 1.15s ease-in-out infinite;
+}
+
+.setupPanel :global(.status-activity-bar) {
+  width: 72px;
+  height: 4px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(183, 129, 3, 0.14) 0%,
+      rgba(183, 129, 3, 0.64) 50%,
+      rgba(183, 129, 3, 0.14) 100%
+    );
+  background-size: 200% 100%;
+  animation: auth-status-sweep 1s linear infinite;
+}
+
 .setupPanel :global(.status-strip code) {
   color: var(--ink);
   font-family: inherit;
@@ -52,6 +83,10 @@
   margin: 0;
   color: var(--ink-muted);
   font-size: 14px;
+}
+
+.setupPanel :global(.status-copy) {
+  color: var(--ink-faint);
 }
 
 .setupPanel :global(form) {
@@ -435,5 +470,28 @@
   .setupPanel :global(.foot) {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@keyframes auth-status-pulse {
+  0%,
+  100% {
+    opacity: 0.48;
+    transform: scale(0.92);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes auth-status-sweep {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
   }
 }

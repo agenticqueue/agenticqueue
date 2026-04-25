@@ -538,6 +538,141 @@ input {
   line-height: 1.6;
 }
 
+.aq-state-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+
+.aq-state-loader-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: var(--tone-info-fg);
+  box-shadow: 0 0 0 0.28rem rgba(63, 118, 255, 0.12);
+  animation: aq-loader-pulse 1.05s ease-in-out infinite;
+}
+
+.aq-state-loader-bar {
+  width: clamp(8rem, 28vw, 13rem);
+  height: 0.38rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(63, 118, 255, 0.12) 0%,
+      rgba(143, 178, 255, 0.72) 50%,
+      rgba(63, 118, 255, 0.12) 100%
+    );
+  background-size: 200% 100%;
+  animation: aq-loader-sweep 0.95s linear infinite;
+}
+
+.aq-state-detail {
+  margin: 0.55rem 0 0;
+  color: var(--tone-danger-fg);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.aq-state-retry {
+  margin-top: 1rem;
+  justify-self: start;
+}
+
+.aq-pipeline-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1.2rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  overflow: hidden;
+  background: rgba(9, 14, 20, 0.82);
+}
+
+.aq-pipeline-skeleton-row {
+  display: grid;
+  grid-template-columns: 22px 3px minmax(0, 1fr) minmax(0, 174px) minmax(0, 220px);
+  gap: 0.9rem;
+  align-items: start;
+  padding: 1rem 1.05rem 1rem 0.85rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.aq-pipeline-skeleton-row:last-child {
+  border-bottom: 0;
+}
+
+.aq-pipeline-skeleton-gutter {
+  width: 14px;
+  height: 14px;
+  margin-top: 0.22rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.aq-pipeline-skeleton-accent {
+  width: 3px;
+  align-self: stretch;
+  border-radius: 999px;
+  background: rgba(143, 178, 255, 0.28);
+}
+
+.aq-pipeline-skeleton-main,
+.aq-pipeline-skeleton-meta,
+.aq-pipeline-skeleton-chips {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.aq-pipeline-skeleton-meta {
+  padding-top: 0.18rem;
+}
+
+.aq-pipeline-skeleton-chips {
+  align-content: start;
+  justify-items: end;
+}
+
+.aq-pipeline-skeleton-line,
+.aq-pipeline-skeleton-pill {
+  display: block;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(143, 178, 255, 0.18) 50%,
+      rgba(255, 255, 255, 0.05) 100%
+    );
+  background-size: 220% 100%;
+  animation: aq-loader-sweep 1.1s linear infinite;
+}
+
+.aq-pipeline-skeleton-line {
+  height: 0.78rem;
+}
+
+.aq-pipeline-skeleton-line.is-title {
+  width: min(18rem, 72%);
+  height: 1rem;
+}
+
+.aq-pipeline-skeleton-line.is-short {
+  width: min(12rem, 46%);
+}
+
+.aq-pipeline-skeleton-line.is-mini {
+  width: 7.5rem;
+}
+
+.aq-pipeline-skeleton-pill {
+  width: 6.25rem;
+  height: 1.45rem;
+}
+
 .aq-pipelines-sections {
   display: grid;
   gap: 0.85rem;
@@ -1866,9 +2001,19 @@ input {
     grid-template-columns: 22px 3px minmax(0, 1fr);
   }
 
+  .aq-pipeline-skeleton-row {
+    grid-template-columns: 22px 3px minmax(0, 1fr);
+  }
+
   .aq-pipe-meta,
   .aq-pipe-chips {
     grid-column: 3;
+  }
+
+  .aq-pipeline-skeleton-meta,
+  .aq-pipeline-skeleton-chips {
+    grid-column: 3;
+    justify-items: start;
   }
 
   .aq-job-detail-grid {
@@ -1902,5 +2047,28 @@ input {
 
   .aq-graph-stage {
     height: 32rem;
+  }
+}
+
+@keyframes aq-loader-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes aq-loader-sweep {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, useEffect, useMemo, useState } from "react";
+import { CSSProperties, startTransition, useEffect, useMemo, useState } from "react";
 
 type PipelineTone = "ok" | "info" | "warn" | "danger" | "mute";
 type PipelineSectionState = "in_progress" | "done";
@@ -118,11 +118,13 @@ const JOB_ICON: Record<PipelineJobState, string> = {
 
 const PIPELINES_CACHE_TTL_MS = 10_000;
 const PIPELINES_CACHE_MAX_ENTRIES = 16;
+const PIPELINE_SKELETON_ROWS = 3;
 const pipelinesResponseCache = new Map<string, CachedPipelinesResponse>();
 
 export function PipelinesView({ authToken }: PipelinesViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [inProgress, setInProgress] = useState<PipelineSummary[]>([]);
   const [completed, setCompleted] = useState<PipelineSummary[]>([]);
   const [sectionOpen, setSectionOpen] = useState({
@@ -171,7 +173,15 @@ export function PipelinesView({ authToken }: PipelinesViewProps) {
       });
 
     return () => controller.abort();
-  }, [authToken]);
+  }, [authToken, reloadKey]);
+
+  const retryLoad = () => {
+    setError(null);
+    startTransition(() => {
+      setLoading(true);
+      setReloadKey((current) => current + 1);
+    });
+  };
 
   return (
     <div className="aq-pipelines-view">
@@ -196,19 +206,9 @@ export function PipelinesView({ authToken }: PipelinesViewProps) {
       </div>
 
       {loading ? (
-        <div className="aq-pipelines-state">
-          <p className="aq-auth-kicker">Loading pipelines</p>
-          <h2 className="aq-state-title">Building the live read model</h2>
-          <p className="aq-state-copy">
-            Paging projects, tasks, policies, and edges through the web proxy.
-          </p>
-        </div>
+        <PipelinesLoadingState />
       ) : error ? (
-        <div className="aq-pipelines-state is-error" role="alert">
-          <p className="aq-auth-kicker">Load failure</p>
-          <h2 className="aq-state-title">Pipelines could not be loaded</h2>
-          <p className="aq-state-copy">{error}</p>
-        </div>
+        <PipelinesErrorState error={error} onRetry={retryLoad} />
       ) : (
         <div className="aq-pipelines-sections">
           <PipelineSection
@@ -278,6 +278,70 @@ export function PipelinesView({ authToken }: PipelinesViewProps) {
           ) : null}
         </div>
       )}
+    </div>
+  );
+}
+
+function PipelinesLoadingState() {
+  return (
+    <div className="aq-pipelines-state" aria-busy="true">
+      <div className="aq-state-loader" aria-hidden="true">
+        <span className="aq-state-loader-dot" />
+        <span className="aq-state-loader-bar" />
+      </div>
+      <p className="aq-auth-kicker">Loading pipelines</p>
+      <h2 className="aq-state-title">Building the live read model</h2>
+      <p className="aq-state-copy">
+        Paging projects, tasks, policies, and edges through the web proxy.
+      </p>
+
+      <div className="aq-pipeline-skeleton-list" aria-hidden="true">
+        {Array.from({ length: PIPELINE_SKELETON_ROWS }, (_, index) => (
+          <div className="aq-pipeline-skeleton-row" key={index}>
+            <span className="aq-pipeline-skeleton-gutter" />
+            <span className="aq-pipeline-skeleton-accent" />
+            <div className="aq-pipeline-skeleton-main">
+              <span className="aq-pipeline-skeleton-line is-title" />
+              <span className="aq-pipeline-skeleton-line" />
+              <span className="aq-pipeline-skeleton-line is-short" />
+            </div>
+            <div className="aq-pipeline-skeleton-meta">
+              <span className="aq-pipeline-skeleton-pill" />
+              <span className="aq-pipeline-skeleton-line is-mini" />
+            </div>
+            <div className="aq-pipeline-skeleton-chips">
+              <span className="aq-pipeline-skeleton-pill" />
+              <span className="aq-pipeline-skeleton-pill" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PipelinesErrorState({
+  error,
+  onRetry,
+}: {
+  error: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="aq-pipelines-state is-error" role="alert">
+      <p className="aq-auth-kicker">Load failure</p>
+      <h2 className="aq-state-title">Pipelines could not be loaded</h2>
+      <p className="aq-state-copy">
+        The live read model could not be refreshed from the web proxy.
+      </p>
+      <p className="aq-state-detail aq-mono">{error}</p>
+      <button
+        className="aq-secondary-button aq-state-retry"
+        onClick={onRetry}
+        type="button"
+      >
+        Retry load
+      </button>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { SplitPitch } from "../(auth)/_components/split-pitch";
+import { StatusActivity } from "../(auth)/_components/status-activity";
 import styles from "../(auth)/setup/setup.module.css";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -61,6 +62,29 @@ function Field({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function LoadingPanel() {
+  return (
+    <SplitPitch variant="login">
+      <section className={styles.setupPanel} aria-busy="true">
+        <div className="status-strip">
+          <StatusActivity />
+          <span>
+            Checking sign-in status · <code>/login</code>
+          </span>
+        </div>
+
+        <div className="heading">
+          <h1>Preparing the sign-in route</h1>
+          <p className="status-copy">
+            Confirming whether this instance should open sign-in or first-run
+            setup before the form unlocks.
+          </p>
+        </div>
+      </section>
+    </SplitPitch>
   );
 }
 
@@ -177,7 +201,7 @@ export default function LoginPage() {
   };
 
   if (status !== "ready") {
-    return null;
+    return <LoadingPanel />;
   }
 
   return (
