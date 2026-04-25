@@ -248,6 +248,14 @@ const donePayload = {
 };
 
 test.beforeEach(async ({ page }) => {
+  await page.context().addCookies([
+    {
+      name: "aq_session",
+      value: "playwright",
+      url: "http://127.0.0.1:3005",
+    },
+  ]);
+
   await page.addInitScript(() => {
     window.localStorage.setItem("aq:web:remember-token", "false");
     window.sessionStorage.setItem("aq:web:api-token", "aq_live_playwright_token");

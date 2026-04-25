@@ -23,6 +23,10 @@ type SessionPayload = {
   };
 };
 
+type BootstrapStatusResponse = {
+  needs_bootstrap?: boolean;
+};
+
 function readErrorMessage(payload: SessionPayload | null) {
   return payload?.error ?? payload?.message ?? null;
 }
@@ -62,6 +66,7 @@ function Field({
 
 export default function LoginPage() {
   const router = useRouter();
+  const [status, setStatus] = useState<"checking" | "ready">("checking");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -69,6 +74,36 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function checkBootstrapStatus() {
+      try {
+        const response = await fetch("/api/auth/bootstrap_status", {
+          cache: "no-store",
+        });
+        const payload = (await response.json().catch(() => null)) as
+          | BootstrapStatusResponse
+          | null;
+
+        if (!active) return;
+        if (response.ok && payload?.needs_bootstrap === true) {
+          window.location.replace("/setup");
+          return;
+        }
+        setStatus("ready");
+      } catch {
+        if (!active) return;
+        setStatus("ready");
+      }
+    }
+
+    void checkBootstrapStatus();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const rememberedEmail = window.localStorage.getItem(REMEMBER_EMAIL_KEY);
@@ -140,6 +175,10 @@ export default function LoginPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (status !== "ready") {
+    return null;
+  }
 
   return (
     <SplitPitch variant="login">

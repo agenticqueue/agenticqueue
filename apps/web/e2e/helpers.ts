@@ -86,6 +86,14 @@ export async function seedAuthenticatedSession(
   const remember = options.remember ?? false;
   const token = options.token ?? "aq_live_playwright_token";
 
+  await page.context().addCookies([
+    {
+      name: "aq_session",
+      value: "playwright",
+      url: "http://127.0.0.1:3005",
+    },
+  ]);
+
   await page.addInitScript(
     ({ apiToken, persist }) => {
       window.localStorage.setItem(

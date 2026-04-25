@@ -119,11 +119,14 @@ test("disables the form while signing in and redirects to pipelines on success",
 
   await page.route("**/api/session", async (route) => {
     await sessionPaused;
-    await route.fulfill({
-      contentType: "application/json",
-      json: {
-        apiBaseUrl: "http://127.0.0.1:8010",
-        user: { email: "admin@example.com", is_admin: true },
+      await route.fulfill({
+        contentType: "application/json",
+        headers: {
+          "set-cookie": "aq_session=playwright; Path=/; SameSite=Lax",
+        },
+        json: {
+          apiBaseUrl: "http://127.0.0.1:8010",
+          user: { email: "admin@example.com", is_admin: true },
       },
       status: 200,
     });
@@ -148,6 +151,9 @@ test("persists and clears the remembered email preference", async ({ page }) => 
   await page.route("**/api/session", async (route) => {
     await route.fulfill({
       contentType: "application/json",
+      headers: {
+        "set-cookie": "aq_session=playwright; Path=/; SameSite=Lax",
+      },
       json: {
         apiBaseUrl: "http://127.0.0.1:8010",
         user: { email: "admin@example.com", is_admin: true },
@@ -188,6 +194,13 @@ test("keeps the auth grid scoped to login and out of pipelines", async ({
     .evaluate((node) => getComputedStyle(node, "::before").backgroundSize);
   expect(loginGridSize).toContain("32px 32px");
 
+  await page.context().addCookies([
+    {
+      name: "aq_session",
+      value: "playwright",
+      url: "http://127.0.0.1:3005",
+    },
+  ]);
   await page.goto("/pipelines");
   await expect(page.locator('[data-auth-route="login"]')).toHaveCount(0);
   const bodyGridSize = await page

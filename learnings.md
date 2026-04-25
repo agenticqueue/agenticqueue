@@ -44,6 +44,26 @@ owner: "codex"
 review_date: "2026-05-24"
 ```
 
+### AQ-300: Middleware e2e tests need a server-side API fixture, not browser route mocks
+
+```yaml
+title: "Next.js middleware tests need server-side upstream fixtures"
+type: "tooling"
+what_happened: "AQ-300's first auth-entry Playwright test failed correctly because `/` still rendered the old shell. After adding middleware, the e2e suite still needed a fake upstream API because Playwright `page.route()` mocks only browser-initiated requests, not middleware's server-side `fetch()` to `bootstrap_status`."
+what_learned: "Auth entry-point coverage crosses the browser/server boundary, so tests must provide a real local upstream for middleware and must isolate bootstrap state between tests."
+action_rule: "When testing Next.js middleware that calls AQ API routes or upstream services, run a Playwright webServer fixture for the upstream and reset its state after each test; do not rely on browser route mocks for middleware fetches."
+applies_when: "A web e2e test verifies middleware redirects, server components, route handlers, or any behavior whose fetch happens outside the browser page context."
+does_not_apply_when: "The fetch is performed from client-side React code and Playwright `page.route()` can intercept it deterministically."
+evidence:
+  - "`pnpm --filter web test:e2e --grep auth-entry-fresh` first failed with `Expected: 307 Received: 200` before middleware existed."
+  - "`pnpm --filter web test:e2e` passed after adding `apps/web/e2e/support/auth-api-server.mjs`, serializing the web e2e worker, and resetting the fake bootstrap state."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-209: DoD screenshots need explicit files, not only Playwright attachments
 
 ```yaml

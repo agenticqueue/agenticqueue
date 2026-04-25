@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AnalyticsView } from "@/components/analytics-view";
 import { DecisionsView } from "@/components/decisions-view";
@@ -10,7 +10,6 @@ import { GraphView } from "@/components/graph-view";
 import { LearningsView } from "@/components/learnings-view";
 import { PipelinesView } from "@/components/pipelines-view";
 import { WorkView } from "@/components/work-view";
-import { DEFAULT_API_BASE_URL } from "@/lib/api-base-url";
 import { AQ_BUILD_VERSION } from "@/lib/build-version";
 
 type ViewKey =
@@ -21,19 +20,6 @@ type ViewKey =
   | "decisions"
   | "learnings"
   | "settings";
-
-type AuthActor = {
-  id: string;
-  handle: string;
-  actor_type: string;
-  display_name: string;
-};
-
-type SessionPayload = {
-  actor: AuthActor;
-  tokenCount: number;
-  apiBaseUrl: string;
-};
 
 type FooterHealthTone = "ok" | "warn" | "danger";
 
@@ -79,8 +65,6 @@ type AgenticQueueWebAppProps = {
   view: ViewKey;
 };
 
-const SESSION_TOKEN_KEY = "aq:web:api-token";
-const PERSIST_TOKEN_KEY = "aq:web:remember-token";
 const HEALTH_POLL_INTERVAL_MS = 30_000;
 const DEFAULT_FOOTER_HEALTH: FooterHealthState = {
   label: "degraded",
@@ -298,96 +282,11 @@ const VIEW_CONTENT: Record<ViewKey, ViewDefinition> = {
 
 export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
   const pathname = usePathname();
-  const [status, setStatus] = useState<"booting" | "logging-in" | "ready">(
-    "booting",
-  );
-  const [actor, setActor] = useState<AuthActor | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
-  const [apiBaseUrl, setApiBaseUrl] = useState(DEFAULT_API_BASE_URL);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [navCounts, setNavCounts] = useState<NavCounts | null>(null);
   const [footerHealth, setFooterHealth] =
     useState<FooterHealthState>(DEFAULT_FOOTER_HEALTH);
 
   useEffect(() => {
-    const token = getStoredToken();
-
-    if (!token) {
-      setStatus("ready");
-      setActor(null);
-      setAuthToken(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    setStatus("logging-in");
-    setErrorMessage(null);
-
-    void validateToken(token)
-      .then((session) => {
-        if (cancelled) {
-          return;
-        }
-
-        setActor(session.actor);
-        setAuthToken(token);
-        setApiBaseUrl(session.apiBaseUrl);
-        setStatus("ready");
-      })
-      .catch((error: unknown) => {
-        if (cancelled) {
-          return;
-        }
-
-        clearStoredToken();
-        setActor(null);
-        setAuthToken(null);
-        setNavCounts(null);
-        setStatus("ready");
-        setErrorMessage(errorMessageFrom(error));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function handleLogin(token: string, remember: boolean) {
-    setStatus("logging-in");
-    setErrorMessage(null);
-
-    try {
-      const session = await validateToken(token);
-
-      storeToken(token, remember);
-      setActor(session.actor);
-      setAuthToken(token);
-      setApiBaseUrl(session.apiBaseUrl);
-      setStatus("ready");
-    } catch (error: unknown) {
-      setActor(null);
-      setAuthToken(null);
-      setNavCounts(null);
-      setStatus("ready");
-      setErrorMessage(errorMessageFrom(error));
-    }
-  }
-
-  function handleLogout() {
-    clearStoredToken();
-    setActor(null);
-    setAuthToken(null);
-    setNavCounts(null);
-    setErrorMessage(null);
-  }
-
-  useEffect(() => {
-    if (!authToken) {
-      setNavCounts(null);
-      return;
-    }
-
     let cancelled = false;
     let activeController: AbortController | null = null;
 
@@ -398,9 +297,6 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
 
       try {
         const response = await fetch("/api/v1/nav-counts", {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
           cache: "no-store",
           signal: controller.signal,
         });
@@ -445,14 +341,9 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
       activeController?.abort();
       window.removeEventListener("focus", handleFocus);
     };
-  }, [authToken]);
+  }, []);
 
   useEffect(() => {
-    if (!actor) {
-      setFooterHealth(DEFAULT_FOOTER_HEALTH);
-      return;
-    }
-
     let cancelled = false;
     let activeController: AbortController | null = null;
 
@@ -498,32 +389,10 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
       activeController?.abort();
       window.clearInterval(interval);
     };
-  }, [actor]);
-
-  if (status !== "ready") {
-    return (
-      <main className="aq-auth-shell">
-        <section className="aq-auth-card">
-          <p className="aq-auth-kicker">Restoring session</p>
-          <h1 className="aq-auth-title">Loading the AgenticQueue shell</h1>
-          <p className="aq-auth-copy">
-            Validating the stored API key before the UI unlocks.
-          </p>
-        </section>
-      </main>
-    );
-  }
-
-  if (!actor) {
-    return (
-      <LoginScreen
-        errorMessage={errorMessage}
-        onLogin={handleLogin}
-      />
-    );
-  }
+  }, []);
 
   const content = VIEW_CONTENT[view];
+  const authToken = "";
 
   return (
     <main className="aq-shell">
@@ -543,33 +412,29 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
         </div>
         <div className="aq-topbar-right">
           <div className="aq-actor-chip">
-            <span className="aq-actor-name">{actor.display_name}</span>
-            <span className="aq-actor-meta">{actor.handle}</span>
+            <span className="aq-actor-name">Authenticated</span>
+            <span className="aq-actor-meta">browser session</span>
           </div>
-          <button
-            className="aq-logout"
-            onClick={handleLogout}
-            type="button"
-          >
+          <Link className="aq-logout" href="/login">
             Log out
-          </button>
+          </Link>
         </div>
       </header>
 
       <PrimaryNav counts={navCounts} pathname={pathname} />
 
       <section className="aq-content">
-        {view === "pipelines" && authToken ? (
+        {view === "pipelines" ? (
           <PipelinesView authToken={authToken} />
-        ) : view === "work" && authToken ? (
+        ) : view === "work" ? (
           <WorkView authToken={authToken} />
-        ) : view === "analytics" && authToken ? (
+        ) : view === "analytics" ? (
           <AnalyticsView authToken={authToken} />
-        ) : view === "graph" && authToken ? (
+        ) : view === "graph" ? (
           <GraphView authToken={authToken} />
-        ) : view === "decisions" && authToken ? (
+        ) : view === "decisions" ? (
           <DecisionsView authToken={authToken} />
-        ) : view === "learnings" && authToken ? (
+        ) : view === "learnings" ? (
           <LearningsView authToken={authToken} />
         ) : (
           <>
@@ -613,103 +478,13 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
       <footer className="aq-footer">
         <div className="aq-footer-health">
           <FooterHealthPill health={footerHealth} />
-          <span>auth actor {actor.actor_type}</span>
-          <span>target {apiBaseUrl.replace(/^https?:\/\//, "")}</span>
+          <span>auth browser session</span>
           <span>build v{AQ_BUILD_VERSION}</span>
         </div>
         <Link className="aq-settings-link" href="/settings">
           Settings
         </Link>
       </footer>
-    </main>
-  );
-}
-
-export type LoginScreenProps = {
-  errorMessage: string | null;
-  onLogin: (token: string, remember: boolean) => Promise<void>;
-};
-
-export function LoginScreen({ errorMessage, onLogin }: LoginScreenProps) {
-  const [token, setToken] = useState("");
-  const [remember, setRemember] = useState(false);
-  const [showToken, setShowToken] = useState(false);
-
-  useEffect(() => {
-    setRemember(window.localStorage.getItem(PERSIST_TOKEN_KEY) === "true");
-  }, []);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await onLogin(token, remember);
-  }
-
-  return (
-    <main className="aq-auth-shell">
-      <section className="aq-auth-card">
-        <p className="aq-auth-kicker">UI always on</p>
-        <h1 className="aq-auth-title">Paste an AgenticQueue API key</h1>
-        <p className="aq-auth-copy">
-          This shell mirrors the Phase 1 actor model. No passwords, no OAuth,
-          no signup flow. A valid bearer token unlocks the dashboard.
-        </p>
-
-        <form className="aq-auth-form" onSubmit={handleSubmit}>
-          <label className="aq-auth-label" htmlFor="api-token">
-            API token
-          </label>
-          <div className="aq-auth-input-wrap">
-            <input
-              autoCapitalize="off"
-              autoComplete="off"
-              className="aq-auth-input"
-              id="api-token"
-              inputMode="text"
-              name="api-token"
-              onChange={(event) => setToken(event.target.value)}
-              placeholder="aq_live_prefixsecret"
-              spellCheck={false}
-              type={showToken ? "text" : "password"}
-              value={token}
-            />
-            <button
-              aria-pressed={showToken}
-              className="aq-auth-toggle"
-              onClick={() => setShowToken((current) => !current)}
-              type="button"
-            >
-              {showToken ? "Hide" : "Show"}
-            </button>
-          </div>
-
-          <label className="aq-auth-checkbox">
-            <input
-              checked={remember}
-              onChange={(event) => setRemember(event.target.checked)}
-              type="checkbox"
-            />
-            <span>Remember on this device</span>
-          </label>
-
-          {errorMessage ? (
-            <p className="aq-auth-error" role="alert">
-              {errorMessage}
-            </p>
-          ) : null}
-
-          <button className="aq-auth-submit" type="submit">
-            Validate token and open shell
-          </button>
-        </form>
-
-        <div className="aq-auth-notes">
-          <p>
-            Nav order is fixed: Pipelines, Work, Analytics, Graph, Decisions,
-            Learnings.
-          </p>
-          <p>Settings lives in the footer because the shell stays edge-to-edge.</p>
-        </div>
-      </section>
     </main>
   );
 }
@@ -760,55 +535,6 @@ export function FooterHealthPill({
   );
 }
 
-async function validateToken(token: string): Promise<SessionPayload> {
-  const response = await fetch("/api/session", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ token }),
-  });
-
-  const payload = (await response.json().catch(() => null)) as
-    | SessionPayload
-    | { error?: string }
-    | null;
-
-  if (!response.ok || payload === null || !("actor" in payload)) {
-    throw new Error(
-      payload && "error" in payload && typeof payload.error === "string"
-        ? payload.error
-        : "Token validation failed.",
-    );
-  }
-
-  return payload;
-}
-
-function getStoredToken() {
-  const localToken = window.localStorage.getItem(SESSION_TOKEN_KEY);
-  const sessionToken = window.sessionStorage.getItem(SESSION_TOKEN_KEY);
-
-  return localToken ?? sessionToken;
-}
-
-function storeToken(token: string, remember: boolean) {
-  clearStoredToken();
-
-  if (remember) {
-    window.localStorage.setItem(SESSION_TOKEN_KEY, token);
-  } else {
-    window.sessionStorage.setItem(SESSION_TOKEN_KEY, token);
-  }
-
-  window.localStorage.setItem(PERSIST_TOKEN_KEY, remember ? "true" : "false");
-}
-
-function clearStoredToken() {
-  window.localStorage.removeItem(SESSION_TOKEN_KEY);
-  window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
-}
-
 function toneLabel(tone: "info" | "ok" | "warn") {
   if (tone === "ok") {
     return "stable";
@@ -819,10 +545,6 @@ function toneLabel(tone: "info" | "ok" | "warn") {
   }
 
   return "live";
-}
-
-function errorMessageFrom(error: unknown) {
-  return error instanceof Error ? error.message : "Unexpected auth failure.";
 }
 
 function isNavCountsPayload(payload: unknown): payload is Required<NavCounts> {
