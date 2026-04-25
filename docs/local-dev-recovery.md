@@ -8,6 +8,22 @@ the restart loop and inspect the local schema before retrying.
 The examples below assume the default Compose project names:
 `agenticqueue-db-1` for Postgres and `agenticqueue-api-1` for the API container.
 
+## Stale .next cache after git pull
+
+The dev Compose override bind-mounts `./apps/web` into the web container. After
+a `git pull`, an old `apps/web/.next/` directory can still point at deleted
+webpack chunks and make `/`, `/setup`, `/login`, or `/api/health` return 500.
+
+The web dev startup hook runs only when `AQ_DEV_MODE=1` and
+`NODE_ENV=development`; it removes `apps/web/.next/` before `next dev` starts.
+Production images and CI test runs do not use that dev override path.
+
+If a local container was started before this fix, restart it once:
+
+```bash
+docker compose restart web
+```
+
 ## Why my dev DB has weird users
 
 Playwright e2e runs must not write bootstrap users or auth audit rows into the
