@@ -64,6 +64,26 @@ owner: "codex"
 review_date: "2026-05-25"
 ```
 
+### AQ-302: Use typing.TextIO for Python 3.13-compatible stream annotations
+
+```yaml
+title: "TextIO is not available from collections.abc on Python 3.13"
+type: "tooling"
+what_happened: "The first AQ-302 diagnostic test collection failed because `agenticqueue_api.migrations` imported `TextIO` from `collections.abc`."
+what_learned: "Runtime-imported modules need type annotations that are valid in the repo's active interpreter, not just familiar from older typing examples."
+action_rule: "Import `TextIO` from `typing` when annotating stderr/stdout-like streams in runtime modules."
+applies_when: "Adding stream annotations to code imported during pytest collection or app startup."
+does_not_apply_when: "Using protocol-style custom stream interfaces or annotations guarded by `TYPE_CHECKING`."
+evidence:
+  - "`uv run pytest apps/api/tests/test_migrations_failure_diagnostic.py -v` initially failed during collection with `ImportError: cannot import name 'TextIO' from 'collections.abc'`."
+  - "`uv run pytest apps/api/tests/test_migrations_failure_diagnostic.py -v` passed (`2 passed`) after switching the import to `typing.TextIO`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-300: Middleware e2e tests need a server-side API fixture, not browser route mocks
 
 ```yaml

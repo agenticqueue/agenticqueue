@@ -50,7 +50,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    restart: unless-stopped
+    restart: on-failure:5
     depends_on:
       pgbouncer:
         condition: service_healthy
