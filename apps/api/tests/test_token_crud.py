@@ -15,6 +15,7 @@ from agenticqueue_api.config import (
     get_psycopg_connect_args,
     get_sqlalchemy_sync_database_url,
 )
+from agenticqueue_api.auth import authenticate_api_token
 from agenticqueue_api.local_auth import hash_password
 from agenticqueue_api.migrations import apply_database_migrations
 
@@ -224,6 +225,38 @@ def test_last_used_updates(
             {"id": created["id"]},
         )
     assert after is not None
+
+
+def test_last_used_update_skips_locked_token(
+    client: TestClient,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _bootstrap(client)
+    created = _create_token(client, name="codex")
+
+    locking_session = session_factory()
+    lock_transaction = locking_session.begin()
+    try:
+        locking_session.execute(
+            sa.text("""
+                SELECT id
+                FROM agenticqueue.api_token
+                WHERE id = :id
+                FOR UPDATE
+                """),
+            {"id": created["id"]},
+        )
+        with session_factory() as auth_session:
+            auth_session.execute(sa.text("SET LOCAL lock_timeout = '100ms'"))
+            started_at = time.monotonic()
+            authenticated = authenticate_api_token(auth_session, created["token"])
+            elapsed = time.monotonic() - started_at
+    finally:
+        lock_transaction.rollback()
+        locking_session.close()
+
+    assert authenticated is not None
+    assert elapsed < 1.0
 
 
 def test_bootstrap_token_in_list(client: TestClient) -> None:

@@ -30,6 +30,7 @@ LEGACY_TOKEN_PREFIX = "aq__"
 TOKEN_HASH_PREFIX_LENGTH = 16
 TOKEN_SEPARATOR = "_"
 WWW_AUTHENTICATE_HEADER = {"WWW-Authenticate": "Bearer"}
+LAST_USED_UPDATE_INTERVAL = dt.timedelta(seconds=60)
 ANONYMOUS_PATHS = {
     "/api/auth/bootstrap_admin",
     "/api/auth/bootstrap_status",
@@ -206,6 +207,36 @@ def delete_api_token(session: Session, token_id: uuid.UUID) -> ApiTokenModel | N
     return model
 
 
+def _mark_token_last_used(
+    session: Session,
+    token_id: uuid.UUID,
+    current_time: dt.datetime,
+) -> None:
+    """Update token usage without blocking concurrent read requests."""
+    session.execute(
+        sa.text("""
+            WITH locked_token AS (
+                SELECT id
+                FROM agenticqueue.api_token
+                WHERE id = :token_id
+                  AND (
+                    last_used_at IS NULL
+                    OR last_used_at < :last_used_cutoff
+                  )
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE agenticqueue.api_token
+            SET last_used_at = :last_used_at
+            WHERE id IN (SELECT id FROM locked_token)
+            """),
+        {
+            "token_id": token_id,
+            "last_used_at": current_time,
+            "last_used_cutoff": current_time - LAST_USED_UPDATE_INTERVAL,
+        },
+    )
+
+
 def authenticate_api_token(
     session: Session,
     token_value: str,
@@ -241,9 +272,7 @@ def authenticate_api_token(
     if token_record.expires_at is not None and token_record.expires_at <= current_time:
         return None
 
-    token_record.last_used_at = current_time
-    session.flush()
-    session.refresh(token_record)
+    _mark_token_last_used(session, token_record.id, current_time)
 
     return AuthenticatedRequest(
         actor=ActorModel.model_validate(actor_record),
