@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { AnalyticsView } from "@/components/analytics-view";
 import { DecisionsView } from "@/components/decisions-view";
@@ -427,7 +427,9 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
         {view === "pipelines" ? (
           <PipelinesView authToken={authToken} />
         ) : view === "work" ? (
-          <WorkView authToken={authToken} />
+          <Suspense fallback={null}>
+            <WorkView authToken={authToken} />
+          </Suspense>
         ) : view === "analytics" ? (
           <AnalyticsView authToken={authToken} />
         ) : view === "graph" ? (
