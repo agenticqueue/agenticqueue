@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -44,7 +46,7 @@ def upgrade() -> None:
         "TO fk_capability_legacy_granted_by_actor_id_actor"
     )
 
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "capability",
         sa.Column("key", sa.String(length=120), nullable=False),
         sa.Column("description", sa.Text(), nullable=False),
@@ -67,7 +69,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("key", name="uq_capability_key"),
         schema="agenticqueue",
     )
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "capability_grant",
         sa.Column("actor_id", sa.UUID(), nullable=False),
         sa.Column("capability_id", sa.UUID(), nullable=False),
@@ -116,14 +118,14 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_capability_grant")),
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "ix_capability_grant_actor_id",
         "capability_grant",
         ["actor_id"],
         unique=False,
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "ix_capability_grant_capability_id",
         "capability_grant",
         ["capability_id"],
@@ -178,11 +180,11 @@ def upgrade() -> None:
         JOIN agenticqueue.capability AS catalog
           ON catalog.key = legacy.capability_key
         """)
-    op.drop_table("capability_legacy", schema="agenticqueue")
+    op_ext.drop_table_if_exists("capability_legacy", schema="agenticqueue")
 
 
 def downgrade() -> None:
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "capability_legacy",
         sa.Column("actor_id", sa.UUID(), nullable=False),
         sa.Column("capability_key", sa.String(length=120), nullable=False),
@@ -234,18 +236,18 @@ def downgrade() -> None:
           ON catalog.id = grant_row.capability_id
         """)
 
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         "ix_capability_grant_capability_id",
         table_name="capability_grant",
         schema="agenticqueue",
     )
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         "ix_capability_grant_actor_id",
         table_name="capability_grant",
         schema="agenticqueue",
     )
-    op.drop_table("capability_grant", schema="agenticqueue")
-    op.drop_table("capability", schema="agenticqueue")
+    op_ext.drop_table_if_exists("capability_grant", schema="agenticqueue")
+    op_ext.drop_table_if_exists("capability", schema="agenticqueue")
     op.rename_table("capability_legacy", "capability", schema="agenticqueue")
     op.execute(
         "ALTER TABLE agenticqueue.capability "

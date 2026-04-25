@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 import json
 
 from alembic import op
@@ -110,7 +112,7 @@ STANDARD_ROLES = (
 
 
 def upgrade() -> None:
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "role",
         sa.Column("name", sa.String(length=120), nullable=False),
         sa.Column("description", sa.Text(), nullable=False),
@@ -145,7 +147,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("name", name="uq_role_name"),
         schema="agenticqueue",
     )
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "actor_role_assignment",
         sa.Column("actor_id", sa.UUID(), nullable=False),
         sa.Column("role_id", sa.UUID(), nullable=False),
@@ -188,21 +190,21 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_actor_role_assignment")),
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "ix_actor_role_assignment_actor_id",
         "actor_role_assignment",
         ["actor_id"],
         unique=False,
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "ix_actor_role_assignment_role_id",
         "actor_role_assignment",
         ["role_id"],
         unique=False,
         schema="agenticqueue",
     )
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "capability_grant",
         sa.Column("role_assignment_id", sa.UUID(), nullable=True),
         schema="agenticqueue",
@@ -217,7 +219,7 @@ def upgrade() -> None:
         referent_schema="agenticqueue",
         ondelete="SET NULL",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "ix_capability_grant_role_assignment_id",
         "capability_grant",
         ["role_assignment_id"],
@@ -241,28 +243,28 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         "ix_capability_grant_role_assignment_id",
         table_name="capability_grant",
         schema="agenticqueue",
     )
-    op.drop_constraint(
+    op_ext.drop_constraint_if_exists(
         op.f("fk_capability_grant_role_assignment_id_actor_role_assignment"),
         "capability_grant",
         schema="agenticqueue",
         type_="foreignkey",
     )
-    op.drop_column("capability_grant", "role_assignment_id", schema="agenticqueue")
+    op_ext.drop_column_if_exists("capability_grant", "role_assignment_id", schema="agenticqueue")
 
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         "ix_actor_role_assignment_role_id",
         table_name="actor_role_assignment",
         schema="agenticqueue",
     )
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         "ix_actor_role_assignment_actor_id",
         table_name="actor_role_assignment",
         schema="agenticqueue",
     )
-    op.drop_table("actor_role_assignment", schema="agenticqueue")
-    op.drop_table("role", schema="agenticqueue")
+    op_ext.drop_table_if_exists("actor_role_assignment", schema="agenticqueue")
+    op_ext.drop_table_if_exists("role", schema="agenticqueue")

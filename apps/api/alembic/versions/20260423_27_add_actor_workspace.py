@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -12,7 +14,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "actor",
         sa.Column("workspace_id", sa.UUID(), nullable=True),
         schema="agenticqueue",
@@ -27,7 +29,7 @@ def upgrade() -> None:
         referent_schema="agenticqueue",
         ondelete="CASCADE",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         op.f("ix_actor_workspace_id"),
         "actor",
         ["workspace_id"],
@@ -48,15 +50,15 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         op.f("ix_actor_workspace_id"),
         table_name="actor",
         schema="agenticqueue",
     )
-    op.drop_constraint(
+    op_ext.drop_constraint_if_exists(
         op.f("fk_actor_workspace_id_workspace"),
         "actor",
         schema="agenticqueue",
         type_="foreignkey",
     )
-    op.drop_column("actor", "workspace_id", schema="agenticqueue")
+    op_ext.drop_column_if_exists("actor", "workspace_id", schema="agenticqueue")

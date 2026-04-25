@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -21,7 +23,7 @@ depends_on = None
 
 def upgrade() -> None:
     for table_name in EMBEDDING_TABLES:
-        op.add_column(
+        op_ext.add_column_if_not_exists(
             table_name,
             sa.Column(
                 EMBEDDING_COLUMN_NAME,
@@ -36,4 +38,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     for table_name in reversed(EMBEDDING_TABLES):
         op.execute(drop_embedding_index_sql(table_name))
-        op.drop_column(table_name, EMBEDDING_COLUMN_NAME, schema="agenticqueue")
+        op_ext.drop_column_if_exists(table_name, EMBEDDING_COLUMN_NAME, schema="agenticqueue")

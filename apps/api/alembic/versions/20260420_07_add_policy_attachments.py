@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -13,7 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "policy",
         sa.Column(
             "capabilities",
@@ -25,7 +27,7 @@ def upgrade() -> None:
     )
 
     for table_name in ("workspace", "project", "task"):
-        op.add_column(
+        op_ext.add_column_if_not_exists(
             table_name,
             sa.Column("policy_id", sa.UUID(), nullable=True),
             schema="agenticqueue",
@@ -40,7 +42,7 @@ def upgrade() -> None:
             referent_schema="agenticqueue",
             ondelete="SET NULL",
         )
-        op.create_index(
+        op_ext.create_index_if_not_exists(
             op.f(f"ix_{table_name}_policy_id"),
             table_name,
             ["policy_id"],
@@ -51,17 +53,17 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     for table_name in ("task", "project", "workspace"):
-        op.drop_index(
+        op_ext.drop_index_if_exists(
             op.f(f"ix_{table_name}_policy_id"),
             table_name=table_name,
             schema="agenticqueue",
         )
-        op.drop_constraint(
+        op_ext.drop_constraint_if_exists(
             op.f(f"fk_{table_name}_policy_id_policy"),
             table_name,
             schema="agenticqueue",
             type_="foreignkey",
         )
-        op.drop_column(table_name, "policy_id", schema="agenticqueue")
+        op_ext.drop_column_if_exists(table_name, "policy_id", schema="agenticqueue")
 
-    op.drop_column("policy", "capabilities", schema="agenticqueue")
+    op_ext.drop_column_if_exists("policy", "capabilities", schema="agenticqueue")

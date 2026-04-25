@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -36,7 +38,7 @@ EDGE_RELATION_ENUM = sa.Enum(
 
 
 def upgrade() -> None:
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "edge",
         sa.Column("src_entity_type", sa.String(length=64), nullable=False),
         sa.Column("src_id", sa.UUID(), nullable=False),
@@ -71,14 +73,14 @@ def upgrade() -> None:
         ),
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "ix_edge_src_lookup",
         "edge",
         ["src_entity_type", "src_id", "relation"],
         unique=False,
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "ix_edge_dst_lookup",
         "edge",
         ["dst_entity_type", "dst_id", "relation"],
@@ -88,6 +90,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_edge_dst_lookup", table_name="edge", schema="agenticqueue")
-    op.drop_index("ix_edge_src_lookup", table_name="edge", schema="agenticqueue")
-    op.drop_table("edge", schema="agenticqueue")
+    op_ext.drop_index_if_exists("ix_edge_dst_lookup", table_name="edge", schema="agenticqueue")
+    op_ext.drop_index_if_exists("ix_edge_src_lookup", table_name="edge", schema="agenticqueue")
+    op_ext.drop_table_if_exists("edge", schema="agenticqueue")

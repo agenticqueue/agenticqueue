@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -15,7 +17,7 @@ depends_on = None
 def upgrade() -> None:
     op.execute("CREATE SEQUENCE IF NOT EXISTS agenticqueue.task_sequence_seq AS BIGINT")
 
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "task",
         sa.Column(
             "priority",
@@ -25,7 +27,7 @@ def upgrade() -> None:
         ),
         schema="agenticqueue",
     )
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "task",
         sa.Column(
             "labels",
@@ -35,7 +37,7 @@ def upgrade() -> None:
         ),
         schema="agenticqueue",
     )
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "task",
         sa.Column(
             "sequence",
@@ -45,12 +47,12 @@ def upgrade() -> None:
         ),
         schema="agenticqueue",
     )
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "task",
         sa.Column("claimed_by_actor_id", sa.UUID(), nullable=True),
         schema="agenticqueue",
     )
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "task",
         sa.Column("claimed_at", sa.DateTime(timezone=True), nullable=True),
         schema="agenticqueue",
@@ -77,7 +79,7 @@ def upgrade() -> None:
         referent_schema="agenticqueue",
         ondelete="SET NULL",
     )
-    op.create_unique_constraint(
+    op_ext.create_unique_constraint_if_not_exists(
         op.f("uq_task_sequence"),
         "task",
         ["sequence"],
@@ -95,21 +97,21 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS agenticqueue.ix_task_labels_gin")
     op.execute("DROP INDEX IF EXISTS agenticqueue.ix_task_queue_lookup")
-    op.drop_constraint(
+    op_ext.drop_constraint_if_exists(
         op.f("uq_task_sequence"),
         "task",
         schema="agenticqueue",
         type_="unique",
     )
-    op.drop_constraint(
+    op_ext.drop_constraint_if_exists(
         op.f("fk_task_claimed_by_actor_id_actor"),
         "task",
         schema="agenticqueue",
         type_="foreignkey",
     )
-    op.drop_column("task", "claimed_at", schema="agenticqueue")
-    op.drop_column("task", "claimed_by_actor_id", schema="agenticqueue")
-    op.drop_column("task", "sequence", schema="agenticqueue")
-    op.drop_column("task", "labels", schema="agenticqueue")
-    op.drop_column("task", "priority", schema="agenticqueue")
+    op_ext.drop_column_if_exists("task", "claimed_at", schema="agenticqueue")
+    op_ext.drop_column_if_exists("task", "claimed_by_actor_id", schema="agenticqueue")
+    op_ext.drop_column_if_exists("task", "sequence", schema="agenticqueue")
+    op_ext.drop_column_if_exists("task", "labels", schema="agenticqueue")
+    op_ext.drop_column_if_exists("task", "priority", schema="agenticqueue")
     op.execute("DROP SEQUENCE IF EXISTS agenticqueue.task_sequence_seq")

@@ -44,6 +44,26 @@ owner: "codex"
 review_date: "2026-05-24"
 ```
 
+### AQ-301: Render SQLAlchemy URLs with passwords for migration fixtures
+
+```yaml
+title: "SQLAlchemy URL strings mask passwords unless explicitly rendered"
+type: "tooling"
+what_happened: "The AQ-301 migration idempotency fixture initially failed host and fallback Postgres auth because it passed `str(sa.URL)` to psycopg, which rendered the password as `***`."
+what_learned: "SQLAlchemy URLs are safe for logs by default, but that behavior makes them unsafe as connection strings unless `render_as_string(hide_password=False)` is used."
+action_rule: "When a test or migration helper passes a SQLAlchemy URL object to psycopg or an environment variable, render it with `hide_password=False` and keep masked forms only for logs."
+applies_when: "Building temporary database fixtures or deriving sync/async database URLs from SQLAlchemy URL objects."
+does_not_apply_when: "The URL is used only for human-readable logging or redacted diagnostics."
+evidence:
+  - "`uv run pytest apps/api/tests/test_migrations_idempotent.py -v` failed with repeated password authentication errors while using `str(sa.URL)`."
+  - "`uv run pytest apps/api/tests/test_migrations_idempotent.py -v` passed (`2 passed`) after switching the fixture to `render_as_string(hide_password=False)`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-300: Middleware e2e tests need a server-side API fixture, not browser route mocks
 
 ```yaml

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -12,7 +14,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "run",
         sa.Column("packet_version_id", sa.UUID(), nullable=True),
         schema="agenticqueue",
@@ -30,10 +32,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint(
+    op_ext.drop_constraint_if_exists(
         op.f("fk_run_packet_version_id_packet_version"),
         "run",
         schema="agenticqueue",
         type_="foreignkey",
     )
-    op.drop_column("run", "packet_version_id", schema="agenticqueue")
+    op_ext.drop_column_if_exists("run", "packet_version_id", schema="agenticqueue")

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from logging.config import fileConfig
+from pathlib import Path
 from uuid import uuid4
 
 from alembic import context
@@ -13,6 +15,7 @@ from agenticqueue_api.config import get_database_url
 from agenticqueue_api.db import metadata
 
 config = context.config
+sys.path.insert(0, str(Path(__file__).parent))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

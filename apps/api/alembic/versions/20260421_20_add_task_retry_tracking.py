@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -14,7 +16,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "task",
         sa.Column(
             "attempt_count",
@@ -24,7 +26,7 @@ def upgrade() -> None:
         ),
         schema="agenticqueue",
     )
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "task",
         sa.Column(
             "last_failure",
@@ -42,5 +44,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column("task", "last_failure", schema="agenticqueue")
-    op.drop_column("task", "attempt_count", schema="agenticqueue")
+    op_ext.drop_column_if_exists("task", "last_failure", schema="agenticqueue")
+    op_ext.drop_column_if_exists("task", "attempt_count", schema="agenticqueue")

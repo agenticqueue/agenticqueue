@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -13,7 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "auth_audit_log",
         sa.Column("user_id", sa.UUID(), nullable=True),
         sa.Column("actor_id", sa.UUID(), nullable=True),
@@ -53,14 +55,14 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_auth_audit_log")),
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         op.f("ix_auth_audit_log_actor_id"),
         "auth_audit_log",
         ["actor_id"],
         unique=False,
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         op.f("ix_auth_audit_log_user_id"),
         "auth_audit_log",
         ["user_id"],
@@ -70,14 +72,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         op.f("ix_auth_audit_log_user_id"),
         table_name="auth_audit_log",
         schema="agenticqueue",
     )
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         op.f("ix_auth_audit_log_actor_id"),
         table_name="auth_audit_log",
         schema="agenticqueue",
     )
-    op.drop_table("auth_audit_log", schema="agenticqueue")
+    op_ext.drop_table_if_exists("auth_audit_log", schema="agenticqueue")

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -13,12 +15,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "learning",
         sa.Column("owner", sa.String(length=255), nullable=True),
         schema="agenticqueue",
     )
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "learning_drafts",
         sa.Column(
             "task_id",
@@ -86,21 +88,21 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_learning_drafts")),
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "ix_learning_drafts_task_id",
         "learning_drafts",
         ["task_id"],
         unique=False,
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "ix_learning_drafts_run_id",
         "learning_drafts",
         ["run_id"],
         unique=False,
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "ix_learning_drafts_draft_status",
         "learning_drafts",
         ["draft_status"],
@@ -110,20 +112,20 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         "ix_learning_drafts_draft_status",
         table_name="learning_drafts",
         schema="agenticqueue",
     )
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         "ix_learning_drafts_run_id",
         table_name="learning_drafts",
         schema="agenticqueue",
     )
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         "ix_learning_drafts_task_id",
         table_name="learning_drafts",
         schema="agenticqueue",
     )
-    op.drop_table("learning_drafts", schema="agenticqueue")
-    op.drop_column("learning", "owner", schema="agenticqueue")
+    op_ext.drop_table_if_exists("learning_drafts", schema="agenticqueue")
+    op_ext.drop_column_if_exists("learning", "owner", schema="agenticqueue")

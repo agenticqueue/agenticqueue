@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -12,7 +14,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "auth_rate_limit",
         sa.Column("ip", sa.String(length=45), nullable=False),
         sa.Column("window_start_minute", sa.DateTime(timezone=True), nullable=False),
@@ -40,14 +42,14 @@ def upgrade() -> None:
         ),
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         op.f("ix_auth_rate_limit_ip"),
         "auth_rate_limit",
         ["ip"],
         unique=False,
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         op.f("ix_auth_rate_limit_window_start_minute"),
         "auth_rate_limit",
         ["window_start_minute"],
@@ -57,14 +59,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         op.f("ix_auth_rate_limit_window_start_minute"),
         table_name="auth_rate_limit",
         schema="agenticqueue",
     )
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         op.f("ix_auth_rate_limit_ip"),
         table_name="auth_rate_limit",
         schema="agenticqueue",
     )
-    op.drop_table("auth_rate_limit", schema="agenticqueue")
+    op_ext.drop_table_if_exists("auth_rate_limit", schema="agenticqueue")

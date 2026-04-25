@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -12,7 +14,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "project_members",
         sa.Column("user_id", sa.UUID(), nullable=False),
         sa.Column("project_id", sa.UUID(), nullable=False),
@@ -52,14 +54,14 @@ def upgrade() -> None:
         ),
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         op.f("ix_project_members_project_id"),
         "project_members",
         ["project_id"],
         unique=False,
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         op.f("ix_project_members_user_id"),
         "project_members",
         ["user_id"],
@@ -69,14 +71,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         op.f("ix_project_members_user_id"),
         table_name="project_members",
         schema="agenticqueue",
     )
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         op.f("ix_project_members_project_id"),
         table_name="project_members",
         schema="agenticqueue",
     )
-    op.drop_table("project_members", schema="agenticqueue")
+    op_ext.drop_table_if_exists("project_members", schema="agenticqueue")

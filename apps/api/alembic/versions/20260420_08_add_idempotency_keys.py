@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -13,7 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "idempotency_key",
         sa.Column("key", sa.Text(), nullable=False),
         sa.Column("actor_id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -42,14 +44,14 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("key", name=op.f("pk_idempotency_key")),
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         op.f("ix_idempotency_key_actor_id"),
         "idempotency_key",
         ["actor_id"],
         unique=False,
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         op.f("ix_idempotency_key_expires_at"),
         "idempotency_key",
         ["expires_at"],
@@ -59,14 +61,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         op.f("ix_idempotency_key_expires_at"),
         table_name="idempotency_key",
         schema="agenticqueue",
     )
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         op.f("ix_idempotency_key_actor_id"),
         table_name="idempotency_key",
         schema="agenticqueue",
     )
-    op.drop_table("idempotency_key", schema="agenticqueue")
+    op_ext.drop_table_if_exists("idempotency_key", schema="agenticqueue")

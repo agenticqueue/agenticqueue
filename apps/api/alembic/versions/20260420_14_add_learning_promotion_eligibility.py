@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -12,7 +14,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "learning",
         sa.Column(
             "promotion_eligible",
@@ -25,4 +27,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column("learning", "promotion_eligible", schema="agenticqueue")
+    op_ext.drop_column_if_exists("learning", "promotion_eligible", schema="agenticqueue")

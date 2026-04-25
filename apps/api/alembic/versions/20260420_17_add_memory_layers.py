@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -16,7 +18,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "memory_item",
         sa.Column("layer", MEMORY_LAYER_ENUM, nullable=False),
         sa.Column("scope_id", sa.UUID(), nullable=False),
@@ -58,7 +60,7 @@ def upgrade() -> None:
         ),
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "ix_memory_item_surface_area_gin",
         "memory_item",
         ["surface_area"],
@@ -69,9 +71,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         "ix_memory_item_surface_area_gin",
         table_name="memory_item",
         schema="agenticqueue",
     )
-    op.drop_table("memory_item", schema="agenticqueue")
+    op_ext.drop_table_if_exists("memory_item", schema="agenticqueue")

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -44,7 +46,7 @@ def _create_append_only_function(include_redaction: bool) -> None:
 
 
 def upgrade() -> None:
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "audit_log",
         sa.Column("redaction", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         schema="agenticqueue",
@@ -54,4 +56,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     _create_append_only_function(include_redaction=False)
-    op.drop_column("audit_log", "redaction", schema="agenticqueue")
+    op_ext.drop_column_if_exists("audit_log", "redaction", schema="agenticqueue")

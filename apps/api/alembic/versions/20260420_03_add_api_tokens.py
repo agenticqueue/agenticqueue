@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -13,7 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "api_token",
         sa.Column("token_hash", sa.String(length=64), nullable=False),
         sa.Column("actor_id", sa.UUID(), nullable=False),
@@ -50,7 +52,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("token_hash", name=op.f("uq_api_token_token_hash")),
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "ix_api_token_actor_id",
         "api_token",
         ["actor_id"],
@@ -60,7 +62,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
+    op_ext.drop_index_if_exists(
         "ix_api_token_actor_id", table_name="api_token", schema="agenticqueue"
     )
-    op.drop_table("api_token", schema="agenticqueue")
+    op_ext.drop_table_if_exists("api_token", schema="agenticqueue")

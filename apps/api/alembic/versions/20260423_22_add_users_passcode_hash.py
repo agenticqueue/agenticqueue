@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -12,7 +14,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    op_ext.create_table_if_not_exists(
         "users",
         sa.Column("username", sa.String(length=120), nullable=False),
         sa.Column("passcode_hash", sa.Text(), nullable=False),
@@ -48,7 +50,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("username", name=op.f("uq_users_username")),
         schema="agenticqueue",
     )
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         op.f("ix_users_actor_id"),
         "users",
         ["actor_id"],
@@ -75,5 +77,5 @@ def downgrade() -> None:
         schema="agenticqueue",
         postgresql_using="left(token_hash, 64)",
     )
-    op.drop_index(op.f("ix_users_actor_id"), table_name="users", schema="agenticqueue")
-    op.drop_table("users", schema="agenticqueue")
+    op_ext.drop_index_if_exists(op.f("ix_users_actor_id"), table_name="users", schema="agenticqueue")
+    op_ext.drop_table_if_exists("users", schema="agenticqueue")

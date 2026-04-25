@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -15,17 +17,17 @@ ZERO_HASH_SQL = "decode(repeat('00', 32), 'hex')"
 
 
 def upgrade() -> None:
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "audit_log",
         sa.Column("chain_position", sa.BigInteger(), nullable=True),
         schema="agenticqueue",
     )
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "audit_log",
         sa.Column("prev_hash", postgresql.BYTEA(), nullable=True),
         schema="agenticqueue",
     )
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "audit_log",
         sa.Column("row_hash", postgresql.BYTEA(), nullable=True),
         schema="agenticqueue",
@@ -154,7 +156,7 @@ def upgrade() -> None:
     )
     op.alter_column("audit_log", "prev_hash", nullable=False, schema="agenticqueue")
     op.alter_column("audit_log", "row_hash", nullable=False, schema="agenticqueue")
-    op.create_index(
+    op_ext.create_index_if_not_exists(
         "uq_audit_log_chain_position",
         "audit_log",
         ["chain_position"],
@@ -379,5 +381,5 @@ def downgrade() -> None:
     op.execute(
         "ALTER TABLE agenticqueue.audit_log DROP COLUMN IF EXISTS chain_position"
     )
-    op.drop_column("audit_log", "row_hash", schema="agenticqueue")
-    op.drop_column("audit_log", "prev_hash", schema="agenticqueue")
+    op_ext.drop_column_if_exists("audit_log", "row_hash", schema="agenticqueue")
+    op_ext.drop_column_if_exists("audit_log", "prev_hash", schema="agenticqueue")

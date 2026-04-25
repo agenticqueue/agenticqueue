@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import op_ext
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -13,17 +15,17 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "audit_log",
         sa.Column("before", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         schema="agenticqueue",
     )
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "audit_log",
         sa.Column("after", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         schema="agenticqueue",
     )
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "audit_log",
         sa.Column("trace_id", sa.String(length=64), nullable=True),
         schema="agenticqueue",
@@ -31,7 +33,7 @@ def upgrade() -> None:
     op.execute(
         'UPDATE agenticqueue.audit_log SET "after" = payload WHERE payload IS NOT NULL'
     )
-    op.drop_column("audit_log", "payload", schema="agenticqueue")
+    op_ext.drop_column_if_exists("audit_log", "payload", schema="agenticqueue")
 
     op.execute("""
         CREATE OR REPLACE FUNCTION agenticqueue.prevent_audit_log_mutation()
@@ -68,7 +70,7 @@ def downgrade() -> None:
     op.execute("DROP TRIGGER IF EXISTS audit_log_append_only ON agenticqueue.audit_log")
     op.execute("DROP FUNCTION IF EXISTS agenticqueue.prevent_audit_log_mutation()")
 
-    op.add_column(
+    op_ext.add_column_if_not_exists(
         "audit_log",
         sa.Column("payload", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         schema="agenticqueue",
@@ -78,6 +80,6 @@ def downgrade() -> None:
         SET payload = COALESCE("after", "before", '{}'::jsonb)
         """)
     op.alter_column("audit_log", "payload", nullable=False, schema="agenticqueue")
-    op.drop_column("audit_log", "trace_id", schema="agenticqueue")
-    op.drop_column("audit_log", "after", schema="agenticqueue")
-    op.drop_column("audit_log", "before", schema="agenticqueue")
+    op_ext.drop_column_if_exists("audit_log", "trace_id", schema="agenticqueue")
+    op_ext.drop_column_if_exists("audit_log", "after", schema="agenticqueue")
+    op_ext.drop_column_if_exists("audit_log", "before", schema="agenticqueue")
