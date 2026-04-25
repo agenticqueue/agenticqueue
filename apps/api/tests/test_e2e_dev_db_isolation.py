@@ -34,7 +34,9 @@ def _pnpm_command() -> list[str]:
 def test_playwright_e2e_uses_test_db_and_leaves_dev_auth_tables_unchanged(
     monkeypatch,
 ) -> None:
-    direct_db_port = os.getenv("AGENTICQUEUE_DB_PORT") or os.getenv("DB_PORT") or "54329"
+    direct_db_port = (
+        os.getenv("AGENTICQUEUE_DB_PORT") or os.getenv("DB_PORT") or "54329"
+    )
     test_database_url = (
         "postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:"
         f"{direct_db_port}/agenticqueue_test"

@@ -69,8 +69,13 @@ def _drop_query_keys(url: str, keys: set[str]) -> str:
 
 def get_database_url() -> str:
     """Return the async database URL used by Alembic and the API."""
-    if os.getenv("AGENTICQUEUE_USE_TEST_DATABASE", "").strip().lower() in TRUE_ENV_VALUES:
-        url = os.getenv("AGENTICQUEUE_DATABASE_URL_TEST") or os.getenv("DATABASE_URL_TEST")
+    if (
+        os.getenv("AGENTICQUEUE_USE_TEST_DATABASE", "").strip().lower()
+        in TRUE_ENV_VALUES
+    ):
+        url = os.getenv("AGENTICQUEUE_DATABASE_URL_TEST") or os.getenv(
+            "DATABASE_URL_TEST"
+        )
         if not url:
             raise RuntimeError(
                 "AGENTICQUEUE_USE_TEST_DATABASE is enabled but no "
