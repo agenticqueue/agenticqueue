@@ -21,13 +21,13 @@ def add_column_if_not_exists(
 
 def create_table_if_not_exists(
     table_name: str,
-    *columns: sa.Column[Any],
+    *schema_items: Any,
     schema: str | None = None,
     **kwargs: Any,
 ) -> sa.Table | None:
     if _has_table(table_name, schema=schema):
         return None
-    return op.create_table(table_name, *columns, schema=schema, **kwargs)
+    return op.create_table(table_name, *schema_items, schema=schema, **kwargs)
 
 
 def create_index_if_not_exists(
@@ -143,7 +143,9 @@ def _has_constraint(
     if not _has_table(table_name, schema=schema):
         return False
     inspector = _inspector()
-    constraints = inspector.get_unique_constraints(table_name, schema=schema)
+    constraints: list[Any] = list(
+        inspector.get_unique_constraints(table_name, schema=schema)
+    )
     constraints.extend(inspector.get_foreign_keys(table_name, schema=schema))
     constraints.extend(inspector.get_check_constraints(table_name, schema=schema))
     pk = inspector.get_pk_constraint(table_name, schema=schema)
