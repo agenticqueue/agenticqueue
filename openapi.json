@@ -352,6 +352,22 @@
             "title": "Id",
             "type": "string"
           },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
           "revoked_at": {
             "anyOf": [
               {
@@ -375,6 +391,10 @@
             "title": "Token Prefix",
             "type": "string"
           },
+          "token_preview": {
+            "title": "Token Preview",
+            "type": "string"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -384,7 +404,9 @@
         "required": [
           "id",
           "actor_id",
+          "name",
           "token_prefix",
+          "token_preview",
           "scopes",
           "created_at",
           "updated_at"
@@ -779,6 +801,136 @@
           "email"
         ],
         "title": "BootstrapUserResponse",
+        "type": "object"
+      },
+      "BrowserTokenCreateRequest": {
+        "description": "Browser-session payload for creating an admin API token.",
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "BrowserTokenCreateRequest",
+        "type": "object"
+      },
+      "BrowserTokenCreateResponse": {
+        "description": "Browser-session create response with the raw token shown once.",
+        "properties": {
+          "actor_id": {
+            "format": "uuid",
+            "title": "Actor Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "token_prefix": {
+            "title": "Token Prefix",
+            "type": "string"
+          },
+          "token_preview": {
+            "title": "Token Preview",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "actor_id",
+          "name",
+          "token_prefix",
+          "token_preview",
+          "scopes",
+          "created_at",
+          "updated_at",
+          "token"
+        ],
+        "title": "BrowserTokenCreateResponse",
+        "type": "object"
+      },
+      "BrowserTokenListResponse": {
+        "description": "Browser-session token list response.",
+        "properties": {
+          "tokens": {
+            "items": {
+              "$ref": "#/components/schemas/ApiTokenView"
+            },
+            "title": "Tokens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tokens"
+        ],
+        "title": "BrowserTokenListResponse",
         "type": "object"
       },
       "CapabilityGrantView": {
@@ -2846,6 +2998,13 @@
             ],
             "title": "Expires At"
           },
+          "name": {
+            "default": "api-token",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
           "scopes": {
             "items": {
               "type": "string"
@@ -4013,6 +4172,93 @@
           }
         },
         "summary": "Bootstrap Status"
+      }
+    },
+    "/api/auth/tokens": {
+      "get": {
+        "operationId": "list_browser_tokens_api_auth_tokens_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserTokenListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Browser Tokens"
+      },
+      "post": {
+        "operationId": "create_browser_token_api_auth_tokens_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrowserTokenCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserTokenCreateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Browser Token"
+      }
+    },
+    "/api/auth/tokens/{token_id}": {
+      "delete": {
+        "operationId": "delete_browser_token_api_auth_tokens__token_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Token Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Browser Token"
       }
     },
     "/api/session": {

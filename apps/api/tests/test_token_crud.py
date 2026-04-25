@@ -27,6 +27,17 @@ AUTH_TRUNCATE_TABLES = [
     "api_token",
     "actor",
 ]
+NON_ADMIN_ACTOR_SQL = """
+INSERT INTO agenticqueue.actor
+    (handle, actor_type, display_name, auth_subject, is_active)
+VALUES
+    ('operator', 'human', 'Operator', 'local:operator@localhost', true)
+RETURNING id
+"""
+TOKEN_HASH_ROWS_SQL = """
+SELECT token_hash, name
+FROM agenticqueue.api_token
+"""
 
 
 @pytest.fixture(scope="session")
@@ -90,13 +101,7 @@ def _create_token(client: TestClient, name: str = "codex") -> dict[str, str]:
 
 def _seed_non_admin(session_factory: sessionmaker[Session]) -> None:
     with session_factory.begin() as session:
-        actor_id = session.scalar(sa.text("""
-                INSERT INTO agenticqueue.actor
-                    (handle, actor_type, display_name, auth_subject, is_active)
-                VALUES
-                    ('operator', 'human', 'Operator', 'local:operator@localhost', true)
-                RETURNING id
-                """))
+        actor_id = session.scalar(sa.text(NON_ADMIN_ACTOR_SQL))
         session.execute(
             sa.text("""
                 INSERT INTO agenticqueue.users
@@ -241,10 +246,7 @@ def test_tokens_stored_hashed(
     created = _create_token(client, name="codex")
 
     with session_factory() as session:
-        rows = session.execute(sa.text("""
-                SELECT token_hash, name
-                FROM agenticqueue.api_token
-                """)).all()
+        rows = session.execute(sa.text(TOKEN_HASH_ROWS_SQL)).all()
 
     serialized_rows = repr(rows)
     assert created["token"] not in serialized_rows
