@@ -414,6 +414,17 @@ export default function SetupPage() {
           </p>
         </div>
 
+        <div
+          aria-label="First-run security"
+          className="first-run-warning"
+          role="note"
+        >
+          Complete setup before exposing this URL publicly.{" "}
+          <a href="https://github.com/agenticqueue/agenticqueue#first-run-security">
+            First-run security
+          </a>
+        </div>
+
         <form autoComplete="off" noValidate onSubmit={submit}>
           {formError ? <div className="form-error">{formError}</div> : null}
           <fieldset disabled={isSubmitting}>

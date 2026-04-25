@@ -89,6 +89,23 @@
   color: var(--ink-faint);
 }
 
+.setupPanel :global(.first-run-warning) {
+  border: 1px solid #f1e2a6;
+  border-radius: 4px;
+  background: #fff7d6;
+  color: #5a4411;
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 10px 12px;
+}
+
+.setupPanel :global(.first-run-warning a) {
+  color: #3e2e08;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .setupPanel :global(form) {
   display: flex;
   flex-direction: column;
