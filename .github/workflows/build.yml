@@ -84,7 +84,7 @@ jobs:
 
       - name: Smoke test login shell HTML
         shell: bash
-        run: curl -fsS http://localhost:3000/ | grep "AgenticQueue"
+        run: curl -fsSL http://localhost:3000/ | grep "AgenticQueue"
 
       - name: Exercise first-run bootstrap flow
         shell: bash
