@@ -9,6 +9,7 @@ import { DecisionsView } from "@/components/decisions-view";
 import { GraphView } from "@/components/graph-view";
 import { LearningsView } from "@/components/learnings-view";
 import { PipelinesView } from "@/components/pipelines-view";
+import { SettingsTokensView } from "@/components/settings-tokens-view";
 import { WorkView } from "@/components/work-view";
 import { AQ_BUILD_VERSION } from "@/lib/build-version";
 
@@ -19,7 +20,8 @@ type ViewKey =
   | "graph"
   | "decisions"
   | "learnings"
-  | "settings";
+  | "settings"
+  | "settingsTokens";
 
 type FooterHealthTone = "ok" | "warn" | "danger";
 
@@ -267,6 +269,8 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
           <DecisionsView authToken={authToken} />
         ) : view === "learnings" ? (
           <LearningsView authToken={authToken} />
+        ) : view === "settingsTokens" ? (
+          <SettingsTokensView />
         ) : view === "settings" ? (
           <>
             <div className="aq-content-head">
