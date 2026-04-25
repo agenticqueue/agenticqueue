@@ -207,14 +207,15 @@ function DonePanel({
         <div className="heading">
           <h1>You&apos;re in.</h1>
           <p>
-            Signed in as <code>{done.email}</code>. Here&apos;s your first API
-            token. Agents will use this to read from this AgenticQueue instance.
+            Signed in as <code>{done.email}</code>. Here&apos;s your first
+            access token. Use this token to authenticate any agent via MCP
+            server, <code>aq</code> CLI, or HTTP API.
           </p>
         </div>
 
         <div>
           <div className="field-label" style={{ marginBottom: 8 }}>
-            First API token
+            First access token
           </div>
           <div className="token-box">
             <span className="token-value">{done.firstToken}</span>
@@ -242,12 +243,13 @@ function DonePanel({
           <li>
             <span className="num">02</span>
             <span>
-              Point agents at <code>/api</code> with bearer auth
+              Configure your agent: AQ MCP server, <code>aq</code> CLI, or HTTP{" "}
+              <code>/api</code>. All use this token as bearer auth.
             </span>
           </li>
           <li>
             <span className="num">03</span>
-            <span>Invite teammates from Settings → Team</span>
+            <span>Create more tokens (one per agent) at Settings → API keys</span>
           </li>
         </ol>
 
