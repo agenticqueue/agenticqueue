@@ -2,6 +2,26 @@
 
 ## 2026-04-25
 
+### AQ-307: Run auth bootstrap DB tests serially
+
+```yaml
+title: "Auth bootstrap tests that share local Postgres must run serially"
+type: "pitfall"
+what_happened: "During AQ-307 verification, one targeted bootstrap pytest command and the broader `-k bootstrap` regression were launched in parallel. Both suites truncated and inserted into the same `agenticqueue.users`, `api_token`, `auth_sessions`, and `actor` tables, so the broader run briefly saw an admin row created by the other process and returned `409` where the wrong-passcode test expected `401`."
+what_learned: "The auth bootstrap fixtures isolate tests inside one pytest process, but they do not isolate two independent pytest processes pointed at the same local database."
+action_rule: "When verifying AgenticQueue auth bootstrap behavior against the shared local Postgres database, run the required pytest commands serially unless each process has its own database."
+applies_when: "Running API tests that truncate or populate the local auth tables, especially bootstrap, session, token, and first-admin tests."
+does_not_apply_when: "Each pytest worker or process has an isolated database/schema, or the command is a pure unit test with no shared Postgres writes."
+evidence:
+  - "`uv run pytest apps/api/tests/test_bootstrap_admin_race.py::test_integrity_error_returns_409 -v` and `uv run pytest apps/api/tests/ -v -k bootstrap` overlapped and produced a transient `409` in `test_wrong_passcode_constant_time`."
+  - "Rerunning `uv run pytest apps/api/tests/ -v -k bootstrap` serially passed with 7 selected tests green."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-276: Keep temporary source-guard tests out of the Next app tree
 
 ```yaml

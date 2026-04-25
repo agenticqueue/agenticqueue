@@ -61,6 +61,18 @@ def _user_count(session: Session) -> int:
     return int(session.scalar(sa.select(sa.func.count()).select_from(UserRecord)) or 0)
 
 
+def _is_one_admin_only_violation(error: sa.exc.IntegrityError) -> bool:
+    reason = str(error.orig if error.orig is not None else error).lower()
+    return "one_admin_only" in reason
+
+
+def _raise_bootstrap_conflict() -> None:
+    raise_api_error(
+        status.HTTP_409_CONFLICT,
+        "Bootstrap admin already exists",
+    )
+
+
 def _client_ip(request: Request) -> str | None:
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
@@ -136,7 +148,7 @@ def build_bootstrap_router(
     ) -> BootstrapAdminResponse:
         _take_bootstrap_lock(session)
         if _user_count(session) > 0:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "Bootstrap not found")
+            _raise_bootstrap_conflict()
 
         expected_passcode = get_admin_passcode()
         if expected_passcode is None:
@@ -151,11 +163,16 @@ def build_bootstrap_router(
                 error_code="auth_failed",
             )
 
-        user = _create_owner_user(
-            session,
-            email=normalize_email(payload.email),
-            password=payload.password,
-        )
+        try:
+            user = _create_owner_user(
+                session,
+                email=normalize_email(payload.email),
+                password=payload.password,
+            )
+        except sa.exc.IntegrityError as error:
+            if _is_one_admin_only_violation(error):
+                _raise_bootstrap_conflict()
+            raise
         assert user.actor_id is not None
         _, first_token = issue_api_token(
             session,

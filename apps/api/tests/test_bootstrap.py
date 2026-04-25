@@ -155,7 +155,7 @@ def test_locked_after_user_one(client: TestClient) -> None:
     assert status_response.json() == {"needs_bootstrap": False}
 
     second = client.post("/api/auth/bootstrap_admin", json=_bootstrap_body())
-    assert second.status_code == 404
+    assert second.status_code == 409
 
 
 def test_token_hash_only(
