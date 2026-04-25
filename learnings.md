@@ -2,6 +2,28 @@
 
 ## 2026-04-24
 
+### AQ-304: Compose smoke should follow auth-entry redirects instead of changing bootstrap semantics
+
+```yaml
+title: "Follow redirects in entry-route smoke checks before changing auth bootstrap behavior"
+type: "verification"
+what_happened: "AQ-304 first fixed the red docker-compose smoke by rewriting `/` to `/login`, then incorrectly fix-forwarded again by auto-seeding the first admin during startup. The repo's auth-entry and setup tests already defined the intended behavior: fresh instances redirect `/` to `/setup`, post-bootstrap anonymous visits redirect `/` to `/login?next=%2F`, and the first admin is created only through `/api/auth/bootstrap_admin`."
+what_learned: "A smoke check that curls a guarded entry route without following redirects can fail even when the product behavior is correct. Fixing the app to satisfy that brittle check can break the actual bootstrap contract."
+action_rule: "When CI smokes a protected entry route in AgenticQueue, either follow redirects (`curl -L`) or assert the redirect target explicitly. Do not change bootstrap or auth-entry behavior until you compare the failing smoke with the existing middleware and e2e route contracts."
+applies_when: "A build or docker-compose smoke check hits `/` or another middleware-guarded route before bootstrap or login is complete."
+does_not_apply_when: "The route contract is explicitly a direct 200 response with no redirect boundary, or the failing check already follows redirects and still disagrees with the rendered page."
+evidence:
+  - "GitHub Actions build run `24922434723` failed `Smoke test login shell HTML` because `curl -fsS http://localhost:3000/ | grep \"AgenticQueue\"` inspected the unfollowed redirect body."
+  - "GitHub Actions build run `24922659530` then failed `Exercise first-run bootstrap flow` after the startup auto-seed change made `/api/auth/bootstrap_status` return `{\"needs_bootstrap\": false}` too early."
+  - "Local compose repro on 2026-04-24 passed with `curl -fsSL http://127.0.0.1:13005/`, `bootstrap_status` true before `/api/auth/bootstrap_admin`, and `bootstrap_status` false afterward."
+  - "GitHub Actions build run `24922852776` passed after restoring the documented redirects and changing the smoke check to `curl -fsSL`."
+scope: "project"
+confidence: "validated"
+status: "active"
+owner: "codex"
+review_date: "2026-05-24"
+```
+
 ### AQ-291: Alembic merge revisions can be order-sensitive under downgrade tests
 
 ```yaml
