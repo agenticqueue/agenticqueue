@@ -36,11 +36,16 @@ async function mockBootstrapSuccess(page: Page, requests: unknown[] = []) {
   });
 }
 
-async function attachScreenshot(page: Page, testInfo: TestInfo, name: string) {
+async function attachScreenshot(
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+  ticket = "aq309",
+) {
   const screenshotPath = path.join(
     process.cwd(),
     "test-results",
-    "aq309",
+    ticket,
     `${name}.png`,
   );
   await mkdir(path.dirname(screenshotPath), { recursive: true });
@@ -49,6 +54,17 @@ async function attachScreenshot(page: Page, testInfo: TestInfo, name: string) {
     path: screenshotPath,
     contentType: "image/png",
   });
+}
+
+async function completeBootstrap(page: Page) {
+  await page.getByLabel("Admin email").fill("admin@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("CorrectHorse1!");
+  await page.getByLabel("Confirm password").fill("CorrectHorse1!");
+  await page.getByRole("button", { name: /create admin account/i }).click();
+
+  await expect(
+    page.getByRole("heading", { level: 1, name: "You're in." }),
+  ).toBeVisible();
 }
 
 test("setup-fields-count renders email password confirm only", async ({
@@ -149,6 +165,62 @@ test("bootstraps the first admin and reveals the first API token once", async ({
       password: "CorrectHorse1!",
     },
   ]);
+});
+
+test("done-screen-heading labels the token as access token", async ({
+  page,
+}, testInfo) => {
+  await mockNeedsBootstrap(page);
+  await mockBootstrapSuccess(page);
+
+  await page.goto("/setup");
+  await completeBootstrap(page);
+
+  await expect(page.getByText("First access token", { exact: true })).toBeVisible();
+  await expect(page.getByText("First API token", { exact: true })).toHaveCount(0);
+  await attachScreenshot(page, testInfo, "aq315-done-screen-1280x800", "aq315");
+});
+
+test("done-screen-surfaces mentions MCP CLI and API", async ({ page }) => {
+  await mockNeedsBootstrap(page);
+  await mockBootstrapSuccess(page);
+
+  await page.goto("/setup");
+  await completeBootstrap(page);
+
+  const summary = page.locator(".heading p");
+  await expect(summary).toContainText("MCP");
+  await expect(summary).toContainText("CLI");
+  await expect(summary).toContainText("API");
+});
+
+test("done-screen-step-02 mentions all token surfaces", async ({ page }) => {
+  await mockNeedsBootstrap(page);
+  await mockBootstrapSuccess(page);
+
+  await page.goto("/setup");
+  await completeBootstrap(page);
+
+  const step = page.locator(".next-list li").nth(1);
+  await expect(step).toContainText("AQ MCP server");
+  await expect(step).toContainText("aq CLI");
+  await expect(step).toContainText("HTTP /api");
+  await expect(step).toContainText("bearer auth");
+});
+
+test("done-screen-step-03 points to API keys without broken link", async ({
+  page,
+}) => {
+  await mockNeedsBootstrap(page);
+  await mockBootstrapSuccess(page);
+
+  await page.goto("/setup");
+  await completeBootstrap(page);
+
+  const step = page.locator(".next-list li").nth(2);
+  await expect(step).toContainText("Settings → API keys");
+  await expect(step).not.toContainText("Team");
+  await expect(step.getByRole("link")).toHaveCount(0);
 });
 
 test("redirects setup to login after bootstrap has already run", async ({
