@@ -13,18 +13,13 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from agenticqueue_api.config import get_admin_email, get_admin_passcode
-from agenticqueue_api.models import ActorRecord, UserRecord
+from agenticqueue_api.models import UserRecord
 
 SESSION_COOKIE_NAME = "aq_session"
 CSRF_COOKIE_NAME = "csrf-token"
 SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 PASSWORD_HASH_SCHEME = "pbkdf2_sha256"
 PASSWORD_HASH_ITERATIONS = 200_000
-
-
-class AdminPasscodeMissingError(RuntimeError):
-    """Raised when admin seed is requested without an admin passcode."""
 
 
 def normalize_email(email: str) -> str:
@@ -34,7 +29,7 @@ def normalize_email(email: str) -> str:
 
 
 def hash_password(password: str) -> str:
-    """Hash a local user password/passcode with stdlib PBKDF2-SHA256."""
+    """Hash a local user password with stdlib PBKDF2-SHA256."""
 
     salt = secrets.token_hex(16)
     digest = hashlib.pbkdf2_hmac(
@@ -98,52 +93,6 @@ def _write_auth_audit(
             "details": json.dumps(details or {}),
         },
     )
-
-
-def ensure_admin_seed(session: Session) -> UserRecord:
-    """Seed the first local admin user from AQ_ADMIN_* env vars."""
-
-    existing_user = session.scalar(
-        sa.select(UserRecord).order_by(UserRecord.created_at.asc(), UserRecord.id.asc())
-    )
-    if existing_user is not None:
-        return existing_user
-
-    passcode = get_admin_passcode()
-    if passcode is None:
-        raise AdminPasscodeMissingError(
-            "AQ_ADMIN_PASSCODE is required before seeding the first local admin"
-        )
-
-    email = normalize_email(get_admin_email())
-    actor = session.scalar(sa.select(ActorRecord).where(ActorRecord.handle == "admin"))
-    if actor is None:
-        actor = ActorRecord(
-            handle="admin",
-            actor_type="admin",
-            display_name="Admin",
-            auth_subject=f"local:{email}",
-            is_active=True,
-        )
-        session.add(actor)
-        session.flush()
-
-    user = UserRecord(
-        email=email,
-        passcode_hash=hash_password(passcode),
-        actor_id=actor.id,
-        is_admin=True,
-        is_active=True,
-    )
-    session.add(user)
-    session.flush()
-    _write_auth_audit(
-        session,
-        action="ADMIN_SEEDED",
-        user_id=user.id,
-        details={"email": user.email},
-    )
-    return user
 
 
 def authenticate_email_password(

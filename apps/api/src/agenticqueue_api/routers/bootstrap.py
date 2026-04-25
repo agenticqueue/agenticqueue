@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import uuid
 from collections.abc import Callable, Iterator
 from typing import Literal
@@ -14,7 +12,6 @@ from pydantic import Field
 from sqlalchemy.orm import Session
 
 from agenticqueue_api.auth import issue_api_token
-from agenticqueue_api.config import get_admin_passcode
 from agenticqueue_api.errors import raise_api_error
 from agenticqueue_api.local_auth import (
     CSRF_COOKIE_NAME,
@@ -38,7 +35,6 @@ class BootstrapAdminRequest(SchemaModel):
     """First-run local owner bootstrap payload."""
 
     email: str = Field(min_length=3, max_length=320, pattern=r"^[^@\s]+@[^@\s]+$")
-    passcode: str = Field(min_length=1)
     password: str = Field(min_length=1)
 
 
@@ -80,12 +76,6 @@ def _client_ip(request: Request) -> str | None:
     if request.client is None:
         return None
     return request.client.host
-
-
-def _admin_passcode_matches(candidate: str, expected: str) -> bool:
-    candidate_digest = hashlib.sha256(candidate.encode("utf-8")).digest()
-    expected_digest = hashlib.sha256(expected.encode("utf-8")).digest()
-    return hmac.compare_digest(candidate_digest, expected_digest)
 
 
 def _take_bootstrap_lock(session: Session) -> None:
@@ -149,19 +139,6 @@ def build_bootstrap_router(
         _take_bootstrap_lock(session)
         if _user_count(session) > 0:
             _raise_bootstrap_conflict()
-
-        expected_passcode = get_admin_passcode()
-        if expected_passcode is None:
-            raise_api_error(
-                status.HTTP_503_SERVICE_UNAVAILABLE,
-                "AQ_ADMIN_PASSCODE must be set before bootstrap",
-            )
-        if not _admin_passcode_matches(payload.passcode, expected_passcode):
-            raise_api_error(
-                status.HTTP_401_UNAUTHORIZED,
-                "Invalid bootstrap passcode",
-                error_code="auth_failed",
-            )
 
         try:
             user = _create_owner_user(

@@ -68,14 +68,12 @@ def client(session_factory: sessionmaker[Session]) -> Iterator[TestClient]:
 
 @pytest.fixture(autouse=True)
 def admin_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("AQ_ADMIN_PASSCODE", "letmein-dev-passcode")
     monkeypatch.setenv("AQ_ADMIN_EMAIL", "admin@localhost")
 
 
 def _bootstrap_body() -> dict[str, str]:
     return {
         "email": "admin@localhost",
-        "passcode": "letmein-dev-passcode",
         "password": "CorrectHorse12!",
     }
 

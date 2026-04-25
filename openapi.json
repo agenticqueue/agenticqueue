@@ -710,11 +710,6 @@
             "title": "Email",
             "type": "string"
           },
-          "passcode": {
-            "minLength": 1,
-            "title": "Passcode",
-            "type": "string"
-          },
           "password": {
             "minLength": 1,
             "title": "Password",
@@ -723,7 +718,6 @@
         },
         "required": [
           "email",
-          "passcode",
           "password"
         ],
         "title": "BootstrapAdminRequest",

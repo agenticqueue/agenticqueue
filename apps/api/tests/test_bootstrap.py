@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
-import statistics
-import time
 import re
 from collections.abc import Iterator
 
@@ -59,14 +55,12 @@ def client(session_factory: sessionmaker[Session]) -> Iterator[TestClient]:
 
 @pytest.fixture(autouse=True)
 def admin_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("AQ_ADMIN_PASSCODE", "letmein-dev-passcode")
     monkeypatch.setenv("AQ_ADMIN_EMAIL", "admin@localhost")
 
 
-def _bootstrap_body(passcode: str = "letmein-dev-passcode") -> dict[str, str]:
+def _bootstrap_body() -> dict[str, str]:
     return {
         "email": "ADMIN@LOCALHOST",
-        "passcode": passcode,
         "password": "CorrectHorse12!",
     }
 
@@ -102,48 +96,17 @@ def test_happy_path(
         assert authenticated.actor.actor_type == "admin"
 
 
-def test_wrong_passcode_constant_time(client: TestClient) -> None:
-    wrong_response = client.post(
+def test_bootstrap_no_passcode(client: TestClient) -> None:
+    response = client.post(
         "/api/auth/bootstrap_admin",
-        json=_bootstrap_body(passcode="wrong-passcode"),
+        json={
+            "email": "admin@localhost",
+            "password": "CorrectHorse12!",
+        },
     )
-    assert wrong_response.status_code == 401
 
-    expected = hashlib.sha256(b"letmein-dev-passcode").digest()
-
-    def compare(candidate: str) -> bool:
-        candidate_digest = hashlib.sha256(candidate.encode("utf-8")).digest()
-        return hmac.compare_digest(candidate_digest, expected)
-
-    short_wrong_samples = []
-    long_wrong_samples = []
-    for _ in range(20):
-        start = time.perf_counter_ns()
-        compare("x")
-        short_wrong_samples.append(time.perf_counter_ns() - start)
-
-        start = time.perf_counter_ns()
-        compare("wrong-passcode-with-a-much-longer-length")
-        long_wrong_samples.append(time.perf_counter_ns() - start)
-
-    median_diff_ms = (
-        abs(
-            statistics.median(short_wrong_samples)
-            - statistics.median(long_wrong_samples)
-        )
-        / 1_000_000
-    )
-    assert median_diff_ms < 5
-
-
-def test_env_unset(monkeypatch: pytest.MonkeyPatch, client: TestClient) -> None:
-    monkeypatch.delenv("AQ_ADMIN_PASSCODE", raising=False)
-    monkeypatch.delenv("AGENTICQUEUE_ADMIN_PASSCODE", raising=False)
-
-    response = client.post("/api/auth/bootstrap_admin", json=_bootstrap_body())
-
-    assert response.status_code == 503
-    assert "AQ_ADMIN_PASSCODE" in response.json()["message"]
+    assert response.status_code == 200
+    assert response.json()["first_token"].startswith("aq_live_")
 
 
 def test_locked_after_user_one(client: TestClient) -> None:

@@ -171,17 +171,6 @@ def get_admin_email() -> str:
     return DEFAULT_ADMIN_EMAIL
 
 
-def get_admin_passcode() -> str | None:
-    """Return the first local admin bootstrap passcode when configured."""
-
-    configured = os.getenv("AQ_ADMIN_PASSCODE") or os.getenv(
-        "AGENTICQUEUE_ADMIN_PASSCODE"
-    )
-    if configured and configured.strip():
-        return configured.strip()
-    return None
-
-
 def get_auto_setup_enabled() -> bool:
     """Return whether the API should auto-run first-boot setup during startup."""
 

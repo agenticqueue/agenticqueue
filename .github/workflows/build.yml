@@ -47,7 +47,6 @@ jobs:
         shell: bash
         env:
           AQ_ADMIN_EMAIL: admin@localhost
-          AQ_ADMIN_PASSCODE: ci-bootstrap-passcode
         run: docker compose -f docker-compose.yml up -d --build
 
       - name: Validate dev override config
@@ -102,7 +101,7 @@ jobs:
             -D /tmp/bootstrap-headers.txt \
             -o /tmp/bootstrap-response.json \
             -H 'Content-Type: application/json' \
-            -d '{"email":"admin@localhost","passcode":"ci-bootstrap-passcode","password":"CorrectHorse12!"}' \
+            -d '{"email":"admin@localhost","password":"CorrectHorse12!"}' \
             http://localhost:8000/api/auth/bootstrap_admin
           python - <<'PY'
           with open("/tmp/bootstrap-headers.txt", encoding="utf-8") as handle:
