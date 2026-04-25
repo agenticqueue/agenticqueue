@@ -102,4 +102,4 @@ def test_bootstrap_admin_replaces_legacy_setup_path(
         assert authenticated.actor.actor_type == "admin"
 
     locked_response = client.post("/api/auth/bootstrap_admin", json=_bootstrap_body())
-    assert locked_response.status_code == 404
+    assert locked_response.status_code == 409
