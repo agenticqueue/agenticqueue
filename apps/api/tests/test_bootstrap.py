@@ -175,3 +175,17 @@ def test_token_hash_only(
 
     assert stored_token != first_token
     assert first_token not in stored_token
+
+
+def test_auto_setup_seeds_first_admin(
+    monkeypatch: pytest.MonkeyPatch,
+    session_factory: sessionmaker[Session],
+) -> None:
+    monkeypatch.setenv("AGENTICQUEUE_AUTO_SETUP", "1")
+
+    app = create_app(session_factory=session_factory)
+    with TestClient(app) as client:
+        response = client.get("/api/auth/bootstrap_status")
+
+    assert response.status_code == 200
+    assert response.json() == {"needs_bootstrap": False}
