@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import op_ext
 
-from alembic import op
-
 revision = "20260421_21"
 down_revision = "20260421_20"
 branch_labels = None
