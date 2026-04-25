@@ -84,6 +84,26 @@ owner: "codex"
 review_date: "2026-05-25"
 ```
 
+### AQ-303: Link migration diagnostics to a concrete recovery runbook
+
+```yaml
+title: "Startup diagnostics need a nearby operator runbook"
+type: "docs"
+what_happened: "AQ-302 added a `[MIGRATION_FAIL]` banner, and AQ-303 followed by adding the referenced `docs/local-dev-recovery.md` runbook."
+what_learned: "A loud failure banner is more useful when it names a specific recovery document with commands operators can run immediately."
+action_rule: "When adding an operational diagnostic or recovery hint, add or update the referenced runbook in the same ticket chain and link it from README troubleshooting."
+applies_when: "A startup, migration, or local-dev failure message tells the user to inspect or recover system state."
+does_not_apply_when: "The diagnostic is self-contained and no manual recovery action is expected."
+evidence:
+  - "`docs/local-dev-recovery.md` documents detection, manual repair, stamp plus upgrade, and the drop-schema recovery path."
+  - "`README.md` links to `docs/local-dev-recovery.md` from the Troubleshooting section."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-300: Middleware e2e tests need a server-side API fixture, not browser route mocks
 
 ```yaml

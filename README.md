@@ -27,6 +27,12 @@ setting. `AQ_API_URL`, `AGENTICQUEUE_API_BASE_URL`, and
 `NEXT_PUBLIC_AGENTICQUEUE_API_BASE_URL` remain deprecated read-only aliases for
 one minor release while existing local setups roll forward.
 
+## Troubleshooting
+
+- [`docs/local-dev-recovery.md`](docs/local-dev-recovery.md) - recovery runbook
+  for local databases left in partial schema state by abandoned pre-1.0
+  branches or `[MIGRATION_FAIL]` startup errors.
+
 ## Repo Map
 
 - `README.md` - project overview and quick start
