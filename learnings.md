@@ -2,6 +2,27 @@
 
 ## 2026-04-25
 
+### AQ-324: Do not update token usage with a blocking per-request row write
+
+```yaml
+title: "Bearer-token last_used_at updates must not block read traffic"
+type: "performance"
+what_happened: "AQ-312 updated `api_token.last_used_at` synchronously on every bearer-token request. The CI REST hardening soak used many concurrent read requests through shared tokens, so requests queued behind the same token row and timed out before collecting latency samples."
+what_learned: "Usage metadata writes can turn read-only traffic into serialized write traffic when all requests share the same auth row. A correctness feature like `last_used_at` needs non-blocking behavior under load."
+action_rule: "When updating API-token usage metadata during authentication, use a rate-limited `FOR UPDATE SKIP LOCKED` write or another non-blocking mechanism so concurrent reads can continue even if another request is already updating the token row."
+applies_when: "Adding or changing auth middleware, API-token metadata, audit fields, or request-scoped usage tracking that writes during otherwise read-only requests."
+does_not_apply_when: "The write is tied to a user-initiated mutation that already requires serialization, or the token row is not shared across concurrent requests."
+evidence:
+  - "GitHub Actions test run `24941899142` failed `rest-hardening-matrix` with 0 successful soak samples and 19 read request timeouts after AQ-312."
+  - "`uv run pytest apps/api/tests/test_token_crud.py::test_last_used_update_skips_locked_token -v` passed after the auth update used `FOR UPDATE SKIP LOCKED`."
+  - "GitHub Actions test run `24942045269` passed `rest-hardening-matrix` and the full `test` workflow on commit `4a2845e`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-312: Reattach Secure browser-session cookies in API route tests
 
 ```yaml
