@@ -2,6 +2,26 @@
 
 ## 2026-04-25
 
+### AQ-312: Reattach Secure browser-session cookies in API route tests
+
+```yaml
+title: "FastAPI TestClient does not resend Secure cookies over HTTP"
+type: "testing"
+what_happened: "AQ-312's token CRUD tests bootstrapped an admin session successfully, then admin-only `/api/auth/tokens` requests still returned 401 because the session cookie was marked Secure and the local TestClient transport was HTTP."
+what_learned: "Browser-session tests can fail before they reach the router logic when production cookie flags interact with the test transport. The fix belongs in the test helper, not in production cookie security."
+action_rule: "When AgenticQueue API tests need to reuse an `aq_session` cookie from bootstrap/session responses, copy that cookie into the TestClient jar without the Secure transport restriction instead of weakening production cookie settings."
+applies_when: "Testing browser-authenticated API routes with FastAPI TestClient, especially admin-only routes under `/api/auth/*`."
+does_not_apply_when: "The test uses bearer-token auth, a real HTTPS browser context, or a route that does not depend on the browser session cookie."
+evidence:
+  - "`uv run pytest apps/api/tests/test_token_crud.py::test_create_token -v` initially returned 401 before the test helper reattached the session cookie for TestClient transport."
+  - "`uv run pytest apps/api/tests/test_token_crud.py -v` passed after the helper copied the cookie without changing production cookie flags."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-322: Do not assume uv exists in GitHub Playwright jobs
 
 ```yaml
