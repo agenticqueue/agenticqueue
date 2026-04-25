@@ -594,3 +594,23 @@ status: "active"
 owner: "codex"
 review_date: "2026-05-24"
 ```
+
+### AQ-285: Pair route caching with a short client TTL cache for repeated shell navigations
+
+```yaml
+title: "Second-navigation performance targets on auth-scoped read models may need a client TTL cache, not just a server cache"
+type: "repo-behavior"
+what_happened: "AQ-285 first added a 10-second cache and `Cache-Control` header to `/api/v1/pipelines`, and the route-level Vitest regression passed, but the Playwright check for a second in-app navigation to `/pipelines` still missed the `<300ms` target until the client reused the same 10-second payload window."
+what_learned: "For read-only shell views that remount and refetch the same auth-scoped aggregate, a short client-side cache can be the difference between proving the user-visible navigation target and only proving the server path in isolation."
+action_rule: "When a shell view has a repeated-navigation latency target and the payload can tolerate a short freshness window, keep the server cache in place and add a small client TTL cache keyed by the auth scope plus section/state."
+applies_when: "A Next.js read-model view re-fetches the same aggregate on in-app re-entry and the verification target is framed as a second navigation or repeated mount speed."
+does_not_apply_when: "The view must always show uncached state on every mount, or the verification target is a cold-document load rather than an in-app navigation."
+evidence:
+  - "`npx vitest run apps/web/app/api/v1/pipelines/route.test.ts` passed on 2026-04-25 with cache-hit and paginated-cache-miss coverage."
+  - "`npm --workspace @agenticqueue/web run test:e2e -- e2e/pipelines-cache.spec.ts` passed on 2026-04-25 after the client reused the 10-second pipelines payload window."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
