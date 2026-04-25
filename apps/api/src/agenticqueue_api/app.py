@@ -52,7 +52,6 @@ from agenticqueue_api.local_auth import (
     SESSION_MAX_AGE_SECONDS,
     authenticate_email_password,
     create_browser_session,
-    ensure_admin_seed,
 )
 from agenticqueue_api.migrations import apply_database_migrations
 from agenticqueue_api.middleware import (
@@ -635,15 +634,10 @@ def create_app(
     def run_auto_migrations() -> None:
         apply_database_migrations()
 
-    def run_auto_setup() -> None:
-        run_auto_migrations()
-        with resolved_session_factory.begin() as session:
-            ensure_admin_seed(session)
-
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if get_auto_setup_enabled():
-            await asyncio.to_thread(run_auto_setup)
+            await asyncio.to_thread(run_auto_migrations)
 
         del app
         packet_cache.start()
