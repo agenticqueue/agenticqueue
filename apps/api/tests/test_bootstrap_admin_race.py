@@ -106,16 +106,14 @@ def test_integrity_error_returns_409(
     session_factory: sessionmaker[Session],
 ) -> None:
     with session_factory.begin() as session:
-        actor_id = session.scalar(
-            sa.text("""
+        actor_id = session.scalar(sa.text("""
                 INSERT INTO agenticqueue.actor
                     (handle, actor_type, display_name, auth_subject, is_active)
                 VALUES
                     ('existing-admin', 'admin', 'Existing Admin',
                      'local:existing@localhost', true)
                 RETURNING id
-                """)
-        )
+                """))
         session.execute(
             sa.text("""
                 INSERT INTO agenticqueue.users
