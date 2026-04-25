@@ -6,7 +6,9 @@ import type { Page, TestInfo } from "@playwright/test";
 
 import { mockShellReadApis, seedAuthenticatedSession } from "./helpers";
 
-const E2E_AUTH_API_URL = "http://127.0.0.1:3127";
+const E2E_AUTH_API_URL = `http://127.0.0.1:${
+  process.env.AQ_E2E_AUTH_API_PORT ?? "3127"
+}`;
 
 async function setBootstrapState(needsBootstrap: boolean) {
   const response = await fetch(`${E2E_AUTH_API_URL}/__aq_e2e/state`, {

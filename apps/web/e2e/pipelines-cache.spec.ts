@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 
 import { seedAuthenticatedSession } from "./helpers";
 
-const E2E_STATE_URL = "http://127.0.0.1:3127/__aq_e2e/state";
+const E2E_STATE_URL = `http://127.0.0.1:${
+  process.env.AQ_E2E_AUTH_API_PORT ?? "3127"
+}/__aq_e2e/state`;
 
 test("second pipelines navigation reuses the cached aggregate", async ({
   page,

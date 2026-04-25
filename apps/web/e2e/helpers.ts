@@ -13,6 +13,7 @@ type SessionPayload = {
 
 const SESSION_TOKEN_KEY = "aq:web:api-token";
 const PERSIST_TOKEN_KEY = "aq:web:remember-token";
+const E2E_WEB_BASE_URL = `http://127.0.0.1:${process.env.AQ_E2E_WEB_PORT ?? "3005"}`;
 
 const DEFAULT_SESSION_PAYLOAD: SessionPayload = {
   actor: {
@@ -90,7 +91,7 @@ export async function seedAuthenticatedSession(
     {
       name: "aq_session",
       value: "playwright",
-      url: "http://127.0.0.1:3005",
+      url: E2E_WEB_BASE_URL,
     },
   ]);
 

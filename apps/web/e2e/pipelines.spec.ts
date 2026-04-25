@@ -11,6 +11,8 @@ const sessionPayload = {
   apiBaseUrl: "http://127.0.0.1:8010",
 };
 
+const E2E_WEB_BASE_URL = `http://127.0.0.1:${process.env.AQ_E2E_WEB_PORT ?? "3005"}`;
+
 const inProgressPayload = {
   state: "in_progress",
   count: 2,
@@ -252,7 +254,7 @@ test.beforeEach(async ({ page }) => {
     {
       name: "aq_session",
       value: "playwright",
-      url: "http://127.0.0.1:3005",
+      url: E2E_WEB_BASE_URL,
     },
   ]);
 

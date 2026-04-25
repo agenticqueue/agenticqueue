@@ -5,6 +5,8 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
 
 test.use({ viewport: { height: 800, width: 1280 } });
 
+const E2E_WEB_BASE_URL = `http://127.0.0.1:${process.env.AQ_E2E_WEB_PORT ?? "3005"}`;
+
 async function attachScreenshot(page: Page, testInfo: TestInfo, name: string) {
   const screenshotPath = path.join(
     process.cwd(),
@@ -198,7 +200,7 @@ test("keeps the auth grid scoped to login and out of pipelines", async ({
     {
       name: "aq_session",
       value: "playwright",
-      url: "http://127.0.0.1:3005",
+      url: E2E_WEB_BASE_URL,
     },
   ]);
   await page.goto("/pipelines");
