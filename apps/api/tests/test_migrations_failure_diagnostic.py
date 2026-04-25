@@ -35,9 +35,7 @@ def test_migration_failure_prints_diagnostic(
     assert "[MIGRATION_FAIL] Alembic migration failed during API startup." in stderr
     assert "[MIGRATION_FAIL] current_rev=20260423_28" in stderr
     assert "[MIGRATION_FAIL] target_rev=20260424_29" in stderr
-    assert (
-        "[MIGRATION_FAIL] failing_migration=20260424_29_users_email.py" in stderr
-    )
+    assert "[MIGRATION_FAIL] failing_migration=20260424_29_users_email.py" in stderr
     assert "[MIGRATION_FAIL] exception=RuntimeError: column already exists" in stderr
     assert "docs/local-dev-recovery.md" in stderr
 

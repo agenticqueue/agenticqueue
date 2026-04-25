@@ -117,7 +117,9 @@ def _has_table(table_name: str, *, schema: str | None) -> bool:
     return _inspector().has_table(table_name, schema=schema)
 
 
-def _has_column(table_name: str, column_name: str | None, *, schema: str | None) -> bool:
+def _has_column(
+    table_name: str, column_name: str | None, *, schema: str | None
+) -> bool:
     if not column_name or not _has_table(table_name, schema=schema):
         return False
     return any(
@@ -135,7 +137,9 @@ def _has_index(table_name: str, index_name: str, *, schema: str | None) -> bool:
     )
 
 
-def _has_constraint(table_name: str, constraint_name: str, *, schema: str | None) -> bool:
+def _has_constraint(
+    table_name: str, constraint_name: str, *, schema: str | None
+) -> bool:
     if not _has_table(table_name, schema=schema):
         return False
     inspector = _inspector()

@@ -160,7 +160,9 @@ def test_migrations_can_rerun_after_head(temp_database: str) -> None:
     with psycopg.connect(temp_database) as connection:
         with connection.cursor() as cursor:
             cursor.execute("SELECT version_num FROM alembic_version")
-            assert cursor.fetchone() == (ScriptDirectory.from_config(config).get_current_head(),)
+            assert cursor.fetchone() == (
+                ScriptDirectory.from_config(config).get_current_head(),
+            )
 
 
 def test_partial_state_recovery(temp_database: str) -> None:
@@ -176,8 +178,7 @@ def test_partial_state_recovery(temp_database: str) -> None:
         with connection.cursor() as cursor:
             cursor.execute("CREATE EXTENSION IF NOT EXISTS citext")
             cursor.execute(
-                "ALTER TABLE agenticqueue.users "
-                "ADD COLUMN IF NOT EXISTS email CITEXT"
+                "ALTER TABLE agenticqueue.users ADD COLUMN IF NOT EXISTS email CITEXT"
             )
         connection.commit()
 

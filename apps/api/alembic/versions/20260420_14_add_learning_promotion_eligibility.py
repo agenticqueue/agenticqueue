@@ -26,4 +26,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op_ext.drop_column_if_exists("learning", "promotion_eligible", schema="agenticqueue")
+    op_ext.drop_column_if_exists(
+        "learning", "promotion_eligible", schema="agenticqueue"
+    )

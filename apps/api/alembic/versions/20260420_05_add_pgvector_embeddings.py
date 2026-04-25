@@ -38,4 +38,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     for table_name in reversed(EMBEDDING_TABLES):
         op.execute(drop_embedding_index_sql(table_name))
-        op_ext.drop_column_if_exists(table_name, EMBEDDING_COLUMN_NAME, schema="agenticqueue")
+        op_ext.drop_column_if_exists(
+            table_name, EMBEDDING_COLUMN_NAME, schema="agenticqueue"
+        )

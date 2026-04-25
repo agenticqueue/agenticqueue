@@ -90,6 +90,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op_ext.drop_index_if_exists("ix_edge_dst_lookup", table_name="edge", schema="agenticqueue")
-    op_ext.drop_index_if_exists("ix_edge_src_lookup", table_name="edge", schema="agenticqueue")
+    op_ext.drop_index_if_exists(
+        "ix_edge_dst_lookup", table_name="edge", schema="agenticqueue"
+    )
+    op_ext.drop_index_if_exists(
+        "ix_edge_src_lookup", table_name="edge", schema="agenticqueue"
+    )
     op_ext.drop_table_if_exists("edge", schema="agenticqueue")

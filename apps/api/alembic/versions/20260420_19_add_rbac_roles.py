@@ -254,7 +254,9 @@ def downgrade() -> None:
         schema="agenticqueue",
         type_="foreignkey",
     )
-    op_ext.drop_column_if_exists("capability_grant", "role_assignment_id", schema="agenticqueue")
+    op_ext.drop_column_if_exists(
+        "capability_grant", "role_assignment_id", schema="agenticqueue"
+    )
 
     op_ext.drop_index_if_exists(
         "ix_actor_role_assignment_role_id",

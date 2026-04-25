@@ -77,5 +77,7 @@ def downgrade() -> None:
         schema="agenticqueue",
         postgresql_using="left(token_hash, 64)",
     )
-    op_ext.drop_index_if_exists(op.f("ix_users_actor_id"), table_name="users", schema="agenticqueue")
+    op_ext.drop_index_if_exists(
+        op.f("ix_users_actor_id"), table_name="users", schema="agenticqueue"
+    )
     op_ext.drop_table_if_exists("users", schema="agenticqueue")
