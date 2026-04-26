@@ -119,6 +119,9 @@ def test_locked_after_user_one(client: TestClient) -> None:
 
     second = client.post("/api/auth/bootstrap_admin", json=_bootstrap_body())
     assert second.status_code == 409
+    payload = second.json()
+    assert payload["error"]["code"] == "conflict"
+    assert payload["message"] == "Bootstrap admin already exists"
 
 
 def test_token_hash_only(

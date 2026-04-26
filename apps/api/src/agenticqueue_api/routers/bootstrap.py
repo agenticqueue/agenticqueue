@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+import logging
 from collections.abc import Callable, Iterator
 from typing import Literal
 
@@ -23,6 +24,10 @@ from agenticqueue_api.local_auth import (
 )
 from agenticqueue_api.models import ActorRecord, UserRecord
 from agenticqueue_api.models.shared import SchemaModel
+
+logger = logging.getLogger(__name__)
+POSTGRES_UNIQUE_VIOLATION = "23505"
+BOOTSTRAP_AUTH_TABLES = frozenset({"actor", "users"})
 
 
 class BootstrapStatusResponse(SchemaModel):
@@ -62,10 +67,51 @@ def _is_one_admin_only_violation(error: sa.exc.IntegrityError) -> bool:
     return "one_admin_only" in reason
 
 
-def _raise_bootstrap_conflict() -> None:
+def _constraint_name(error: sa.exc.IntegrityError) -> str | None:
+    diag = getattr(getattr(error, "orig", None), "diag", None)
+    constraint_name = getattr(diag, "constraint_name", None)
+    if constraint_name is None:
+        return None
+    return str(constraint_name)
+
+
+def _table_name(error: sa.exc.IntegrityError) -> str | None:
+    diag = getattr(getattr(error, "orig", None), "diag", None)
+    table_name = getattr(diag, "table_name", None)
+    if table_name is None:
+        return None
+    return str(table_name)
+
+
+def _is_bootstrap_auth_unique_violation(error: sa.exc.IntegrityError) -> bool:
+    if _is_one_admin_only_violation(error):
+        return True
+    orig = error.orig
+    if str(getattr(orig, "sqlstate", "")) != POSTGRES_UNIQUE_VIOLATION:
+        return False
+    return _table_name(error) in BOOTSTRAP_AUTH_TABLES
+
+
+def _raise_bootstrap_conflict(
+    *,
+    constraint_name: str | None = None,
+) -> None:
+    details = None
+    if constraint_name is not None:
+        details = {"constraint": constraint_name}
     raise_api_error(
         status.HTTP_409_CONFLICT,
         "Bootstrap admin already exists",
+        details=details,
+    )
+
+
+def _log_bootstrap_conflict(constraint_name: str | None) -> None:
+    # Alembic startup logging can disable existing module loggers.
+    logger.disabled = False
+    logger.warning(
+        "Bootstrap admin unique constraint conflict: %s",
+        constraint_name or "unknown",
     )
 
 
@@ -147,8 +193,10 @@ def build_bootstrap_router(
                 password=payload.password,
             )
         except sa.exc.IntegrityError as error:
-            if _is_one_admin_only_violation(error):
-                _raise_bootstrap_conflict()
+            if _is_bootstrap_auth_unique_violation(error):
+                constraint_name = _constraint_name(error)
+                _log_bootstrap_conflict(constraint_name)
+                _raise_bootstrap_conflict(constraint_name=constraint_name)
             raise
         assert user.actor_id is not None
         _, first_token = issue_api_token(
