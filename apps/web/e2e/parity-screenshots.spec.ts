@@ -9,9 +9,14 @@ import { mockShellReadApis, seedAuthenticatedSession } from "./helpers";
 const AQ_321_VIEWPORT = { width: 1440, height: 900 } as const;
 const FOOTER_SINGLE_ROW_TOLERANCE_PX = 4;
 const FOOTER_SINGLE_ROW_MAX_HEIGHT_PX = 64;
+const DESIGN_REFERENCE_FIXTURE_HTML = path.resolve(
+  __dirname,
+  "fixtures",
+  "aq-321",
+  "AgenticQueue-standalone.html",
+);
 const DESIGN_REFERENCE_HTML =
-  process.env.AQ_DESIGN_REFERENCE_HTML ??
-  "D:/mmmmm/mmmmm-agenticqueue/site/app-preview/project/AgenticQueue-standalone.html";
+  process.env.AQ_DESIGN_REFERENCE_HTML ?? DESIGN_REFERENCE_FIXTURE_HTML;
 const DESIGN_REFERENCE_URL = pathToFileURL(DESIGN_REFERENCE_HTML).href;
 const ARTIFACT_DIR = path.resolve(__dirname, "..", "test-results", "aq-321");
 const MANIFEST_PATH = path.join(ARTIFACT_DIR, "manifest.json");
@@ -120,8 +125,12 @@ test("aq-321-parity captures product and design screenshot pairs", async ({
     });
   }
 
-  await fs.writeFile(MANIFEST_PATH, JSON.stringify(manifest, null, 2), "utf8");
-  await fs.writeFile(COMPARISON_PATH, buildComparisonHtml(manifest), "utf8");
+  await fs.writeFile(
+    MANIFEST_PATH,
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf8",
+  );
+  await fs.writeFile(COMPARISON_PATH, `${buildComparisonHtml(manifest)}\n`, "utf8");
   await expect.poll(() => fs.stat(MANIFEST_PATH).then((stat) => stat.size)).toBeGreaterThan(0);
   await expect.poll(() => fs.stat(COMPARISON_PATH).then((stat) => stat.size)).toBeGreaterThan(0);
 });
