@@ -1,0 +1,38 @@
+[
+  {
+    "view": "pipelines",
+    "product": "C:\\Users\\devop\\.config\\superpowers\\worktrees\\agenticqueue\\aq-311-20260425152406\\apps\\web\\test-results\\aq-321\\pipelines-product.png",
+    "design": "C:\\Users\\devop\\.config\\superpowers\\worktrees\\agenticqueue\\aq-311-20260425152406\\apps\\web\\test-results\\aq-321\\pipelines-design.png",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    }
+  },
+  {
+    "view": "work",
+    "product": "C:\\Users\\devop\\.config\\superpowers\\worktrees\\agenticqueue\\aq-311-20260425152406\\apps\\web\\test-results\\aq-321\\work-product.png",
+    "design": "C:\\Users\\devop\\.config\\superpowers\\worktrees\\agenticqueue\\aq-311-20260425152406\\apps\\web\\test-results\\aq-321\\work-design.png",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    }
+  },
+  {
+    "view": "decisions",
+    "product": "C:\\Users\\devop\\.config\\superpowers\\worktrees\\agenticqueue\\aq-311-20260425152406\\apps\\web\\test-results\\aq-321\\decisions-product.png",
+    "design": "C:\\Users\\devop\\.config\\superpowers\\worktrees\\agenticqueue\\aq-311-20260425152406\\apps\\web\\test-results\\aq-321\\decisions-design.png",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    }
+  },
+  {
+    "view": "learnings",
+    "product": "C:\\Users\\devop\\.config\\superpowers\\worktrees\\agenticqueue\\aq-311-20260425152406\\apps\\web\\test-results\\aq-321\\learnings-product.png",
+    "design": "C:\\Users\\devop\\.config\\superpowers\\worktrees\\agenticqueue\\aq-311-20260425152406\\apps\\web\\test-results\\aq-321\\learnings-design.png",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    }
+  }
+]
