@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 import logging
 from collections.abc import Callable, Iterator
@@ -26,6 +27,11 @@ from agenticqueue_api.models import ActorRecord, UserRecord
 from agenticqueue_api.models.shared import SchemaModel
 
 logger = logging.getLogger(__name__)
+ADMIN_HANDLE = "admin"
+ADMIN_DISPLAY_NAME = "Admin"
+ADMIN_ACTOR_TYPE = "admin"
+ARCHIVED_ADMIN_HANDLE_PREFIX = "admin-archived"
+ARCHIVE_TIMESTAMP_MULTIPLIER = 1_000_000
 POSTGRES_UNIQUE_VIOLATION = "23505"
 BOOTSTRAP_AUTH_TABLES = frozenset({"actor", "users"})
 
@@ -115,6 +121,36 @@ def _log_bootstrap_conflict(constraint_name: str | None) -> None:
     )
 
 
+def _archived_admin_handle() -> str:
+    archive_timestamp = int(
+        dt.datetime.now(dt.UTC).timestamp() * ARCHIVE_TIMESTAMP_MULTIPLIER
+    )
+    return f"{ARCHIVED_ADMIN_HANDLE_PREFIX}-{archive_timestamp}"
+
+
+def _archive_stale_admin_actor(session: Session) -> ActorRecord | None:
+    actor = session.scalar(
+        sa.select(ActorRecord)
+        .where(ActorRecord.handle == ADMIN_HANDLE)
+        .with_for_update()
+    )
+    if actor is None:
+        return None
+
+    archived_handle = _archived_admin_handle()
+    actor.handle = archived_handle
+    actor.is_active = False
+    session.flush()
+
+    logger.disabled = False
+    logger.warning(
+        "Archived stale admin actor before bootstrap: actor_id=%s archived_handle=%s",
+        actor.id,
+        archived_handle,
+    )
+    return actor
+
+
 def _client_ip(request: Request) -> str | None:
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
@@ -134,10 +170,11 @@ def _create_owner_user(
     email: str,
     password: str,
 ) -> UserRecord:
+    _archive_stale_admin_actor(session)
     actor = ActorRecord(
-        handle="admin",
-        actor_type="admin",
-        display_name="Admin",
+        handle=ADMIN_HANDLE,
+        actor_type=ADMIN_ACTOR_TYPE,
+        display_name=ADMIN_DISPLAY_NAME,
         auth_subject=f"local:{email}",
         is_active=True,
     )

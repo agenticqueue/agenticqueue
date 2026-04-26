@@ -97,6 +97,28 @@ def _seed_orphan_admin_actor(session_factory: sessionmaker[Session]) -> None:
         session.execute(orphan_actor_insert)
 
 
+def _seed_existing_admin_user(session_factory: sessionmaker[Session]) -> None:
+    with session_factory.begin() as session:
+        actor_insert = sa.text("""
+                INSERT INTO agenticqueue.actor
+                    (handle, actor_type, display_name, auth_subject, is_active)
+                VALUES
+                    ('existing-admin', 'admin', 'Existing Admin',
+                     'local:existing@localhost', true)
+                RETURNING id
+                """)
+        actor_id = session.scalar(actor_insert)
+        session.execute(
+            sa.text("""
+                INSERT INTO agenticqueue.users
+                    (email, passcode_hash, actor_id, is_admin, is_active)
+                VALUES
+                    ('existing@localhost', 'hash', :actor_id, true, true)
+                """),
+            {"actor_id": actor_id},
+        )
+
+
 @contextmanager
 def _serve_app(app: FastAPI) -> Iterator[str]:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -187,7 +209,7 @@ def test_integrity_error_returns_409(
     assert response.json()["message"] == "Bootstrap admin already exists"
 
 
-def test_orphan_actor_returns_409(
+def test_orphan_actor_is_archived_and_bootstrap_succeeds(
     client: TestClient,
     session_factory: sessionmaker[Session],
 ) -> None:
@@ -198,10 +220,25 @@ def test_orphan_actor_returns_409(
         json=_bootstrap_body(email="new-admin@localhost"),
     )
 
-    assert response.status_code == 409
-    payload = response.json()
-    assert "already exists" in payload["message"].lower()
-    assert "uq_actor_handle" in str(payload["details"])
+    assert response.status_code == 200
+    assert response.json()["user"]["email"] == "new-admin@localhost"
+
+    with session_factory() as session:
+        active_admin_query = sa.text("""
+                SELECT auth_subject
+                FROM agenticqueue.actor
+                WHERE handle = 'admin' AND is_active = true
+                """)
+        archived_admin_query = sa.text("""
+                SELECT handle
+                FROM agenticqueue.actor
+                WHERE handle LIKE 'admin-archived-%' AND is_active = false
+                """)
+        active_admin = session.scalar(active_admin_query)
+        archived_admin = session.scalar(archived_admin_query)
+
+    assert active_admin == "local:new-admin@localhost"
+    assert archived_admin is not None
 
 
 def test_response_parity_live_vs_testclient(
@@ -225,17 +262,22 @@ def test_response_parity_live_vs_testclient(
             timeout=HTTP_CLIENT_TIMEOUT_SECONDS,
         )
 
-    assert test_response.status_code == 409
-    assert live_response.status_code == 409
-    assert test_response.json() == live_response.json()
+    assert test_response.status_code == 200
+    assert live_response.status_code == 200
+    assert test_response.json()["user"]["email"] == "testclient-admin@localhost"
+    assert live_response.json()["user"]["email"] == "live-admin@localhost"
+    assert test_response.json()["first_token"].startswith("aq_live_")
+    assert live_response.json()["first_token"].startswith("aq_live_")
 
 
 def test_409_logs_constraint_name(
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     client: TestClient,
     session_factory: sessionmaker[Session],
 ) -> None:
-    _seed_orphan_admin_actor(session_factory)
+    _seed_existing_admin_user(session_factory)
+    monkeypatch.setattr(bootstrap_router, "_user_count", lambda session: 0)
 
     handler = logging.StreamHandler()
     handler.setLevel(logging.WARNING)
@@ -252,4 +294,4 @@ def test_409_logs_constraint_name(
         bootstrap_router.logger.setLevel(previous_level)
 
     assert response.status_code == 409
-    assert "uq_actor_handle" in capsys.readouterr().err
+    assert "one_admin_only" in capsys.readouterr().err
