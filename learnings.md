@@ -2,6 +2,25 @@
 
 ## 2026-04-25
 
+### AQ-334: Pytest env leak can invalidate late CI database tests
+
+```yaml
+title: "Unit tests for env-setting helpers must register cleanup for every env var they set"
+type: "testing"
+what_happened: "AQ-330's new idempotency test deleted CI and called `prepare_pytest_database()` with the subprocess mocked, but it did not register cleanup for `AGENTICQUEUE_USE_TEST_DATABASE`. In GitHub Actions that leaked the test-database switch into later tests, so the suite tried to connect to `agenticqueue_test` after CI had only prepared the normal `agenticqueue` database."
+what_learned: "When a unit test calls a helper that writes environment variables directly, cleanup has to cover every variable the helper can mutate, not only the variables used by assertions. CI-only leaks can appear late in the suite because pytest keeps one process-wide environment across files."
+action_rule: "For tests around environment-mutating helpers, include every helper-owned env var in monkeypatch cleanup before invoking the helper, especially boolean switches that change config selection."
+applies_when: "Testing AgenticQueue config or test-support helpers that call `os.environ[...] = ...`."
+does_not_apply_when: "The code under test receives an isolated env mapping and never mutates `os.environ`."
+evidence:
+  - "`CI=1 AGENTICQUEUE_DATABASE_URL=.../agenticqueue_test uv run pytest --no-cov tests/unit/test_pytest_db_isolation.py tests/unit/test_statement_timeout.py tests/unit/test_task_type_registry.py -v` passed after adding `AGENTICQUEUE_USE_TEST_DATABASE` to cleanup."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-330: Local pytest must prepare test DB before imports
 
 ```yaml
