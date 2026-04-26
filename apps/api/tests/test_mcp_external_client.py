@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import os
 import socket
-import subprocess
-import sys
 import threading
 import time
 import uuid
@@ -24,16 +21,6 @@ from mcp.types import CallToolResult
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 import uvicorn
-
-os.environ.setdefault("AGENTICQUEUE_USE_TEST_DATABASE", "1")
-_direct_db_port = os.getenv("AGENTICQUEUE_DB_PORT") or os.getenv("DB_PORT") or "54329"
-_test_database_url = (
-    os.getenv("AGENTICQUEUE_DATABASE_URL_TEST")
-    or os.getenv("DATABASE_URL_TEST")
-    or f"postgresql+asyncpg://agenticqueue:agenticqueue@127.0.0.1:{_direct_db_port}/agenticqueue_test"
-)
-os.environ.setdefault("AGENTICQUEUE_DATABASE_URL_TEST", _test_database_url)
-os.environ.setdefault("DATABASE_URL_TEST", _test_database_url)
 
 from agenticqueue_api.app import create_app  # noqa: E402
 from agenticqueue_api.config import (  # noqa: E402
@@ -163,32 +150,7 @@ def tool_result_payload(result: CallToolResult) -> dict[str, Any]:
 
 
 @pytest.fixture(scope="session")
-def prepared_test_database() -> Iterator[None]:
-    env = {
-        **os.environ,
-        "AGENTICQUEUE_USE_TEST_DATABASE": "1",
-        "AGENTICQUEUE_DATABASE_URL_TEST": _test_database_url,
-        "DATABASE_URL_TEST": _test_database_url,
-    }
-    subprocess.run(
-        [sys.executable, "apps/api/scripts/e2e_test_db.py", "setup"],
-        cwd=os.getcwd(),
-        env=env,
-        check=True,
-    )
-    try:
-        yield
-    finally:
-        subprocess.run(
-            [sys.executable, "apps/api/scripts/e2e_test_db.py", "teardown"],
-            cwd=os.getcwd(),
-            env=env,
-            check=True,
-        )
-
-
-@pytest.fixture(scope="session")
-def engine(prepared_test_database: None) -> Iterator[Engine]:
+def engine() -> Iterator[Engine]:
     engine = sa.create_engine(
         get_sqlalchemy_sync_database_url(),
         future=True,

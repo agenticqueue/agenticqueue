@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -11,10 +13,31 @@ from agenticqueue_api.config import get_database_url, get_sqlalchemy_sync_databa
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 AUTH_TABLES = ("users", "auth_audit_log", "actor")
+TEST_DATABASE_ENV_VARS = (
+    "AGENTICQUEUE_USE_TEST_DATABASE",
+    "AGENTICQUEUE_DATABASE_URL_TEST",
+    "DATABASE_URL_TEST",
+)
+
+
+@contextmanager
+def _dev_database_env() -> Iterator[None]:
+    previous = {name: os.environ.get(name) for name in TEST_DATABASE_ENV_VARS}
+    for name in TEST_DATABASE_ENV_VARS:
+        os.environ.pop(name, None)
+    try:
+        yield
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 
 def _auth_row_counts() -> dict[str, int]:
-    engine = sa.create_engine(get_sqlalchemy_sync_database_url(), future=True)
+    with _dev_database_env():
+        engine = sa.create_engine(get_sqlalchemy_sync_database_url(), future=True)
     try:
         with engine.connect() as connection:
             return {

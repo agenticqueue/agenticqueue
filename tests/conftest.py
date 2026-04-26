@@ -6,7 +6,14 @@ import psycopg
 import sqlalchemy as sa
 from sqlalchemy.engine import Engine
 
-from agenticqueue_api.config import get_psycopg_connect_args
+from test_support.db_isolation import (
+    prepare_pytest_database,
+    teardown_pytest_database,
+)
+
+_PREPARED_TEST_DATABASE = prepare_pytest_database()
+
+from agenticqueue_api.config import get_psycopg_connect_args  # noqa: E402
 
 _ORIGINAL_CREATE_ENGINE = sa.create_engine
 _ORIGINAL_PSYCOPG_CONNECT = psycopg.connect
@@ -35,3 +42,8 @@ def _patched_psycopg_connect(conninfo: str = "", *args: Any, **kwargs: Any) -> A
 # Keep the pooled CI test surface on the same no-prepared-statements path as the app.
 setattr(sa, "create_engine", _patched_create_engine)
 setattr(psycopg, "connect", _patched_psycopg_connect)
+
+
+def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
+    del session, exitstatus
+    teardown_pytest_database(_PREPARED_TEST_DATABASE)
