@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from urllib.parse import urlsplit
 
 from test_support import db_isolation
@@ -7,6 +8,13 @@ from test_support.db_isolation import (
     derive_pytest_database_url,
     prepare_pytest_database,
     should_prepare_pytest_database,
+)
+
+PYTEST_DB_ENV_VARS = (
+    "AGENTICQUEUE_USE_TEST_DATABASE",
+    "AGENTICQUEUE_DATABASE_URL_TEST",
+    "DATABASE_URL_TEST",
+    "AGENTICQUEUE_PYTEST_TEST_DB_PREPARED",
 )
 
 
@@ -80,8 +88,12 @@ def test_prepare_pytest_database_is_process_idempotent(monkeypatch) -> None:
         lambda *args, **kwargs: calls.append((args, kwargs)),
     )
 
-    assert prepare_pytest_database() is True
-    monkeypatch.delenv("AGENTICQUEUE_PYTEST_TEST_DB_PREPARED", raising=False)
+    try:
+        assert prepare_pytest_database() is True
+        os.environ.pop("AGENTICQUEUE_PYTEST_TEST_DB_PREPARED", None)
 
-    assert prepare_pytest_database() is False
-    assert len(calls) == 1
+        assert prepare_pytest_database() is False
+        assert len(calls) == 1
+    finally:
+        for name in PYTEST_DB_ENV_VARS:
+            os.environ.pop(name, None)
