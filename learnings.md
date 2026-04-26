@@ -2,6 +2,26 @@
 
 ## 2026-04-25
 
+### AQ-330: Local pytest must prepare test DB before imports
+
+```yaml
+title: "Local pytest DB isolation belongs in conftest import startup"
+type: "testing"
+what_happened: "AQ-323 exposed that an explicit standalone pytest command could use the default dev database and truncate auth tables. AQ-330 added conftest import-time setup for both `tests/` and `apps/api/tests/` so local mutating tests prepare `agenticqueue_test` before test modules import app config."
+what_learned: "Database isolation has to happen before test modules import `agenticqueue_api.config`; putting the guard inside individual fixtures is too late for files that create engines at module or session scope. `pytest_sessionstart` was also too late for mixed test roots because a second conftest can load after the first tree has already started using the database. A process-local idempotency guard is needed in addition to an env flag so tests that monkeypatch env vars cannot make a second conftest recreate the database mid-session. Dropping the test DB at session finish can kill pooled SQLAlchemy connections on Windows, so local pytest recreates the disposable DB at startup and leaves it for the next run to replace."
+action_rule: "When adding a new pytest tree that can touch Postgres, load `test_support.db_isolation.prepare_pytest_database()` from that tree's `conftest.py` unless CI already provides an ephemeral database."
+applies_when: "Adding or reorganizing AgenticQueue pytest suites outside the existing `tests/` and `apps/api/tests/` trees."
+does_not_apply_when: "The test tree never imports database config and cannot create a Postgres connection."
+evidence:
+  - "`uv run pytest --no-cov tests/unit/test_pytest_db_isolation.py -v` passed after the helper was added."
+  - "`uv run pytest apps/api/tests/test_token_crud.py -v` passed with `agenticqueue_test` isolation enabled by `apps/api/tests/conftest.py`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-323: External MCP auth tests need isolated DB setup
 
 ```yaml
@@ -9,12 +29,12 @@ title: "External MCP auth tests should provision the disposable test DB themselv
 type: "testing"
 what_happened: "AQ-323 added an API-level MCP client test outside the Playwright harness. The first run correctly targeted `agenticqueue_test`, but failed because that database is normally created by Playwright global setup, not by standalone pytest."
 what_learned: "Any standalone API test that truncates auth or actor tables must both force `AGENTICQUEUE_USE_TEST_DATABASE=1` and prepare the disposable test database before connecting. Relying on another harness's global setup makes the required pytest command unsafe or non-reproducible."
-action_rule: "When adding standalone pytest coverage that mutates AgenticQueue auth, actor, or task tables, call the existing `apps/api/scripts/e2e_test_db.py setup|teardown` helper from the test fixture or document an explicit pre-step in the required command."
+action_rule: "When adding standalone pytest coverage that mutates AgenticQueue auth, actor, or task tables, make sure the test tree's `conftest.py` prepares `agenticqueue_test` before config imports, or document an explicit isolated-DB pre-step in the required command."
 applies_when: "Adding API pytest files under `apps/api/tests` that create users, issue tokens, truncate tables, or exercise MCP HTTP/SSE auth."
 does_not_apply_when: "The test is purely unit-level and uses no live Postgres connection."
 evidence:
   - "`uv run pytest apps/api/tests/test_mcp_external_client.py -v` first failed with `InvalidCatalogNameError: database \"agenticqueue_test\" does not exist`."
-  - "`uv run pytest apps/api/tests/test_mcp_external_client.py -v` passed after the fixture prepared and tore down `agenticqueue_test` with `apps/api/scripts/e2e_test_db.py`."
+  - "`uv run pytest apps/api/tests/test_mcp_external_client.py -v` passed after app-level pytest startup prepared `agenticqueue_test` with `apps/api/scripts/e2e_test_db.py`."
 scope: "project"
 confidence: "confirmed"
 status: "active"
