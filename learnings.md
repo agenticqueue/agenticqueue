@@ -1020,6 +1020,28 @@ owner: "codex"
 review_date: "2026-05-26"
 ```
 
+### AQ-321: Prove compact footer geometry with explicit row metrics
+
+```yaml
+title: "Single-row footer ports need geometry assertions, not just DOM assertions"
+type: "ui-contract"
+what_happened: "AQ-321 first added the design footer left/right regions and health pills, but the required footer test still failed because the row was about 68px tall. After tightening padding, it failed again because the Settings link was about five pixels shorter than the health pill row."
+what_learned: "A footer can have the right classes and still miss the visual contract. Geometry assertions on height and left/right row alignment catch the small spacing mismatches that screenshots alone leave to subjective review."
+action_rule: "When porting a compact shell footer or header, assert the named DOM regions and also assert bounded height plus row-alignment delta before relying on screenshots for HITL visual review."
+applies_when: "A design-port ticket asks for a single-row header/footer or pixel-proximate shell chrome."
+does_not_apply_when: "The ticket only changes content inside an already-proven shell region."
+evidence:
+  - "`pnpm --filter web test:e2e --grep footer-single-row` first failed because `.aq-footer-left` was missing."
+  - "`pnpm --filter web test:e2e --grep footer-single-row` then failed with footer height `67.90625` greater than the `64` pixel cap."
+  - "`pnpm --filter web test:e2e --grep footer-single-row` then failed with row delta `5.21875` greater than the `4` pixel tolerance."
+  - "`pnpm --filter web test:e2e --grep footer-single-row` passed after the Settings link reused the same footer-pill sizing as the health row."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-26"
+```
+
 ### AQ-285: Pair route caching with a short client TTL cache for repeated shell navigations
 
 ```yaml
