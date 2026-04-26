@@ -1,5 +1,27 @@
 # AgenticQueue Learnings
 
+## 2026-04-26
+
+### AQ-326: Preserve stale admin actors during bootstrap recovery
+
+```yaml
+title: "Bootstrap recovery should soft-archive stale admin actors"
+type: "auth"
+what_happened: "AQ-326 found that deleting the demo `admin@localhost` user could leave `actor(handle='admin')` behind, so the next real `/setup` bootstrap hit the actor handle uniqueness constraint instead of creating the real owner."
+what_learned: "When an auth actor may have audit or event history, recovery should preserve the row and move the unique handle out of the way instead of deleting it. A renamed inactive `admin-archived-<timestamp>` actor keeps old references readable while freeing `handle='admin'` for the real bootstrap actor."
+action_rule: "For first-admin bootstrap recovery, archive stale `handle='admin'` actors with a logged rename and `is_active=false`, then create the new active actor linked to the submitted email."
+applies_when: "A local demo, auto-setup path, or manual cleanup removes the first admin user but leaves the admin actor row."
+does_not_apply_when: "A real active admin user still exists; bootstrap should continue to return 409 and not mutate actors."
+evidence:
+  - "`uv run pytest apps/api/tests/test_auto_setup_bootstrap_interaction.py::test_manual_delete_then_real_bootstrap -v` failed with 409 before the fix and passed after the soft-archive implementation."
+  - "`uv run pytest apps/api/tests/test_bootstrap_admin_race.py -v` passed after updating the orphan actor expectation while keeping active-admin 409 coverage."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-26"
+```
+
 ## 2026-04-25
 
 ### AQ-325: Alembic can disable route loggers before conflict handling
