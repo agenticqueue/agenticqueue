@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 type JobDetailPanelTone = "ok" | "info" | "warn" | "danger" | "mute";
 
 type JobDetailPanelState =
@@ -8,7 +10,9 @@ type JobDetailPanelState =
   | "review"
   | "queued"
   | "blocked"
-  | "done";
+  | "done"
+  | "active"
+  | "superseded";
 
 type JobDetailPanelRelation = {
   ref: string;
@@ -19,7 +23,7 @@ export type JobDetailPanelJob = {
   title: string;
   task_type: string;
   status: JobDetailPanelState;
-  priority: number;
+  priority: number | null;
   labels: string[];
   description: string | null;
   claimed_by_actor_id: string | null;
@@ -37,10 +41,16 @@ type JobDetailPanelProps = {
   onSelect: (ref: string) => void;
   open: boolean;
   pipelineName: string;
+  callout?: string;
+  children?: ReactNode;
+  eyebrow?: string;
   testId?: string;
 };
 
 export function JobDetailPanel({
+  callout = "Writes are disabled here. Use `aq` or MCP for task actions.",
+  children,
+  eyebrow = "Selected job",
   job,
   onClose,
   onSelect,
@@ -66,7 +76,7 @@ export function JobDetailPanel({
       >
         <div className="aq-job-detail-head">
           <div>
-            <p className="aq-auth-kicker">Selected job</p>
+            <p className="aq-auth-kicker">{eyebrow}</p>
             <h3 className="aq-job-detail-title" id={titleId}>
               {job.title}
             </h3>
@@ -109,7 +119,9 @@ export function JobDetailPanel({
           </div>
           <div className="aq-job-detail-prop">
             <span className="aq-job-detail-key">priority</span>
-            <span className="aq-job-detail-value aq-mono">{job.priority}</span>
+            <span className="aq-job-detail-value aq-mono">
+              {job.priority ?? "n/a"}
+            </span>
           </div>
         </div>
 
@@ -149,10 +161,10 @@ export function JobDetailPanel({
           </div>
         ) : null}
 
+        {children}
+
         <div className="aq-job-detail-callout">
-          <span className="aq-mono aq-mute">
-            Writes are disabled here. Use `aq` or MCP for task actions.
-          </span>
+          <span className="aq-mono aq-mute">{callout}</span>
         </div>
       </article>
     </div>
@@ -213,13 +225,13 @@ function formatActor(actorId: string | null) {
 }
 
 function jobStateTone(state: JobDetailPanelState): JobDetailPanelTone {
-  if (state === "done") {
+  if (state === "done" || state === "active") {
     return "ok";
   }
   if (state === "failed") {
     return "danger";
   }
-  if (state === "review" || state === "blocked") {
+  if (state === "review" || state === "blocked" || state === "superseded") {
     return "warn";
   }
   if (state === "running") {

@@ -277,7 +277,7 @@ test("renders the AQ-183 decisions ledger, lineage, and linked-job navigation", 
     workPayload: WORK_FIXTURE,
   });
 
-  await expect(page.locator(".aq-table-work")).toBeVisible();
+  await expect(page.locator(".aq-knowledge-list")).toBeVisible();
 
   const projectScope = page
     .locator(".aq-filter-group")
@@ -293,6 +293,7 @@ test("renders the AQ-183 decisions ledger, lineage, and linked-job navigation", 
 
   const detail = page.getByTestId("decision-detail");
   await expect(detail).toBeVisible();
+  await expect(page.locator(".aq-side-panel .aq-job-detail")).toBeVisible();
   await expect(detail.getByText("Rationale")).toBeVisible();
   await expect(detail).toContainText(
     "Decisions must stay visible in the shell",
@@ -314,4 +315,54 @@ test("renders the AQ-183 decisions ledger, lineage, and linked-job navigation", 
   await detail.getByRole("link", { name: "job-183" }).click();
   await expect(page).toHaveURL(/\/work\?job=job-183/);
   await expect(page.getByTestId("work-detail")).toContainText("job-183");
+});
+
+test("decisions-side-panel opens shared job detail panel", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openAuthedView(page, "/decisions", {
+    decisionsPayload: DECISIONS_FIXTURE,
+    decisionLineageById: LINEAGE_FIXTURES,
+  });
+
+  await expect(page.locator(".aq-knowledge-list")).toBeVisible();
+  await page.getByTestId("decision-row-dc-current").click();
+
+  const panel = page.locator(".aq-side-panel .aq-job-detail");
+  await expect(panel).toBeVisible();
+  await expect(panel).toHaveAttribute("data-testid", "decision-detail");
+  await expect(panel).toContainText("dc-current");
+  await expect(panel).toContainText("Rationale");
+  await expect(panel.getByRole("button", { name: "Close job detail" })).toBeVisible();
+
+  await page.addStyleTag({
+    content: "nextjs-portal { display: none !important; }",
+  });
+  await page.screenshot({
+    path: "test-results/decisions-1440x900-panel.png",
+  });
+});
+
+test("decisions-keyboard navigates the filtered list and closes panel", async ({
+  page,
+}) => {
+  await openAuthedView(page, "/decisions", {
+    decisionsPayload: DECISIONS_FIXTURE,
+    decisionLineageById: LINEAGE_FIXTURES,
+  });
+
+  const projectScope = page
+    .locator(".aq-filter-group")
+    .filter({ hasText: "Scope" })
+    .getByRole("button", { name: /Project/i });
+  await projectScope.click();
+  await expect(page.getByTestId("decision-row-dc-current")).toBeVisible();
+
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("decision-detail")).toContainText("dc-current");
+
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("decision-detail")).toContainText("dc-prev");
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".aq-side-panel")).toHaveCount(0);
 });

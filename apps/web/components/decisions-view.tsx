@@ -1,7 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import {
+  JobDetailPanel,
+  type JobDetailPanelJob,
+} from "@/components/job-detail-panel";
 
 type DecisionScope = "global" | "project" | "task";
 type DecisionStatus = "active" | "superseded";
@@ -83,6 +94,10 @@ const SCOPE_OPTIONS: Array<{ value: FilterValue; label: string }> = [
   { value: "task", label: "Task" },
 ];
 
+const DECISIONS_REFRESH_INTERVAL_MS = 30_000;
+const DECISION_PANEL_CALLOUT =
+  "Writes stay outside the UI. Use `aq`, REST, or MCP to create, supersede, or retract decisions.";
+
 export function DecisionsView({ authToken }: DecisionsViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +112,7 @@ export function DecisionsView({ authToken }: DecisionsViewProps) {
   const [dateRangeFilter, setDateRangeFilter] =
     useState<DateRangeFilter>("all");
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const focusReturnIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,7 +171,7 @@ export function DecisionsView({ authToken }: DecisionsViewProps) {
       if (!document.hidden) {
         void load();
       }
-    }, 30_000);
+    }, DECISIONS_REFRESH_INTERVAL_MS);
 
     const handleVisibility = () => {
       if (!document.hidden) {
@@ -187,6 +203,47 @@ export function DecisionsView({ authToken }: DecisionsViewProps) {
   const selectedItem = useMemo(
     () => filteredItems.find((item) => item.id === selectedId) ?? null,
     [filteredItems, selectedId],
+  );
+
+  const selectedPanelJob = useMemo(
+    () => (selectedItem ? toDecisionPanelJob(selectedItem) : null),
+    [selectedItem],
+  );
+
+  const closeSelectedItem = useCallback(() => {
+    const focusReturnId = focusReturnIdRef.current;
+    setSelectedId(null);
+
+    if (focusReturnId) {
+      window.requestAnimationFrame(() => {
+        document.getElementById(focusReturnId)?.focus();
+      });
+    }
+  }, []);
+
+  const selectItem = useCallback((itemId: string, focusReturnId?: string) => {
+    if (focusReturnId) {
+      focusReturnIdRef.current = focusReturnId;
+    }
+    setSelectedId(itemId);
+  }, []);
+
+  const selectLineageItem = useCallback(
+    (itemId: string) => {
+      const nextItem = items.find((item) => item.id === itemId);
+      if (!nextItem) {
+        return;
+      }
+
+      if (scopeFilter !== "all" && nextItem.scope !== scopeFilter) {
+        setScopeFilter("all");
+      }
+      if (statusFilter !== "all" && nextItem.status !== statusFilter) {
+        setStatusFilter("all");
+      }
+      setSelectedId(nextItem.id);
+    },
+    [items, scopeFilter, statusFilter],
   );
 
   const scopeCounts = useMemo(
@@ -298,6 +355,58 @@ export function DecisionsView({ authToken }: DecisionsViewProps) {
     }
   }, [filteredItems, selectedId]);
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      if (event.key === "Escape") {
+        if (selectedId) {
+          event.preventDefault();
+          closeSelectedItem();
+        }
+        return;
+      }
+
+      if (
+        event.key !== "ArrowDown" &&
+        event.key !== "ArrowUp" &&
+        event.key !== "ArrowLeft" &&
+        event.key !== "ArrowRight"
+      ) {
+        return;
+      }
+
+      if (filteredItems.length === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      const currentIndex = selectedId
+        ? filteredItems.findIndex((item) => item.id === selectedId)
+        : -1;
+      const direction =
+        event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 1;
+      const nextIndex =
+        currentIndex === -1
+          ? direction < 0
+            ? filteredItems.length - 1
+            : 0
+          : (currentIndex + direction + filteredItems.length) %
+            filteredItems.length;
+      setSelectedId(filteredItems[nextIndex]?.id ?? null);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [closeSelectedItem, filteredItems, selectedId]);
+
   const newerLineage = useMemo(
     () =>
       lineage?.nodes
@@ -404,212 +513,183 @@ export function DecisionsView({ authToken }: DecisionsViewProps) {
           </span>
         </div>
       ) : (
-        <div className="aq-work-shell aq-decision-shell">
-          <section className="aq-table-work" aria-label="Decisions table">
-            <div className="aq-work-head aq-decision-head aq-mono aq-mute">
-              <div>ref</div>
-              <div>title</div>
-              <div>scope</div>
-              <div>actor</div>
-              <div>decided-at</div>
-              <div>supersedes</div>
-              <div>status</div>
-            </div>
-
-            {filteredItems.map((item) => (
+        <section className="aq-knowledge-list" aria-label="Decisions list">
+          {filteredItems.map((item) => {
+            const rowId = decisionRowElementId(item.ref);
+            return (
               <button
-                className={`aq-table-row aq-decision-row ${selectedItem?.id === item.id ? "is-selected" : ""}`}
+                aria-pressed={selectedItem?.id === item.id}
+                className={`aq-knowledge-row ${selectedItem?.id === item.id ? "is-selected" : ""}`}
                 data-testid={`decision-row-${item.ref}`}
+                id={rowId}
                 key={item.id}
-                onClick={() => setSelectedId(item.id)}
+                onClick={() => selectItem(item.id, rowId)}
                 type="button"
               >
-                <div className="aq-mono">{item.ref}</div>
-                <div className="aq-table-title">
-                  <span>{item.title}</span>
-                  <span className="aq-table-subtitle">
-                    {item.project_name ?? "agenticqueue"}
-                  </span>
-                </div>
-                <div>
-                  <ToneChip label={item.scope} tone="info" />
-                </div>
-                <div className="aq-mono aq-mute">
-                  {item.actor ? `@${item.actor}` : "system"}
-                </div>
-                <div className="aq-mono aq-mute">
-                  {formatTimestamp(item.decided_at)}
-                </div>
-                <div className="aq-mono aq-mute">
-                  {item.supersedes_refs.length > 0
-                    ? item.supersedes_refs.join(", ")
-                    : "—"}
-                </div>
-                <div>
-                  <ToneChip label={item.status} tone={statusTone(item.status)} />
-                </div>
-              </button>
-            ))}
-          </section>
-
-          {selectedItem ? (
-            <aside className="aq-detail" data-testid="decision-detail">
-              <div className="aq-detail-head">
-                <div>
-                  <p className="aq-auth-kicker">Selected decision</p>
-                  <h2 className="aq-detail-title">{selectedItem.title}</h2>
-                </div>
-                <div className="aq-detail-status-row">
-                  <ToneChip
-                    label={selectedItem.status}
-                    tone={statusTone(selectedItem.status)}
-                  />
-                  <span className="aq-mono aq-detail-ref">{selectedItem.ref}</span>
-                </div>
-              </div>
-
-              <div className="aq-detail-copy">
-                <p className="aq-detail-prose">
-                  <strong>Scope:</strong> {selectedItem.scope}
-                </p>
-                <p className="aq-detail-prose">
-                  <strong>Actor:</strong>{" "}
-                  {selectedItem.actor ? `@${selectedItem.actor}` : "system"}
-                </p>
-              </div>
-
-              <div className="aq-detail-section">
-                <div className="aq-detail-section-label">Rationale</div>
-                <p className="aq-detail-prose">
-                  {selectedItem.rationale?.trim() ||
-                    "No rationale has been captured for this decision yet."}
-                </p>
-              </div>
-
-              <div className="aq-detail-section">
-                <div className="aq-detail-section-label">
-                  Alternatives considered
-                </div>
-                {selectedItem.alternative_refs.length > 0 ? (
-                  <div className="aq-output-list">
-                    {selectedItem.alternative_refs.map((alternative) => (
-                      <article className="aq-inline-card" key={alternative.id}>
-                        <div className="aq-inline-card-head">
-                          <span>{alternative.title}</span>
-                          <span className="aq-mono aq-mute">
-                            {alternative.ref}
-                          </span>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="aq-detail-prose aq-mute">
-                    No explicit alternatives are linked to this decision.
-                  </p>
-                )}
-              </div>
-
-              <div
-                className="aq-detail-section"
-                data-testid="decision-lineage"
-              >
-                <div className="aq-detail-section-label">Supersedes chain</div>
-                {lineageLoading ? (
-                  <p className="aq-detail-prose aq-mute">
-                    Loading lineage graph...
-                  </p>
-                ) : lineageError ? (
-                  <p className="aq-detail-prose aq-mute">{lineageError}</p>
-                ) : lineage ? (
-                  <div className="aq-lineage-grid">
-                    <LineageColumn
-                      label="Newer decisions"
-                      nodes={newerLineage}
-                      onSelect={setSelectedId}
-                    />
-                    <LineageColumn
-                      label="Current"
-                      nodes={selectedLineageNode ? [selectedLineageNode] : []}
-                      onSelect={setSelectedId}
-                    />
-                    <LineageColumn
-                      label="Superseded by this decision"
-                      nodes={olderLineage}
-                      onSelect={setSelectedId}
-                    />
-                  </div>
-                ) : (
-                  <p className="aq-detail-prose aq-mute">
-                    No supersedes chain is available for this decision yet.
-                  </p>
-                )}
-              </div>
-
-              <div className="aq-detail-section">
-                <div className="aq-detail-section-label">Linked Jobs</div>
-                {selectedItem.linked_job_refs.length > 0 ? (
-                  <div className="aq-linked-jobs">
-                    {selectedItem.linked_job_refs.map((jobRef) => (
-                      <Link
-                        className="aq-prop-link aq-linked-job aq-mono"
-                        href={`/work?job=${encodeURIComponent(jobRef)}`}
-                        key={jobRef}
-                      >
-                        {jobRef}
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="aq-detail-prose aq-mute">
-                    No linked Jobs are attached to this decision.
-                  </p>
-                )}
-              </div>
-
-              <div className="aq-detail-section">
-                <div className="aq-detail-section-label">Properties</div>
-                <div className="aq-detail-props">
-                  <PropertyCard label="Ref" value={selectedItem.ref} />
-                  <PropertyCard label="Scope" value={selectedItem.scope} />
-                  <PropertyCard
-                    label="Decided"
-                    value={formatTimestamp(selectedItem.decided_at)}
-                  />
-                  <PropertyCard
-                    label="Actor"
-                    value={selectedItem.actor ? `@${selectedItem.actor}` : "system"}
-                  />
-                  <PropertyCard label="Status" value={selectedItem.status} />
-                  <PropertyCard
-                    label="Primary Job"
-                    value={selectedItem.primary_job_ref ?? "—"}
-                  />
-                </div>
-              </div>
-
-              <div className="aq-job-detail-callout">
-                <span className="aq-mono aq-mute">
-                  Writes stay outside the UI. Use `aq`, REST, or MCP to create,
-                  supersede, or retract decisions.
+                <span className="aq-knowledge-ref aq-mono aq-mute">
+                  {item.ref}
                 </span>
-              </div>
-            </aside>
-          ) : (
-            <aside className="aq-detail aq-detail-empty">
-              <p className="aq-auth-kicker">No decision selected</p>
-              <h2 className="aq-detail-title">
-                Choose a row to open the detail panel
-              </h2>
-              <p className="aq-detail-prose">
-                The detail panel shows rationale, alternatives, supersedes
-                lineage, linked Jobs, and immutable properties.
-              </p>
-            </aside>
-          )}
-        </div>
+                <span className="aq-knowledge-title">{item.title}</span>
+                <span className="aq-knowledge-meta aq-mono aq-mute">
+                  <span className="aq-knowledge-pipe">
+                    {item.project_name ?? item.scope}
+                  </span>
+                  {item.linked_job_refs.length > 0 ? (
+                    <>
+                      <span className="aq-knowledge-sep">·</span>
+                      <span>{item.linked_job_refs.join(", ")}</span>
+                    </>
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+        </section>
       )}
+
+      {selectedItem && selectedPanelJob ? (
+        <JobDetailPanel
+          callout={DECISION_PANEL_CALLOUT}
+          eyebrow="Selected decision"
+          job={selectedPanelJob}
+          onClose={closeSelectedItem}
+          onSelect={() => undefined}
+          open
+          pipelineName={selectedItem.project_name ?? "Decisions"}
+          testId="decision-detail"
+        >
+          <DecisionPanelSections
+            item={selectedItem}
+            lineage={lineage}
+            lineageError={lineageError}
+            lineageLoading={lineageLoading}
+            newerLineage={newerLineage}
+            olderLineage={olderLineage}
+            onSelectLineage={selectLineageItem}
+            selectedLineageNode={selectedLineageNode}
+          />
+        </JobDetailPanel>
+      ) : null}
     </div>
+  );
+}
+
+function DecisionPanelSections({
+  item,
+  lineage,
+  lineageError,
+  lineageLoading,
+  newerLineage,
+  olderLineage,
+  onSelectLineage,
+  selectedLineageNode,
+}: {
+  item: DecisionItem;
+  lineage: DecisionLineageResponse | null;
+  lineageError: string | null;
+  lineageLoading: boolean;
+  newerLineage: DecisionLineageNode[];
+  olderLineage: DecisionLineageNode[];
+  onSelectLineage: (id: string) => void;
+  selectedLineageNode: DecisionLineageNode | null;
+}) {
+  return (
+    <>
+      <div className="aq-detail-section">
+        <div className="aq-detail-section-label">Rationale</div>
+        <p className="aq-detail-prose">
+          {item.rationale?.trim() ||
+            "No rationale has been captured for this decision yet."}
+        </p>
+      </div>
+
+      <div className="aq-detail-section">
+        <div className="aq-detail-section-label">Alternatives considered</div>
+        {item.alternative_refs.length > 0 ? (
+          <div className="aq-output-list">
+            {item.alternative_refs.map((alternative) => (
+              <article className="aq-inline-card" key={alternative.id}>
+                <div className="aq-inline-card-head">
+                  <span>{alternative.title}</span>
+                  <span className="aq-mono aq-mute">{alternative.ref}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="aq-detail-prose aq-mute">
+            No explicit alternatives are linked to this decision.
+          </p>
+        )}
+      </div>
+
+      <div className="aq-detail-section" data-testid="decision-lineage">
+        <div className="aq-detail-section-label">Supersedes chain</div>
+        {lineageLoading ? (
+          <p className="aq-detail-prose aq-mute">Loading lineage graph...</p>
+        ) : lineageError ? (
+          <p className="aq-detail-prose aq-mute">{lineageError}</p>
+        ) : lineage ? (
+          <div className="aq-lineage-grid">
+            <LineageColumn
+              label="Newer decisions"
+              nodes={newerLineage}
+              onSelect={onSelectLineage}
+            />
+            <LineageColumn
+              label="Current"
+              nodes={selectedLineageNode ? [selectedLineageNode] : []}
+              onSelect={onSelectLineage}
+            />
+            <LineageColumn
+              label="Superseded by this decision"
+              nodes={olderLineage}
+              onSelect={onSelectLineage}
+            />
+          </div>
+        ) : (
+          <p className="aq-detail-prose aq-mute">
+            No supersedes chain is available for this decision yet.
+          </p>
+        )}
+      </div>
+
+      <div className="aq-detail-section">
+        <div className="aq-detail-section-label">Linked Jobs</div>
+        {item.linked_job_refs.length > 0 ? (
+          <div className="aq-linked-jobs">
+            {item.linked_job_refs.map((jobRef) => (
+              <Link
+                className="aq-prop-link aq-linked-job aq-mono"
+                href={`/work?job=${encodeURIComponent(jobRef)}`}
+                key={jobRef}
+              >
+                {jobRef}
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="aq-detail-prose aq-mute">
+            No linked Jobs are attached to this decision.
+          </p>
+        )}
+      </div>
+
+      <div className="aq-detail-section">
+        <div className="aq-detail-section-label">Properties</div>
+        <div className="aq-detail-props">
+          <PropertyCard label="Ref" value={item.ref} />
+          <PropertyCard label="Scope" value={item.scope} />
+          <PropertyCard label="Decided" value={formatTimestamp(item.decided_at)} />
+          <PropertyCard
+            label="Actor"
+            value={item.actor ? `@${item.actor}` : "system"}
+          />
+          <PropertyCard label="Status" value={item.status} />
+          <PropertyCard label="Primary Job" value={item.primary_job_ref ?? "n/a"} />
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -687,16 +767,6 @@ function PropertyCard({ label, value }: { label: string; value: string }) {
       <span className="aq-prop-v aq-mono">{value}</span>
     </div>
   );
-}
-
-function ToneChip({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: "ok" | "info" | "warn" | "danger" | "mute";
-}) {
-  return <span className={`aq-tone aq-tone-${tone}`}>{label}</span>;
 }
 
 function buildFilterCounts({
@@ -830,6 +900,33 @@ function formatTimestamp(value: string) {
   }).format(new Date(value));
 }
 
-function statusTone(status: DecisionStatus) {
-  return status === "active" ? ("ok" as const) : ("warn" as const);
+function toDecisionPanelJob(item: DecisionItem): JobDetailPanelJob {
+  return {
+    ref: item.ref,
+    title: item.title,
+    task_type: `decision-${item.scope}`,
+    status: item.status,
+    priority: null,
+    labels: decisionLabels(item),
+    description: item.rationale,
+    claimed_by_actor_id: item.actor,
+    updated_at: item.decided_at,
+    parent_ref: null,
+    child_refs: [],
+    depends_on: [],
+    blocked_by: [],
+    blocks: [],
+  };
+}
+
+function decisionLabels(item: DecisionItem) {
+  return [
+    `scope:${item.scope}`,
+    `status:${item.status}`,
+    ...(item.project_slug ? [`project:${item.project_slug}`] : []),
+  ];
+}
+
+function decisionRowElementId(ref: string) {
+  return `aq-decision-row-${ref.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
