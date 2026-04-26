@@ -979,6 +979,26 @@ owner: "codex"
 review_date: "2026-05-25"
 ```
 
+### AQ-319: Keep decision lineage out of generic job relation rows
+
+```yaml
+title: "Decision supersedes links should render once in the decision lineage section"
+type: "ui-contract"
+what_happened: "While moving Decisions into the shared JobDetailPanel, mapping `supersedes_refs` into the panel's generic `depends_on` buttons created a second `dc-prev` button next to the real lineage node, which broke the existing linked-lineage e2e strict locator."
+what_learned: "The shared side panel can host decision-specific content, but decision lineage remains a decision concern. Duplicating it into generic job relation rows creates ambiguous controls and weakens the existing navigation contract."
+action_rule: "When adapting non-job views to the shared JobDetailPanel, pass only fields that match the shared panel's generic semantics and put domain-specific relationships in child sections with their original test hooks."
+applies_when: "A view such as Decisions or Learnings uses the shared right-side panel while preserving domain-specific relationships, history, or linked resources."
+does_not_apply_when: "The relationship is an actual job dependency/blocking relationship already owned by the shared JobDetailPanel relation rows."
+evidence:
+  - "`pnpm --filter web test:e2e --grep \"decisions\"` initially failed because `decision-detail.getByRole('button', { name: /dc-prev/i })` matched both a generic relation button and a lineage node."
+  - "`pnpm --filter web test:e2e --grep \"decisions\"` passed after removing generic relation mappings for decision supersedes links and keeping lineage in `decision-lineage`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-285: Pair route caching with a short client TTL cache for repeated shell navigations
 
 ```yaml
