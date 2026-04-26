@@ -310,14 +310,16 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
       </section>
 
       <footer className="aq-footer">
-        <div className="aq-footer-health">
+        <div className="aq-footer-left aq-footer-health">
           <FooterHealthPill health={footerHealth} />
-          <span>auth browser session</span>
-          <span>build v{AQ_BUILD_VERSION}</span>
+          <span className="aq-footer-pill">auth browser session</span>
+          <span className="aq-footer-pill">build v{AQ_BUILD_VERSION}</span>
         </div>
-        <Link className="aq-settings-link" href="/settings">
-          Settings
-        </Link>
+        <div className="aq-footer-right">
+          <Link className="aq-settings-link aq-footer-pill aq-mono" href="/settings">
+            Settings
+          </Link>
+        </div>
       </footer>
     </main>
   );
@@ -363,8 +365,13 @@ export function FooterHealthPill({
 }) {
   return (
     <>
-      <span className={`aq-tone aq-tone-${health.tone}`}>{health.label}</span>
-      {health.detail ? <span>{health.detail}</span> : null}
+      <span className={`aq-footer-pill aq-footer-pill-${health.tone}`}>
+        {health.tone === "ok" ? <span className="aq-live-dot" /> : null}
+        {health.label}
+      </span>
+      {health.detail ? (
+        <span className="aq-footer-pill">{health.detail}</span>
+      ) : null}
     </>
   );
 }
