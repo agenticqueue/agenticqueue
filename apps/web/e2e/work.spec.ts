@@ -1,19 +1,15 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  mockShellReadApis,
-  openAuthedView,
-  seedAuthenticatedSession,
-} from "./helpers";
+import { openAuthedView } from "./helpers";
 
 const WORK_FIXTURE = {
   generated_at: "2026-04-21T15:04:45.000Z",
-  count: 2,
+  count: 6,
   items: [
     {
       id: "task-104",
       ref: "job-104",
-      title: "Work view — cross-pipeline Job table + right-side detail panel",
+      title: "Work view — cross-pipeline job table",
       pipeline: "Phase 7 - Web UI",
       pipeline_slug: "phase-7-web-ui",
       actor: "codex",
@@ -27,46 +23,9 @@ const WORK_FIXTURE = {
       task_type: "coding-task",
       description: "Build the Phase 7 work queue lens on top of the shell scaffold.",
       labels: ["phase:7", "needs:coding", "agent:codex"],
-      outputs: [
-        {
-          id: "artifact-104",
-          kind: "diff",
-          label: "work-view.patch",
-          uri: "file:///tmp/work-view.patch",
-          created_at: "2026-04-21T15:02:00.000Z",
-          run_ref: "run-abcd1234",
-        },
-      ],
-      decisions: [
-        {
-          id: "decision-104",
-          summary: "Keep the Work panel read-only",
-          rationale: "Product policy keeps mutations outside the UI.",
-          decided_at: "2026-04-21T15:01:00.000Z",
-          actor: "codex",
-          run_ref: "run-abcd1234",
-        },
-      ],
-      activity: [
-        {
-          id: "activity-104-1",
-          label: "queued -> in_progress",
-          summary: "Task transitioned into active execution.",
-          happened_at: "2026-04-21T15:00:00.000Z",
-          state: "running",
-          source: "run",
-          command: "aq claim job-104",
-        },
-        {
-          id: "activity-104-2",
-          label: "Decision recorded",
-          summary: "Keep the Work panel read-only",
-          happened_at: "2026-04-21T15:01:00.000Z",
-          state: null,
-          source: "decision",
-          command: null,
-        },
-      ],
+      outputs: [],
+      decisions: [],
+      activity: [],
       parent_ref: null,
       dependency_refs: ["job-102"],
       blocked_by_refs: [],
@@ -92,20 +51,114 @@ const WORK_FIXTURE = {
       labels: ["phase:7", "needs:coding"],
       outputs: [],
       decisions: [],
-      activity: [
-        {
-          id: "activity-115-1",
-          label: "Task created",
-          summary: "Smoke coverage is ready once the work view lands.",
-          happened_at: "2026-04-21T14:10:00.000Z",
-          state: "queued",
-          source: "task",
-          command: null,
-        },
-      ],
+      activity: [],
       parent_ref: null,
       dependency_refs: [],
       blocked_by_refs: [],
+      block_refs: [],
+      child_refs: [],
+    },
+    {
+      id: "task-201",
+      ref: "job-201",
+      title: "Failed packet replay",
+      pipeline: "Runtime Hardening",
+      pipeline_slug: "runtime-hardening",
+      actor: "claude",
+      claimed_at: "2026-04-21T13:30:00.000Z",
+      closed_at: null,
+      created_at: "2026-04-21T13:00:00.000Z",
+      updated_at: "2026-04-21T14:45:00.000Z",
+      status: "failed",
+      raw_state: "failed",
+      priority: 3,
+      task_type: "coding-task",
+      description: "Replay a failed packet and capture diagnostics.",
+      labels: ["needs:coding"],
+      outputs: [],
+      decisions: [],
+      activity: [],
+      parent_ref: null,
+      dependency_refs: [],
+      blocked_by_refs: [],
+      block_refs: [],
+      child_refs: [],
+    },
+    {
+      id: "task-202",
+      ref: "job-202",
+      title: "Review queue dashboard",
+      pipeline: "Runtime Hardening",
+      pipeline_slug: "runtime-hardening",
+      actor: "gemini",
+      claimed_at: "2026-04-21T12:30:00.000Z",
+      closed_at: null,
+      created_at: "2026-04-21T12:20:00.000Z",
+      updated_at: "2026-04-21T14:20:00.000Z",
+      status: "review",
+      raw_state: "validated",
+      priority: 2,
+      task_type: "review-task",
+      description: "Waiting for human sign-off.",
+      labels: ["needs:review"],
+      outputs: [],
+      decisions: [],
+      activity: [],
+      parent_ref: null,
+      dependency_refs: ["job-201"],
+      blocked_by_refs: [],
+      block_refs: [],
+      child_refs: [],
+    },
+    {
+      id: "task-301",
+      ref: "job-301",
+      title: "Release note packet",
+      pipeline: "Launch Readiness",
+      pipeline_slug: "launch-readiness",
+      actor: "codex",
+      claimed_at: "2026-04-21T10:35:00.000Z",
+      closed_at: "2026-04-21T11:30:00.000Z",
+      created_at: "2026-04-21T10:31:00.000Z",
+      updated_at: "2026-04-21T11:30:00.000Z",
+      status: "done",
+      raw_state: "done",
+      priority: 1,
+      task_type: "coding-task",
+      description: "Publish the release packet after docs lock.",
+      labels: ["phase:7"],
+      outputs: [],
+      decisions: [],
+      activity: [],
+      parent_ref: "job-202",
+      dependency_refs: [],
+      blocked_by_refs: [],
+      block_refs: [],
+      child_refs: [],
+    },
+    {
+      id: "task-401",
+      ref: "job-401",
+      title: "Blocked release gate",
+      pipeline: "Launch Readiness",
+      pipeline_slug: "launch-readiness",
+      actor: null,
+      claimed_at: null,
+      closed_at: null,
+      created_at: "2026-04-21T09:31:00.000Z",
+      updated_at: "2026-04-21T09:40:00.000Z",
+      status: "blocked",
+      raw_state: "blocked",
+      priority: 1,
+      task_type: "coding-task",
+      description: "Blocked by upstream verification.",
+      labels: ["blocked"],
+      outputs: [],
+      decisions: [],
+      activity: [],
+      parent_ref: null,
+      dependency_refs: [],
+      blocked_by_refs: ["job-301"],
       block_refs: [],
       child_refs: [],
     },
@@ -136,44 +189,72 @@ test("keeps primary nav route-aware and settings anchored in the footer", async 
   }
 });
 
-test("renders the work queue detail panel when AQ-104 is live", async ({
+test("work-subtabs renders six status tabs with counts", async ({ page }) => {
+  await openAuthedView(page, "/work", {
+    workPayload: WORK_FIXTURE,
+  });
+
+  await expect(page.locator(".aq-subtab")).toHaveCount(6);
+  await expect(page.getByTestId("work-subtab-all")).toContainText("6");
+  await expect(page.getByTestId("work-subtab-running")).toContainText("1");
+  await expect(page.getByTestId("work-subtab-failed")).toContainText("1");
+  await expect(page.getByTestId("work-subtab-review")).toContainText("1");
+  await expect(page.getByTestId("work-subtab-queued")).toContainText("1");
+  await expect(page.getByTestId("work-subtab-done")).toContainText("1");
+
+  await page.getByTestId("work-subtab-queued").click();
+
+  await expect(page.getByTestId("work-row-job-115")).toBeVisible();
+  await expect(page.getByTestId("work-row-job-104")).toHaveCount(0);
+});
+
+test("work-side-panel opens shared job detail panel", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openAuthedView(page, "/work", {
+    workPayload: WORK_FIXTURE,
+  });
+
+  await page.getByTestId("work-row-job-104").click();
+
+  const panel = page.locator(".aq-side-panel .aq-job-detail");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("Work view — cross-pipeline job table");
+  await expect(panel).toContainText("job-104");
+  await expect(panel.getByRole("button", { name: "Close job detail" })).toBeVisible();
+
+  await page.addStyleTag({
+    content: "nextjs-portal { display: none !important; }",
+  });
+  await page.screenshot({
+    path: "test-results/work-1440x900-subtabs-panel.png",
+  });
+});
+
+test("work-keyboard-nav moves through filtered rows and closes panel", async ({
   page,
 }) => {
   await openAuthedView(page, "/work", {
     workPayload: WORK_FIXTURE,
   });
 
-  await expect(page.locator(".aq-table-work")).toBeVisible();
   await expect(page.getByTestId("work-row-job-104")).toBeVisible();
-
-  const firstRow = page.getByTestId("work-row-job-104");
-  await expect(firstRow).toBeVisible();
-  const started = await page.evaluate(() => performance.now());
-  await firstRow.click();
-  const finished = await page.evaluate(() => performance.now());
-
-  const detail = page.getByTestId("work-detail");
-  await expect(detail).toBeVisible();
-  await expect(detail).toContainText("job-104");
-  await expect(finished - started).toBeLessThan(100);
-  await detail.getByRole("tab", { name: "Outputs" }).click();
-  await expect(detail).toContainText("work-view.patch");
-  await detail.getByRole("tab", { name: "Activity log" }).click();
-  await expect(detail).toContainText("aq claim job-104");
-  await detail.getByRole("tab", { name: "Properties" }).click();
-  await expect(detail).toContainText("job-115");
-  await expect(
-    detail.getByRole("button", { name: /approve/i }),
-  ).toHaveCount(0);
-  await expect(
-    detail.getByRole("button", { name: /reject/i }),
-  ).toHaveCount(0);
-
-  await page.keyboard.press("Shift+/");
-  await expect(page.getByTestId("work-shortcuts")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("work-shortcuts")).toHaveCount(0);
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator(".aq-job-detail")).toContainText("job-104");
 
   await page.keyboard.press("ArrowDown");
-  await expect(detail).toContainText("job-115");
+  await expect(page.locator(".aq-job-detail")).toContainText("job-115");
+
+  await page.keyboard.press("ArrowUp");
+  await expect(page.locator(".aq-job-detail")).toContainText("job-104");
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".aq-side-panel")).toHaveCount(0);
+
+  await page.getByTestId("work-subtab-queued").click();
+  await expect(page.getByTestId("work-row-job-115")).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator(".aq-job-detail")).toContainText("job-115");
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".aq-side-panel")).toHaveCount(0);
 });

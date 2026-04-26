@@ -1380,6 +1380,64 @@ input {
   justify-items: end;
 }
 
+.aq-subtabs {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding-bottom: 0;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.aq-subtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  flex-shrink: 0;
+  margin-bottom: -1px;
+  padding: 0.55rem 0.78rem 0.68rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: lowercase;
+  transition:
+    border-color 140ms ease,
+    color 140ms ease,
+    background 140ms ease;
+}
+
+.aq-subtab:hover,
+.aq-subtab.is-active {
+  color: var(--ink);
+}
+
+.aq-subtab.is-active {
+  border-bottom-color: var(--accent);
+}
+
+.aq-subtab-count {
+  min-width: 1.15rem;
+  padding: 0.05rem 0.38rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink-faint);
+  font-size: 0.66rem;
+  text-align: center;
+}
+
+.aq-subtab.is-active .aq-subtab-count {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.aq-subtab-hint {
+  margin-left: auto;
+}
+
 .aq-filter-stack {
   display: grid;
   gap: 0.8rem;

@@ -37,6 +37,7 @@ type JobDetailPanelProps = {
   onSelect: (ref: string) => void;
   open: boolean;
   pipelineName: string;
+  testId?: string;
 };
 
 export function JobDetailPanel({
@@ -45,6 +46,7 @@ export function JobDetailPanel({
   onSelect,
   open,
   pipelineName,
+  testId,
 }: JobDetailPanelProps) {
   if (!open) {
     return null;
@@ -58,6 +60,7 @@ export function JobDetailPanel({
         aria-labelledby={titleId}
         aria-modal="true"
         className="aq-job-detail"
+        data-testid={testId}
         onClick={(event) => event.stopPropagation()}
         role="dialog"
       >
