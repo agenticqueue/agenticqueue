@@ -999,6 +999,27 @@ owner: "codex"
 review_date: "2026-05-25"
 ```
 
+### AQ-320: Adapt non-job records through a small shared-panel mapper
+
+```yaml
+title: "Shared side panels stay reusable when domain details remain child sections"
+type: "ui-contract"
+what_happened: "AQ-320 moved Learnings from a bespoke inline detail card to the AQ-316 shared JobDetailPanel. A direct mapping of every learning field into the generic job relation area would have blurred panel semantics, so the implementation maps only generic fields and renders Context, Evidence, Applied in, and Properties as children."
+what_learned: "The shared panel is useful across non-job views when each view has a narrow adapter and keeps domain-specific relationships in its own child sections. That preserves one panel shell without forcing every record type to pretend its fields are job dependencies."
+action_rule: "When porting a non-job AgenticQueue view to the shared JobDetailPanel, add a typed mapper for generic panel fields and keep view-specific evidence, lineage, or cross-references in child sections with stable test hooks."
+applies_when: "A shell view such as Learnings or Decisions needs design-matching rows plus the shared right-side panel."
+does_not_apply_when: "The record being displayed is already a Job and its relations are actual parent, child, dependency, blocked-by, or blocking relations."
+evidence:
+  - "`pnpm --filter web test:e2e --grep learnings-side-panel` first failed because `.aq-knowledge-list` was missing from Learnings."
+  - "`pnpm --filter web test:e2e --grep learnings-side-panel` passed after adding the Learnings adapter and shared side panel."
+  - "`pnpm --filter web test:e2e --grep learnings-keyboard` passed after adding global arrow/Escape handling."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-26"
+```
+
 ### AQ-285: Pair route caching with a short client TTL cache for repeated shell navigations
 
 ```yaml
