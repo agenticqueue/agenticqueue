@@ -2085,6 +2085,38 @@ input {
   text-align: center;
 }
 
+@media (max-width: 1100px) {
+  [class~="aq-header"] {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .aq-shell-left,
+  .aq-shell-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .aq-tabs {
+    width: 100%;
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .aq-tab {
+    flex: 0 1 auto;
+  }
+
+  .aq-area {
+    max-width: 100%;
+  }
+
+  .aq-area-label {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 @media (max-width: 920px) {
   [class~="aq-header"],
   .aq-footer,

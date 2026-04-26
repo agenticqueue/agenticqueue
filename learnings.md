@@ -22,6 +22,26 @@ owner: "codex"
 review_date: "2026-05-25"
 ```
 
+### AQ-327: Responsive audits treat scrollable nav children as overflow
+
+```yaml
+title: "Responsive audits treat scrollable nav children as overflow"
+type: "repo-behavior"
+what_happened: "AQ-316 passed the focused shell and Pipelines checks, but main CI failed in the full Playwright smoke suite because `responsive-audit.spec.ts` flags elements whose bounding boxes extend past the viewport, even when they are inside an `overflow-x: auto` nav container."
+what_learned: "For this shell, horizontal scrolling inside the primary nav still fails the responsive baseline. Narrow and tablet breakpoints need the header controls and tab links to wrap within the viewport instead of relying on an internal scroll strip."
+action_rule: "When changing shell navigation, run `pnpm --filter web test:e2e --grep \"responsive baseline\"` before push, and make sub-1100px header/nav layouts wrap instead of scroll horizontally."
+applies_when: "The authenticated shell header, area pill, primary nav, or responsive layout CSS changes."
+does_not_apply_when: "The affected component is not part of a view covered by `responsive-audit.spec.ts`."
+evidence:
+  - "CI `test` workflow for `d09e7008d4c7e7bfdfb7bb8548affc6bbc31f929` failed in `responsive-audit.spec.ts` with `header.aq-header`, `div.aq-shell-left`, `nav.aq-tabs`, and `.aq-area` right-overflow selectors."
+  - "`pnpm --filter web test:e2e --grep \"responsive baseline\"` passed locally after adding the sub-1100px wrapping header rule."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-316: Literal class grep contracts need selector discipline and artifact tests last
 
 ```yaml
