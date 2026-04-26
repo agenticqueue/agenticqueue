@@ -2,6 +2,26 @@
 
 ## 2026-04-25
 
+### AQ-323: External MCP auth tests need isolated DB setup
+
+```yaml
+title: "External MCP auth tests should provision the disposable test DB themselves"
+type: "testing"
+what_happened: "AQ-323 added an API-level MCP client test outside the Playwright harness. The first run correctly targeted `agenticqueue_test`, but failed because that database is normally created by Playwright global setup, not by standalone pytest."
+what_learned: "Any standalone API test that truncates auth or actor tables must both force `AGENTICQUEUE_USE_TEST_DATABASE=1` and prepare the disposable test database before connecting. Relying on another harness's global setup makes the required pytest command unsafe or non-reproducible."
+action_rule: "When adding standalone pytest coverage that mutates AgenticQueue auth, actor, or task tables, call the existing `apps/api/scripts/e2e_test_db.py setup|teardown` helper from the test fixture or document an explicit pre-step in the required command."
+applies_when: "Adding API pytest files under `apps/api/tests` that create users, issue tokens, truncate tables, or exercise MCP HTTP/SSE auth."
+does_not_apply_when: "The test is purely unit-level and uses no live Postgres connection."
+evidence:
+  - "`uv run pytest apps/api/tests/test_mcp_external_client.py -v` first failed with `InvalidCatalogNameError: database \"agenticqueue_test\" does not exist`."
+  - "`uv run pytest apps/api/tests/test_mcp_external_client.py -v` passed after the fixture prepared and tore down `agenticqueue_test` with `apps/api/scripts/e2e_test_db.py`."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-317: Side-panel screenshots should mock shell background calls and hide dev chrome
 
 ```yaml
