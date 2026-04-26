@@ -274,7 +274,7 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
               type="button"
             >
               <span>{option.label}</span>
-              <span className="aq-nav-count">{option.value}</span>
+              <span className="aq-tab-count">{option.value}</span>
             </button>
           ))}
         </div>

@@ -227,21 +227,22 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
 
   return (
     <main className="aq-shell">
-      <header className="aq-topbar">
-        <div className="aq-topbar-left">
-          <div className="aq-brand-lockup">
+      <header className="aq-header">
+        <div className="aq-shell-left">
+          <Link className="aq-brand" href="/pipelines">
             <span className="aq-brand-mark">AQ</span>
-            <div>
-              <p className="aq-brand-eyebrow">Coordination plane</p>
-              <p className="aq-brand-title">AgenticQueue</p>
-            </div>
+            <span className="aq-brand-text">
+              <span className="aq-brand-eyebrow">Coordination plane</span>
+              <span className="aq-brand-title">AgenticQueue</span>
+            </span>
+          </Link>
+          <div className="aq-area" aria-label="Current area">
+            <span className="aq-area-code">AQ</span>
+            <span className="aq-area-label">Public product workspace</span>
           </div>
-          <div className="aq-workspace-pill">
-            <span className="aq-workspace-code">AQ</span>
-            <span>Public product workspace</span>
-          </div>
+          <PrimaryNav counts={navCounts} pathname={pathname} />
         </div>
-        <div className="aq-topbar-right">
+        <div className="aq-shell-actions">
           <div className="aq-actor-chip">
             <span className="aq-actor-name">Authenticated</span>
             <span className="aq-actor-meta">browser session</span>
@@ -251,8 +252,6 @@ export function AgenticQueueWebApp({ view }: AgenticQueueWebAppProps) {
           </Link>
         </div>
       </header>
-
-      <PrimaryNav counts={navCounts} pathname={pathname} />
 
       <section className="aq-content">
         {view === "pipelines" ? (
@@ -332,7 +331,7 @@ export function PrimaryNav({
   pathname: string;
 }) {
   return (
-    <nav className="aq-nav" aria-label="Primary">
+    <nav className="aq-tabs" aria-label="Primary">
       {NAV_ITEMS.map((item) => {
         const isActive =
           (item.href === "/pipelines" && pathname === "/") ||
@@ -343,12 +342,12 @@ export function PrimaryNav({
         return (
           <Link
             key={item.href}
-            className={isActive ? "aq-nav-link is-active" : "aq-nav-link"}
+            className={isActive ? "aq-tab is-active" : "aq-tab"}
             href={item.href}
           >
             <span>{item.label}</span>
             {typeof count === "number" ? (
-              <span className="aq-nav-count">{count}</span>
+              <span className="aq-tab-count">{count}</span>
             ) : null}
           </Link>
         );

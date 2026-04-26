@@ -128,7 +128,7 @@ test("keeps primary nav route-aware and settings anchored in the footer", async 
   for (const route of routes) {
     await page.goto(route.href);
     await expect(
-      page.locator(`.aq-nav-link.is-active[href="${route.href}"]`),
+      page.locator(`.aq-tab.is-active[href="${route.href}"]`),
     ).toHaveCount(1);
     await expect(
       page.getByRole("link", { name: /^Settings$/i }),

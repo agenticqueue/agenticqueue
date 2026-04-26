@@ -829,7 +829,7 @@ function FilterGroup<T extends string>({
             type="button"
           >
             <span>{option.label}</span>
-            <span className="aq-nav-count">{counts[option.value] ?? 0}</span>
+            <span className="aq-tab-count">{counts[option.value] ?? 0}</span>
           </button>
         ))}
       </div>
