@@ -8,6 +8,7 @@ import hmac
 import secrets
 import uuid
 from dataclasses import dataclass
+from typing import Literal
 
 import sqlalchemy as sa
 from fastapi.responses import JSONResponse
@@ -52,6 +53,17 @@ class AuthenticatedRequest:
     api_token: ApiTokenModel
 
 
+TokenAuthFailure = Literal["invalid", "revoked", "expired"]
+
+
+@dataclass(frozen=True)
+class ApiTokenAuthentication:
+    """Authentication result plus a non-secret denial reason."""
+
+    authenticated: AuthenticatedRequest | None
+    failure_reason: TokenAuthFailure | None
+
+
 class AuthenticationError(ValueError):
     """Raised when bearer authentication fails."""
 
@@ -83,6 +95,11 @@ def is_anonymous_path(path: str) -> bool:
     return path in ANONYMOUS_PATHS or any(
         path.startswith(prefix) for prefix in ANONYMOUS_PATH_PREFIXES
     )
+
+
+def is_mcp_path(path: str) -> bool:
+    """Return whether the request targets an HTTP-mounted MCP surface."""
+    return path == "/mcp" or path.startswith("/mcp/")
 
 
 def extract_bearer_token(authorization_header: str | None) -> str:
@@ -237,21 +254,21 @@ def _mark_token_last_used(
     )
 
 
-def authenticate_api_token(
+def inspect_api_token(
     session: Session,
     token_value: str,
     *,
     now: dt.datetime | None = None,
-) -> AuthenticatedRequest | None:
-    """Resolve a bearer token to an authenticated actor context."""
+) -> ApiTokenAuthentication:
+    """Resolve a bearer token and preserve safe failure state."""
     try:
         prefix, raw_secret = _parse_token(token_value)
     except AuthenticationError:
-        return None
+        return ApiTokenAuthentication(authenticated=None, failure_reason="invalid")
 
     token_hash = _hash_token_secret(raw_secret)
     if not hmac.compare_digest(prefix, _token_prefix_from_hash(token_hash)):
-        return None
+        return ApiTokenAuthentication(authenticated=None, failure_reason="invalid")
 
     statement = (
         sa.select(ApiTokenRecord, ActorRecord)
@@ -263,21 +280,34 @@ def authenticate_api_token(
     )
     row = session.execute(statement).first()
     if row is None:
-        return None
+        return ApiTokenAuthentication(authenticated=None, failure_reason="invalid")
 
     token_record, actor_record = row
     current_time = now or dt.datetime.now(dt.UTC)
     if token_record.revoked_at is not None:
-        return None
+        return ApiTokenAuthentication(authenticated=None, failure_reason="revoked")
     if token_record.expires_at is not None and token_record.expires_at <= current_time:
-        return None
+        return ApiTokenAuthentication(authenticated=None, failure_reason="expired")
 
     _mark_token_last_used(session, token_record.id, current_time)
 
-    return AuthenticatedRequest(
-        actor=ActorModel.model_validate(actor_record),
-        api_token=ApiTokenModel.model_validate(token_record),
+    return ApiTokenAuthentication(
+        authenticated=AuthenticatedRequest(
+            actor=ActorModel.model_validate(actor_record),
+            api_token=ApiTokenModel.model_validate(token_record),
+        ),
+        failure_reason=None,
     )
+
+
+def authenticate_api_token(
+    session: Session,
+    token_value: str,
+    *,
+    now: dt.datetime | None = None,
+) -> AuthenticatedRequest | None:
+    """Resolve a bearer token to an authenticated actor context."""
+    return inspect_api_token(session, token_value, now=now).authenticated
 
 
 def _unauthorized_response(detail: str) -> JSONResponse:
@@ -285,6 +315,13 @@ def _unauthorized_response(detail: str) -> JSONResponse:
         status_code=401,
         content=error_payload(status_code=401, message=detail),
         headers=WWW_AUTHENTICATE_HEADER,
+    )
+
+
+def _forbidden_response(detail: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=403,
+        content=error_payload(status_code=403, message=detail),
     )
 
 
@@ -303,13 +340,18 @@ class AgenticQueueAuthMiddleware(BaseHTTPMiddleware):
         request.state.db_session = session
         try:
             bearer_token = extract_bearer_token(request.headers.get("Authorization"))
-            authenticated = authenticate_api_token(session, bearer_token)
-            if authenticated is None:
+            inspected = inspect_api_token(session, bearer_token)
+            if inspected.authenticated is None:
                 session.rollback()
+                if (
+                    is_mcp_path(request.url.path)
+                    and inspected.failure_reason == "revoked"
+                ):
+                    return _forbidden_response("Bearer token revoked")
                 return _unauthorized_response("Invalid bearer token")
 
-            request.state.actor = authenticated.actor
-            request.state.api_token = authenticated.api_token
+            request.state.actor = inspected.authenticated.actor
+            request.state.api_token = inspected.authenticated.api_token
             response = await call_next(request)
             if session.is_active:
                 session.commit()
