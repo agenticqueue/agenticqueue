@@ -35,6 +35,20 @@ against it, and teardown drops it. If `agenticqueue.users` or
 or `testclient` after an e2e run, treat that as dev DB pollution and check that
 the suite used `apps/web/playwright.config.ts`, not a hand-started dev server.
 
+## AUTO_SETUP orphan admin actor recovery
+
+Older local demo paths could leave a stale `agenticqueue.actor` row with
+`handle='admin'` after the corresponding `agenticqueue.users` row was manually
+deleted. That state used to make `/setup` fail again because the actor handle is
+unique.
+
+Current bootstrap recovery preserves the stale actor for audit history by
+renaming it to `admin-archived-<timestamp>` and setting `is_active=false`, then
+creates a new active `admin` actor linked to the email submitted in `/setup`.
+If you are cleaning a local demo database, delete only the unwanted user row and
+rerun `/setup`; do not manually delete the actor row unless you are doing a full
+schema reset.
+
 ## Detecting partial state
 
 Start by comparing the database revision with the migration heads.

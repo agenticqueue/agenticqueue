@@ -63,6 +63,18 @@ uv run aq job list
 
 After setup, use the login screen with the email and password you created.
 
+## AUTO_SETUP and local recovery
+
+`AGENTICQUEUE_AUTO_SETUP=1` runs startup migrations for the bundled compose
+stack. The first real owner account is still created through `/setup` or the
+manual bootstrap endpoint, which returns the first API token once.
+
+If an older local demo or manual cleanup leaves a stale `actor` row with
+`handle='admin'` but no matching user, the next bootstrap archives that actor
+as `admin-archived-<timestamp>`, marks it inactive, and creates the new active
+admin actor for the email you submit. Do not delete actor rows by hand for this
+case; use `/setup` again after removing only the unwanted local user.
+
 ## Manual bootstrap variant
 
 If you prefer to run first-time setup through HTTP, call the bootstrap endpoint
