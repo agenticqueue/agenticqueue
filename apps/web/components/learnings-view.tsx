@@ -1,11 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import {
+  JobDetailPanel,
+  type JobDetailPanelJob,
+} from "@/components/job-detail-panel";
 
 type LearningScope = "task" | "project" | "global";
 type LearningStatus = "active" | "superseded" | "expired";
-type LearningTone = "ok" | "info" | "warn" | "danger" | "mute";
 
 type LearningItem = {
   id: string;
@@ -70,6 +80,10 @@ const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: "expired", label: "Expired" },
 ];
 
+const LEARNINGS_SEARCH_DEBOUNCE_MS = 300;
+const LEARNING_PANEL_CALLOUT =
+  "Mutation stays outside the UI. Use `aq learning promote`, `aq learning supersede`, or MCP for lifecycle changes.";
+
 export function LearningsView({ authToken }: LearningsViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,11 +95,12 @@ export function LearningsView({ authToken }: LearningsViewProps) {
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const focusReturnIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       setDebouncedQuery(query.trim());
-    }, 300);
+    }, LEARNINGS_SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timeout);
   }, [query]);
 
@@ -102,7 +117,7 @@ export function LearningsView({ authToken }: LearningsViewProps) {
         setSelectedId((current) =>
           current && payload.items.some((item) => item.id === current)
             ? current
-            : payload.items[0]?.id ?? null,
+            : null,
         );
       })
       .catch((requestError: unknown) => {
@@ -146,12 +161,89 @@ export function LearningsView({ authToken }: LearningsViewProps) {
     setSelectedId((current) =>
       current && filteredItems.some((item) => item.id === current)
         ? current
-        : filteredItems[0]?.id ?? null,
+        : null,
     );
   }, [filteredItems]);
 
-  const selectedItem =
-    filteredItems.find((item) => item.id === selectedId) ?? filteredItems[0] ?? null;
+  const selectedItem = useMemo(
+    () => filteredItems.find((item) => item.id === selectedId) ?? null,
+    [filteredItems, selectedId],
+  );
+
+  const selectedPanelJob = useMemo(
+    () => (selectedItem ? toLearningPanelJob(selectedItem) : null),
+    [selectedItem],
+  );
+
+  const closeSelectedItem = useCallback(() => {
+    const focusReturnId = focusReturnIdRef.current;
+    setSelectedId(null);
+
+    if (focusReturnId) {
+      window.requestAnimationFrame(() => {
+        document.getElementById(focusReturnId)?.focus();
+      });
+    }
+  }, []);
+
+  const selectItem = useCallback((itemId: string, focusReturnId?: string) => {
+    if (focusReturnId) {
+      focusReturnIdRef.current = focusReturnId;
+    }
+    setSelectedId(itemId);
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      if (event.key === "Escape") {
+        if (selectedId) {
+          event.preventDefault();
+          closeSelectedItem();
+        }
+        return;
+      }
+
+      if (
+        event.key !== "ArrowDown" &&
+        event.key !== "ArrowUp" &&
+        event.key !== "ArrowLeft" &&
+        event.key !== "ArrowRight"
+      ) {
+        return;
+      }
+
+      if (filteredItems.length === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      const currentIndex = selectedId
+        ? filteredItems.findIndex((item) => item.id === selectedId)
+        : -1;
+      const direction =
+        event.key === "ArrowUp" || event.key === "ArrowLeft" ? -1 : 1;
+      const nextIndex =
+        currentIndex === -1
+          ? direction < 0
+            ? filteredItems.length - 1
+            : 0
+          : (currentIndex + direction + filteredItems.length) %
+            filteredItems.length;
+      setSelectedId(filteredItems[nextIndex]?.id ?? null);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [closeSelectedItem, filteredItems, selectedId]);
 
   return (
     <div className="aq-learnings-view">
@@ -247,186 +339,53 @@ export function LearningsView({ authToken }: LearningsViewProps) {
         </div>
       ) : (
         <div className="aq-learnings-shell">
-          <section className="aq-learnings-table" aria-label="Learnings table">
-            <div className="aq-learnings-head aq-mono aq-mute">
-              <div>ref</div>
-              <div>title</div>
-              <div>scope</div>
-              <div>tier</div>
-              <div>confidence</div>
-              <div>last applied</div>
-              <div>status</div>
-            </div>
-
-            {filteredItems.map((item) => (
-              <button
-                className={`aq-learning-row ${
-                  selectedItem?.id === item.id ? "is-selected" : ""
-                }`}
-                data-testid={`learning-row-${item.ref}`}
-                key={item.id}
-                onClick={() => setSelectedId(item.id)}
-                type="button"
-              >
-                <div className="aq-learning-cell aq-mono">{item.ref}</div>
-                <div className="aq-learning-cell aq-learning-title">
-                  {item.title}
-                </div>
-                <div className="aq-learning-cell aq-mono">{item.scope}</div>
-                <div className="aq-learning-cell aq-mono">tier {item.tier}</div>
-                <div className="aq-learning-cell">
-                  <ToneChip
-                    label={item.confidence}
-                    tone={confidenceTone(item.confidence)}
-                  />
-                </div>
-                <div className="aq-learning-cell aq-mono">
-                  {formatTimestamp(item.last_applied)}
-                </div>
-                <div className="aq-learning-cell">
-                  <ToneChip label={item.status} tone={statusTone(item.status)} />
-                </div>
-              </button>
-            ))}
+          <section className="aq-knowledge-list" aria-label="Learnings list">
+            {filteredItems.map((item) => {
+              const rowId = learningRowElementId(item.ref);
+              return (
+                <button
+                  aria-pressed={selectedItem?.id === item.id}
+                  className={`aq-knowledge-row ${
+                    selectedItem?.id === item.id ? "is-selected" : ""
+                  }`}
+                  data-testid={`learning-row-${item.ref}`}
+                  id={rowId}
+                  key={item.id}
+                  onClick={() => selectItem(item.id, rowId)}
+                  type="button"
+                >
+                  <span className="aq-knowledge-ref aq-mono aq-mute">
+                    {item.ref}
+                  </span>
+                  <span className="aq-knowledge-title">{item.title}</span>
+                  <span className="aq-knowledge-meta aq-mono aq-mute">
+                    <span className="aq-knowledge-pipe">{item.scope}</span>
+                    <span className="aq-knowledge-sep">·</span>
+                    <span>tier {item.tier}</span>
+                    <span className="aq-knowledge-sep">·</span>
+                    <span>{item.confidence}</span>
+                  </span>
+                </button>
+              );
+            })}
           </section>
-
-          {selectedItem ? (
-            <aside className="aq-detail" data-testid="learning-detail">
-              <div className="aq-detail-head">
-                <div>
-                  <p className="aq-auth-kicker">Selected learning</p>
-                  <h2 className="aq-detail-title">{selectedItem.title}</h2>
-                </div>
-                <div className="aq-detail-status-row">
-                  <ToneChip
-                    label={`tier ${selectedItem.tier}`}
-                    tone={tierTone(selectedItem.tier)}
-                  />
-                  <ToneChip
-                    label={selectedItem.confidence}
-                    tone={confidenceTone(selectedItem.confidence)}
-                  />
-                  <ToneChip
-                    label={selectedItem.status}
-                    tone={statusTone(selectedItem.status)}
-                  />
-                </div>
-              </div>
-
-              <div className="aq-detail-ref aq-mono aq-mute">{selectedItem.ref}</div>
-
-              <div className="aq-detail-section">
-                <div className="aq-detail-section-label">Context</div>
-                <div className="aq-detail-copy">
-                  <p className="aq-detail-prose">
-                    <strong>What happened:</strong>{" "}
-                    {selectedItem.context.what_happened}
-                  </p>
-                  <p className="aq-detail-prose">
-                    <strong>What learned:</strong>{" "}
-                    {selectedItem.context.what_learned}
-                  </p>
-                  <p className="aq-detail-prose">
-                    <strong>Action rule:</strong>{" "}
-                    {selectedItem.context.action_rule}
-                  </p>
-                  <p className="aq-detail-prose">
-                    <strong>Applies when:</strong>{" "}
-                    {selectedItem.context.applies_when}
-                  </p>
-                  <p className="aq-detail-prose">
-                    <strong>Does not apply:</strong>{" "}
-                    {selectedItem.context.does_not_apply_when}
-                  </p>
-                </div>
-              </div>
-
-              <div className="aq-detail-section">
-                <div className="aq-detail-section-label">Evidence</div>
-                {selectedItem.evidence.length > 0 ? (
-                  <ul className="aq-detail-list">
-                    {selectedItem.evidence.map((entry) => (
-                      <li className="aq-mono" key={entry}>
-                        {entry}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="aq-detail-prose aq-mute">No evidence attached.</p>
-                )}
-              </div>
-
-              <div className="aq-detail-section">
-                <div className="aq-detail-section-label">Applied in</div>
-                {selectedItem.applied_in.length > 0 ? (
-                  <div className="aq-job-detail-relbuttons">
-                    {selectedItem.applied_in.map((entry) => (
-                      <Link
-                        className="aq-prop-link aq-mono"
-                        href={entry.href}
-                        key={entry.task_id}
-                      >
-                        {entry.ref}
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="aq-detail-prose aq-mute">
-                    No linked job cross-references.
-                  </p>
-                )}
-              </div>
-
-              <div className="aq-detail-section">
-                <div className="aq-detail-section-label">Properties</div>
-                <div className="aq-detail-props">
-                  <div className="aq-prop">
-                    <span className="aq-prop-k">Scope</span>
-                    <span className="aq-prop-v aq-mono">{selectedItem.scope}</span>
-                  </div>
-                  <div className="aq-prop">
-                    <span className="aq-prop-k">Tier</span>
-                    <span className="aq-prop-v aq-mono">
-                      {selectedItem.tier}
-                    </span>
-                  </div>
-                  <div className="aq-prop">
-                    <span className="aq-prop-k">Confidence</span>
-                    <span className="aq-prop-v aq-mono">
-                      {selectedItem.confidence}
-                    </span>
-                  </div>
-                  <div className="aq-prop">
-                    <span className="aq-prop-k">Status</span>
-                    <span className="aq-prop-v aq-mono">
-                      {selectedItem.status}
-                    </span>
-                  </div>
-                  <div className="aq-prop">
-                    <span className="aq-prop-k">Owner</span>
-                    <span className="aq-prop-v aq-mono">
-                      {selectedItem.owner ?? "unknown"}
-                    </span>
-                  </div>
-                  <div className="aq-prop">
-                    <span className="aq-prop-k">Review date</span>
-                    <span className="aq-prop-v aq-mono">
-                      {selectedItem.review_date ?? "n/a"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="aq-job-detail-callout">
-                <span className="aq-mono aq-mute">
-                  Mutation stays outside the UI. Use `aq learning promote`,
-                  `aq learning supersede`, or MCP for lifecycle changes.
-                </span>
-              </div>
-            </aside>
-          ) : null}
         </div>
       )}
+
+      {selectedItem && selectedPanelJob ? (
+        <JobDetailPanel
+          callout={LEARNING_PANEL_CALLOUT}
+          eyebrow="Selected learning"
+          job={selectedPanelJob}
+          onClose={closeSelectedItem}
+          onSelect={() => undefined}
+          open
+          pipelineName={`Learnings ${selectedItem.scope}`}
+          testId="learning-detail"
+        >
+          <LearningPanelSections item={selectedItem} />
+        </JobDetailPanel>
+      ) : null}
     </div>
   );
 }
@@ -523,44 +482,131 @@ function buildCounts(items: LearningItem[]) {
   };
 }
 
-function ToneChip({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: LearningTone;
-}) {
-  return <span className={`aq-tone aq-tone-${tone}`}>{label}</span>;
+function LearningPanelSections({ item }: { item: LearningItem }) {
+  return (
+    <>
+      <div className="aq-detail-section">
+        <div className="aq-detail-section-label">Context</div>
+        <div className="aq-detail-copy">
+          <p className="aq-detail-prose">
+            <strong>What happened:</strong> {item.context.what_happened}
+          </p>
+          <p className="aq-detail-prose">
+            <strong>What learned:</strong> {item.context.what_learned}
+          </p>
+          <p className="aq-detail-prose">
+            <strong>Action rule:</strong> {item.context.action_rule}
+          </p>
+          <p className="aq-detail-prose">
+            <strong>Applies when:</strong> {item.context.applies_when}
+          </p>
+          <p className="aq-detail-prose">
+            <strong>Does not apply:</strong> {item.context.does_not_apply_when}
+          </p>
+        </div>
+      </div>
+
+      <div className="aq-detail-section">
+        <div className="aq-detail-section-label">Evidence</div>
+        {item.evidence.length > 0 ? (
+          <ul className="aq-detail-list">
+            {item.evidence.map((entry) => (
+              <li className="aq-mono" key={entry}>
+                {entry}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="aq-detail-prose aq-mute">No evidence attached.</p>
+        )}
+      </div>
+
+      <div className="aq-detail-section">
+        <div className="aq-detail-section-label">Applied in</div>
+        {item.applied_in.length > 0 ? (
+          <div className="aq-job-detail-relbuttons">
+            {item.applied_in.map((entry) => (
+              <Link
+                className="aq-prop-link aq-mono"
+                href={entry.href}
+                key={entry.task_id}
+              >
+                {entry.ref}
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="aq-detail-prose aq-mute">
+            No linked job cross-references.
+          </p>
+        )}
+      </div>
+
+      <div className="aq-detail-section">
+        <div className="aq-detail-section-label">Properties</div>
+        <div className="aq-detail-props">
+          <div className="aq-prop">
+            <span className="aq-prop-k">Scope</span>
+            <span className="aq-prop-v aq-mono">{item.scope}</span>
+          </div>
+          <div className="aq-prop">
+            <span className="aq-prop-k">Tier</span>
+            <span className="aq-prop-v aq-mono">{item.tier}</span>
+          </div>
+          <div className="aq-prop">
+            <span className="aq-prop-k">Confidence</span>
+            <span className="aq-prop-v aq-mono">{item.confidence}</span>
+          </div>
+          <div className="aq-prop">
+            <span className="aq-prop-k">Status</span>
+            <span className="aq-prop-v aq-mono">{item.status}</span>
+          </div>
+          <div className="aq-prop">
+            <span className="aq-prop-k">Owner</span>
+            <span className="aq-prop-v aq-mono">{item.owner ?? "unknown"}</span>
+          </div>
+          <div className="aq-prop">
+            <span className="aq-prop-k">Review date</span>
+            <span className="aq-prop-v aq-mono">
+              {item.review_date ?? "n/a"}
+            </span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
 }
 
-function confidenceTone(confidence: string): LearningTone {
-  if (confidence === "validated") {
-    return "ok";
-  }
-  if (confidence === "confirmed") {
-    return "info";
-  }
-  return "warn";
+function toLearningPanelJob(item: LearningItem): JobDetailPanelJob {
+  return {
+    ref: item.ref,
+    title: item.title,
+    task_type: `learning-${item.scope}`,
+    status: item.status,
+    priority: item.tier,
+    labels: learningLabels(item),
+    description: item.context.what_learned,
+    claimed_by_actor_id: item.owner,
+    updated_at: item.last_applied,
+    parent_ref: null,
+    child_refs: [],
+    depends_on: [],
+    blocked_by: [],
+    blocks: [],
+  };
 }
 
-function statusTone(status: LearningStatus): LearningTone {
-  if (status === "active") {
-    return "ok";
-  }
-  if (status === "superseded") {
-    return "warn";
-  }
-  return "mute";
+function learningLabels(item: LearningItem) {
+  return [
+    `scope:${item.scope}`,
+    `tier:${item.tier}`,
+    `confidence:${item.confidence}`,
+    `status:${item.status}`,
+  ];
 }
 
-function tierTone(tier: 1 | 2 | 3): LearningTone {
-  if (tier === 3) {
-    return "ok";
-  }
-  if (tier === 2) {
-    return "info";
-  }
-  return "warn";
+function learningRowElementId(ref: string) {
+  return `aq-learning-row-${ref.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
 function formatTimestamp(value: string) {

@@ -124,6 +124,7 @@ test("renders the learnings browser and opens the detail panel", async ({ page }
   await expect(
     page.getByRole("heading", { level: 1, name: "Learnings" }),
   ).toBeVisible();
+  await expect(page.locator(".aq-knowledge-list")).toBeVisible();
 
   const rows = page.locator("[data-testid^='learning-row-']");
   await expect(rows.first()).toBeVisible();
@@ -139,10 +140,55 @@ test("renders the learnings browser and opens the detail panel", async ({ page }
 
   const detail = page.getByTestId("learning-detail");
   await expect(detail).toBeVisible();
+  await expect(page.locator(".aq-side-panel .aq-job-detail")).toBeVisible();
   await expect(detail.getByText("Evidence")).toBeVisible();
   await expect(detail.locator("li").first()).toBeVisible();
   await expect(detail.getByText("Applied in")).toBeVisible();
 
   await expect(detail.getByRole("button", { name: /^Promote$/i })).toHaveCount(0);
   await expect(detail.getByRole("button", { name: /^Supersede$/i })).toHaveCount(0);
+});
+
+test("learnings-side-panel opens shared job detail panel", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/learnings");
+
+  await expect(page.locator(".aq-knowledge-list")).toBeVisible();
+  await page.getByTestId("learning-row-lrn-a1111111").click();
+
+  const panel = page.locator(".aq-side-panel .aq-job-detail");
+  await expect(panel).toBeVisible();
+  await expect(panel).toHaveAttribute("data-testid", "learning-detail");
+  await expect(panel).toContainText("lrn-a1111111");
+  await expect(panel).toContainText("Evidence");
+  await expect(
+    panel.getByRole("button", { name: "Close job detail" }),
+  ).toBeVisible();
+
+  await page.addStyleTag({
+    content: "nextjs-portal { display: none !important; }",
+  });
+  await page.screenshot({
+    path: "test-results/learnings-1440x900-panel.png",
+  });
+});
+
+test("learnings-keyboard navigates the filtered list and closes panel", async ({
+  page,
+}) => {
+  await page.goto("/learnings");
+
+  await expect(page.locator(".aq-knowledge-list")).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("learning-detail")).toContainText(
+    "lrn-a1111111",
+  );
+
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("learning-detail")).toContainText(
+    "lrn-b2222222",
+  );
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".aq-side-panel")).toHaveCount(0);
 });

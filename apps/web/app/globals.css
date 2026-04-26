@@ -1481,7 +1481,6 @@ input {
 
 .aq-learnings-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(22rem, 0.95fr);
   gap: 1rem;
   align-items: start;
 }

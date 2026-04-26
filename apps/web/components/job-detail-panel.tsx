@@ -12,7 +12,8 @@ type JobDetailPanelState =
   | "blocked"
   | "done"
   | "active"
-  | "superseded";
+  | "superseded"
+  | "expired";
 
 type JobDetailPanelRelation = {
   ref: string;
