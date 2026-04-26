@@ -959,6 +959,26 @@ owner: "codex"
 review_date: "2026-05-24"
 ```
 
+### AQ-318: Wait for hydrated row state before proving global keyboard shortcuts
+
+```yaml
+title: "Global keyboard shortcut e2e checks need a visible hydrated row before sending keys"
+type: "test-behavior"
+what_happened: "The AQ-318 Work view keyboard e2e initially sent ArrowDown immediately after `page.goto('/work')`; the row data rendered later, so the one key event was lost before the Work view had selectable rows."
+what_learned: "For client-fetched shell views with window-level keyboard handlers, a visible row is the useful readiness signal. Waiting only for navigation can test a race in hydration/fetch timing instead of the intended shortcut behavior."
+action_rule: "When adding Playwright coverage for AgenticQueue shell keyboard shortcuts, wait for the first target row/control to be visible before sending global key events, and close modal side panels before clicking covered controls behind them."
+applies_when: "A Next.js shell view fetches data after load and registers window-level keyboard handlers for row navigation or panel control."
+does_not_apply_when: "The target shortcut is bound to a focused input/control that is already awaited directly before the keypress."
+evidence:
+  - "`pnpm --filter web test:e2e --grep work-keyboard-nav` failed before the readiness wait with no `.aq-job-detail` after ArrowDown."
+  - "`pnpm --filter web test:e2e --grep work-keyboard-nav` passed after waiting for `work-row-job-104` and closing the shared side panel before clicking a subtab."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-285: Pair route caching with a short client TTL cache for repeated shell navigations
 
 ```yaml
