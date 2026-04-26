@@ -8,8 +8,8 @@
 title: "Unit tests for env-setting helpers must register cleanup for every env var they set"
 type: "testing"
 what_happened: "AQ-330's new idempotency test deleted CI and called `prepare_pytest_database()` with the subprocess mocked, but it did not register cleanup for `AGENTICQUEUE_USE_TEST_DATABASE`. In GitHub Actions that leaked the test-database switch into later tests, so the suite tried to connect to `agenticqueue_test` after CI had only prepared the normal `agenticqueue` database."
-what_learned: "When a unit test calls a helper that writes environment variables directly, cleanup has to cover every variable the helper can mutate, not only the variables used by assertions. CI-only leaks can appear late in the suite because pytest keeps one process-wide environment across files."
-action_rule: "For tests around environment-mutating helpers, include every helper-owned env var in monkeypatch cleanup before invoking the helper, especially boolean switches that change config selection."
+what_learned: "When a unit test calls a helper that writes environment variables directly, cleanup has to cover every variable the helper can mutate, not only the variables used by assertions. CI-only leaks can appear late in the suite because pytest keeps one process-wide environment across files. For this helper, explicit `finally` cleanup was required; relying only on pre-call monkeypatch cleanup still left the switch visible to a later probe test."
+action_rule: "For tests around environment-mutating helpers, use explicit `finally` cleanup for every helper-owned env var after invoking the helper, especially boolean switches that change config selection."
 applies_when: "Testing AgenticQueue config or test-support helpers that call `os.environ[...] = ...`."
 does_not_apply_when: "The code under test receives an isolated env mapping and never mutates `os.environ`."
 evidence:
