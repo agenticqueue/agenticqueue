@@ -63,6 +63,7 @@ def test_explicit_dev_database_opt_out(monkeypatch) -> None:
 def test_prepare_pytest_database_is_process_idempotent(monkeypatch) -> None:
     calls = []
     for name in (
+        "AGENTICQUEUE_USE_TEST_DATABASE",
         "AGENTICQUEUE_DATABASE_URL",
         "DATABASE_URL",
         "AGENTICQUEUE_DATABASE_URL_TEST",
