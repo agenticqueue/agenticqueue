@@ -23,5 +23,8 @@ Use the stored token as bearer auth for the API, CLI, and MCP server:
 
 ```text
 Authorization: Bearer aq_live_...
-AQ_TOKEN=aq_live_...
+AGENTICQUEUE_TOKEN=aq_live_...
 ```
+
+See [MCP Clients](mcp-clients.md) for Codex, Claude Desktop, and Gemini MCP
+configuration snippets.
