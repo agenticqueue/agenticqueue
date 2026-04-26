@@ -2,6 +2,26 @@
 
 ## 2026-04-25
 
+### AQ-325: Alembic can disable route loggers before conflict handling
+
+```yaml
+title: "Bootstrap conflict logging must survive Alembic logger reconfiguration"
+type: "testing"
+what_happened: "AQ-325 fixed an orphan `actor(handle='admin')` bootstrap conflict to return 409, then the logging DoD exposed that Alembic `fileConfig` disables existing module loggers during migration setup. The route was returning the correct 409 with `uq_actor_handle` details, but the bootstrap logger did not emit until the route re-enabled it before the warning."
+what_learned: "When a route-level DoD requires logs after migrations have run, verify that Alembic has not disabled the module logger. If it has, a local logging fix may be safer than changing global Alembic logging behavior for a narrow route bug."
+action_rule: "For route tests that assert logs after `apply_database_migrations()`, check `logger.disabled` during debugging and either re-enable the route logger at the emission point or deliberately adjust Alembic logging config as its own scoped task."
+applies_when: "Testing AgenticQueue API routes in files whose fixtures call `apply_database_migrations()` before the route emits logs."
+does_not_apply_when: "The test does not run migrations or asserts only response payloads without any logging DoD."
+evidence:
+  - "`uv run pytest apps/api/tests/test_bootstrap_admin_race.py::test_409_logs_constraint_name -v` failed with an empty captured log before `_log_bootstrap_conflict()` re-enabled the logger, then passed after the local route fix."
+  - "`uv run pytest apps/api/tests/test_bootstrap_admin_race.py -v` passed with all five bootstrap race tests after the logging fix."
+scope: "project"
+confidence: "confirmed"
+status: "accepted"
+owner: "codex"
+review_date: "2026-04-26"
+```
+
 ### AQ-334: Pytest env leak can invalidate late CI database tests
 
 ```yaml
