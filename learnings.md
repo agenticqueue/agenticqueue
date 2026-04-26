@@ -2,6 +2,26 @@
 
 ## 2026-04-25
 
+### AQ-317: Side-panel screenshots should mock shell background calls and hide dev chrome
+
+```yaml
+title: "Side-panel screenshot tests should isolate product UI from dev-only chrome"
+type: "testing"
+what_happened: "AQ-317's first side-panel screenshot included the Next.js dev issue badge because the focused test did not mock shell health/nav-count requests and captured the dev server overlay along with the product panel."
+what_learned: "A HITL screenshot is evidence for the product surface, so focused UI artifact tests should mock the shell background reads they trigger and hide the Next.js dev portal before capturing the artifact."
+action_rule: "When a Playwright test writes a HITL screenshot from the Next dev server, route expected shell background APIs and hide `nextjs-portal` immediately before `page.screenshot()` so dev-only chrome does not pollute the artifact."
+applies_when: "Adding or updating AgenticQueue web Playwright screenshot artifacts under `apps/web/test-results`."
+does_not_apply_when: "The screenshot is intentionally documenting a dev overlay, a runtime error, or a browser-level failure state."
+evidence:
+  - "`pnpm --filter web test:e2e --grep pipelines-side-panel-open` regenerated `apps/web/test-results/pipelines-1440x900-side-panel.png` after nav-counts and health mocks plus the `nextjs-portal` screenshot hide."
+  - "The regenerated artifact was opened locally and shows the Pipelines side panel without the Next.js dev issue badge."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-315: Treat bootstrap token copy as cross-surface contract
 
 ```yaml
