@@ -1042,6 +1042,28 @@ owner: "codex"
 review_date: "2026-05-26"
 ```
 
+### AQ-335: Keep visual parity fixtures portable in CI
+
+```yaml
+title: "Visual parity tests must not depend on local design-bundle paths"
+type: "ci-contract"
+what_happened: "AQ-321 initially passed locally because the parity test loaded the design reference from a machine-local D:/ design bundle path. Main CI failed because Linux resolved that string under the checkout and could not find the file. The same push also failed pre-commit because generated manifest and comparison HTML artifacts lacked trailing newlines."
+what_learned: "If a Playwright test is part of the normal CI suite, every file it opens must live in the repo or be supplied through a documented env override. Local absolute paths are fine for one-off operator runs, but not as default test inputs."
+action_rule: "For committed visual parity tests, add the reference fixture under the test tree, keep any local path as an optional env override, and make generated text artifacts end with newlines before committing them."
+applies_when: "A screenshot, snapshot, or parity test reads a design reference, fixture bundle, or generated artifact."
+does_not_apply_when: "The test is explicitly marked manual-only and excluded from CI."
+evidence:
+  - "GitHub `test` run `24951477850` failed with `net::ERR_FILE_NOT_FOUND` for the D:/ design reference on Linux CI."
+  - "GitHub `pre-commit` run `24951477847` failed because `end-of-file-fixer` modified `apps/web/test-results/aq-321/manifest.json` and `apps/web/test-results/aq-321/index.html`."
+  - "`pnpm --filter web test:e2e --grep aq-321-parity` passed after the design HTML was copied into `apps/web/e2e/fixtures/aq-321/` and the spec defaulted to that fixture."
+  - "`uvx pre-commit run --all-files --show-diff-on-failure` passed after generated text artifacts included trailing newlines."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-26"
+```
+
 ### AQ-285: Pair route caching with a short client TTL cache for repeated shell navigations
 
 ```yaml
