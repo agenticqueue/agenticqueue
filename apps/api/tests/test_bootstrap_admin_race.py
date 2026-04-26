@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import io
 import logging
 import socket
 import threading
@@ -232,13 +231,13 @@ def test_response_parity_live_vs_testclient(
 
 
 def test_409_logs_constraint_name(
+    capsys: pytest.CaptureFixture[str],
     client: TestClient,
     session_factory: sessionmaker[Session],
 ) -> None:
     _seed_orphan_admin_actor(session_factory)
 
-    log_stream = io.StringIO()
-    handler = logging.StreamHandler(log_stream)
+    handler = logging.StreamHandler()
     handler.setLevel(logging.WARNING)
     previous_level = bootstrap_router.logger.level
     bootstrap_router.logger.addHandler(handler)
@@ -253,4 +252,4 @@ def test_409_logs_constraint_name(
         bootstrap_router.logger.setLevel(previous_level)
 
     assert response.status_code == 409
-    assert "uq_actor_handle" in log_stream.getvalue()
+    assert "uq_actor_handle" in capsys.readouterr().err
