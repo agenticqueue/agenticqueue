@@ -282,7 +282,9 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("renders pipeline sections and expands the inline DAG", async ({ page }) => {
+test("renders pipeline sections, expands the DAG, and opens job detail", async ({
+  page,
+}) => {
   await page.goto("/pipelines");
 
   await expect(
@@ -312,6 +314,8 @@ test("renders pipeline sections and expands the inline DAG", async ({ page }) =>
       "Writes are disabled here. Use `aq` or MCP for task actions.",
     ),
   ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".aq-side-panel")).toHaveCount(0);
 
   await page.getByRole("button", { name: /Pipelines \(completed\)/ }).click();
   await expect(

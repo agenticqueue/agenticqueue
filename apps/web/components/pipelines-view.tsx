@@ -1,6 +1,14 @@
 "use client";
 
-import { CSSProperties, startTransition, useEffect, useMemo, useState } from "react";
+import {
+  CSSProperties,
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { JobDetailPanel } from "@/components/job-detail-panel";
 
@@ -84,6 +92,11 @@ type PipelinesViewProps = {
   authToken: string;
 };
 
+type SelectedPipelineJob = {
+  pipelineId: string;
+  ref: string;
+};
+
 type JobLayout = {
   columns: Map<number, PipelineJob[]>;
   positions: Map<string, { x: number; y: number }>;
@@ -134,6 +147,57 @@ export function PipelinesView({ authToken }: PipelinesViewProps) {
     done: false,
   });
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [selectedJob, setSelectedJob] = useState<SelectedPipelineJob | null>(
+    null,
+  );
+  const focusReturnIdRef = useRef<string | null>(null);
+
+  const allPipelines = useMemo(
+    () => [...inProgress, ...completed],
+    [completed, inProgress],
+  );
+  const selectedPipeline = selectedJob
+    ? allPipelines.find((pipeline) => pipeline.id === selectedJob.pipelineId) ??
+      null
+    : null;
+  const selectedJobDetail =
+    selectedPipeline && selectedJob
+      ? selectedPipeline.tasks.find((job) => job.ref === selectedJob.ref) ?? null
+      : null;
+
+  const closeSelectedJob = useCallback(() => {
+    const focusReturnId = focusReturnIdRef.current;
+    setSelectedJob(null);
+
+    if (focusReturnId) {
+      window.requestAnimationFrame(() => {
+        document.getElementById(focusReturnId)?.focus();
+      });
+    }
+  }, []);
+
+  const selectJob = useCallback(
+    (pipelineId: string, ref: string, focusReturnId?: string) => {
+      if (focusReturnId) {
+        focusReturnIdRef.current = focusReturnId;
+      }
+      setSelectedJob({ pipelineId, ref });
+    },
+    [],
+  );
+
+  const selectRelatedJob = useCallback(
+    (ref: string) => {
+      if (!selectedPipeline) {
+        return;
+      }
+
+      if (selectedPipeline.tasks.some((job) => job.ref === ref)) {
+        setSelectedJob({ pipelineId: selectedPipeline.id, ref });
+      }
+    },
+    [selectedPipeline],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -176,6 +240,51 @@ export function PipelinesView({ authToken }: PipelinesViewProps) {
 
     return () => controller.abort();
   }, [authToken, reloadKey]);
+
+  useEffect(() => {
+    if (selectedJob && !selectedJobDetail) {
+      setSelectedJob(null);
+    }
+  }, [selectedJob, selectedJobDetail]);
+
+  useEffect(() => {
+    if (!selectedJob || !selectedPipeline) {
+      return;
+    }
+
+    const orderedJobs = [...selectedPipeline.tasks].sort(comparePipelineJobs);
+    if (orderedJobs.length === 0) {
+      return;
+    }
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeSelectedJob();
+        return;
+      }
+
+      if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") {
+        return;
+      }
+
+      event.preventDefault();
+      const currentIndex = Math.max(
+        orderedJobs.findIndex((job) => job.ref === selectedJob.ref),
+        0,
+      );
+      const direction = event.key === "ArrowRight" ? 1 : -1;
+      const nextIndex =
+        (currentIndex + direction + orderedJobs.length) % orderedJobs.length;
+      setSelectedJob({
+        pipelineId: selectedPipeline.id,
+        ref: orderedJobs[nextIndex].ref,
+      });
+    };
+
+    document.addEventListener("keydown", handleKeydown);
+    return () => document.removeEventListener("keydown", handleKeydown);
+  }, [closeSelectedJob, selectedJob, selectedPipeline]);
 
   const retryLoad = () => {
     setError(null);
@@ -240,7 +349,15 @@ export function PipelinesView({ authToken }: PipelinesViewProps) {
                       [pipeline.id]: !previous[pipeline.id],
                     }))
                   }
+                  onJobSelect={(ref, focusReturnId) =>
+                    selectJob(pipeline.id, ref, focusReturnId)
+                  }
                   pipeline={pipeline}
+                  selectedRef={
+                    selectedJob?.pipelineId === pipeline.id
+                      ? selectedJob.ref
+                      : null
+                  }
                 />
               ))}
             </div>
@@ -273,13 +390,31 @@ export function PipelinesView({ authToken }: PipelinesViewProps) {
                       [pipeline.id]: !previous[pipeline.id],
                     }))
                   }
+                  onJobSelect={(ref, focusReturnId) =>
+                    selectJob(pipeline.id, ref, focusReturnId)
+                  }
                   pipeline={pipeline}
+                  selectedRef={
+                    selectedJob?.pipelineId === pipeline.id
+                      ? selectedJob.ref
+                      : null
+                  }
                 />
               ))}
             </div>
           ) : null}
         </div>
       )}
+
+      {selectedPipeline && selectedJobDetail ? (
+        <JobDetailPanel
+          job={selectedJobDetail}
+          onClose={closeSelectedJob}
+          onSelect={selectRelatedJob}
+          open
+          pipelineName={selectedPipeline.name}
+        />
+      ) : null}
     </div>
   );
 }
@@ -396,11 +531,19 @@ function PipelineSection({
 
 type PipelineCardProps = {
   expanded: boolean;
+  onJobSelect: (ref: string, focusReturnId: string) => void;
   onToggle: () => void;
   pipeline: PipelineSummary;
+  selectedRef: string | null;
 };
 
-function PipelineCard({ expanded, onToggle, pipeline }: PipelineCardProps) {
+function PipelineCard({
+  expanded,
+  onJobSelect,
+  onToggle,
+  pipeline,
+  selectedRef,
+}: PipelineCardProps) {
   const hasTasks = pipeline.tasks.length > 0;
   const rowStyle = {
     "--accent": TONE_ACCENT[pipeline.tone],
@@ -480,7 +623,11 @@ function PipelineCard({ expanded, onToggle, pipeline }: PipelineCardProps) {
               {pipeline.tasks.length} jobs · edges from task relations
             </span>
           </div>
-          <PipelineDag pipeline={pipeline} />
+          <PipelineDag
+            onJobSelect={onJobSelect}
+            pipeline={pipeline}
+            selectedRef={selectedRef}
+          />
         </div>
       ) : null}
     </>
@@ -488,24 +635,16 @@ function PipelineCard({ expanded, onToggle, pipeline }: PipelineCardProps) {
 }
 
 type PipelineDagProps = {
+  onJobSelect: (ref: string, focusReturnId: string) => void;
   pipeline: PipelineSummary;
+  selectedRef: string | null;
 };
 
-function PipelineDag({ pipeline }: PipelineDagProps) {
-  const [selectedRef, setSelectedRef] = useState<string | null>(
-    pipeline.tasks[0]?.ref ?? null,
-  );
+function PipelineDag({ onJobSelect, pipeline, selectedRef }: PipelineDagProps) {
   const layout = useMemo(() => layoutJobs(pipeline.tasks), [pipeline.tasks]);
-  const selectedJob =
-    pipeline.tasks.find((job) => job.ref === selectedRef) ?? pipeline.tasks[0] ?? null;
-
-  useEffect(() => {
-    setSelectedRef((current) =>
-      current && pipeline.tasks.some((job) => job.ref === current)
-        ? current
-        : pipeline.tasks[0]?.ref ?? null,
-    );
-  }, [pipeline.tasks]);
+  const selectedJob = selectedRef
+    ? pipeline.tasks.find((job) => job.ref === selectedRef) ?? null
+    : null;
 
   return (
     <div className="aq-dag-shell">
@@ -554,6 +693,8 @@ function PipelineDag({ pipeline }: PipelineDagProps) {
               return null;
             }
 
+            const buttonId = jobCardElementId(pipeline.id, job.ref);
+
             return (
               <div
                 className="aq-dag-node"
@@ -561,8 +702,9 @@ function PipelineDag({ pipeline }: PipelineDagProps) {
                 style={{ left: position.x, top: position.y }}
               >
                 <JobCard
+                  buttonId={buttonId}
                   job={job}
-                  onClick={() => setSelectedRef(job.ref)}
+                  onClick={() => onJobSelect(job.ref, buttonId)}
                   selected={selectedJob?.ref === job.ref}
                 />
               </div>
@@ -570,30 +712,25 @@ function PipelineDag({ pipeline }: PipelineDagProps) {
           })}
         </div>
       </div>
-
-      {selectedJob ? (
-        <JobDetailPanel
-          job={selectedJob}
-          onSelect={setSelectedRef}
-          pipelineName={pipeline.name}
-        />
-      ) : null}
     </div>
   );
 }
 
 type JobCardProps = {
+  buttonId: string;
   job: PipelineJob;
   onClick: () => void;
   selected: boolean;
 };
 
-function JobCard({ job, onClick, selected }: JobCardProps) {
+function JobCard({ buttonId, job, onClick, selected }: JobCardProps) {
   const tone = jobStateTone(job.status);
 
   return (
     <button
+      aria-pressed={selected}
       className={`aq-jobcard aq-jobcard-${tone} ${selected ? "is-selected" : ""}`}
+      id={buttonId}
       onClick={onClick}
       type="button"
     >
@@ -610,6 +747,11 @@ function JobCard({ job, onClick, selected }: JobCardProps) {
       </div>
     </button>
   );
+}
+
+function jobCardElementId(pipelineId: string, ref: string) {
+  const stableRef = ref.replace(/[^a-zA-Z0-9_-]/g, "-");
+  return `aq-jobcard-${pipelineId}-${stableRef}`;
 }
 
 function layoutJobs(jobs: PipelineJob[]): JobLayout {

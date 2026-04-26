@@ -33,98 +33,126 @@ export type JobDetailPanelJob = {
 
 type JobDetailPanelProps = {
   job: JobDetailPanelJob;
+  onClose: () => void;
   onSelect: (ref: string) => void;
+  open: boolean;
   pipelineName: string;
 };
 
 export function JobDetailPanel({
   job,
+  onClose,
   onSelect,
+  open,
   pipelineName,
 }: JobDetailPanelProps) {
+  if (!open) {
+    return null;
+  }
+
+  const titleId = `aq-job-detail-title-${job.ref.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+
   return (
-    <article className="aq-job-detail">
-      <div className="aq-job-detail-head">
-        <div>
-          <p className="aq-auth-kicker">Selected job</p>
-          <h3 className="aq-job-detail-title">{job.title}</h3>
+    <div className="aq-side-panel is-open" onClick={onClose}>
+      <article
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="aq-job-detail"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <div className="aq-job-detail-head">
+          <div>
+            <p className="aq-auth-kicker">Selected job</p>
+            <h3 className="aq-job-detail-title" id={titleId}>
+              {job.title}
+            </h3>
+          </div>
+          <div className="aq-job-detail-status">
+            <ToneChip label={job.status} tone={jobStateTone(job.status)} />
+            <span className="aq-mono aq-job-detail-ref">{job.ref}</span>
+            <button
+              aria-label="Close job detail"
+              className="aq-detail-close"
+              onClick={onClose}
+              type="button"
+            >
+              x
+            </button>
+          </div>
         </div>
-        <div className="aq-job-detail-status">
-          <ToneChip label={job.status} tone={jobStateTone(job.status)} />
-          <span className="aq-mono aq-job-detail-ref">{job.ref}</span>
-        </div>
-      </div>
 
-      <p className="aq-job-detail-copy">
-        {job.description?.trim() ||
-          `This job belongs to ${pipelineName} and is visible here strictly for execution-chain inspection.`}
-      </p>
+        <p className="aq-job-detail-copy">
+          {job.description?.trim() ||
+            `This job belongs to ${pipelineName} and is visible here strictly for execution-chain inspection.`}
+        </p>
 
-      <div className="aq-job-detail-grid">
-        <div className="aq-job-detail-prop">
-          <span className="aq-job-detail-key">task type</span>
-          <span className="aq-job-detail-value aq-mono">{job.task_type}</span>
+        <div className="aq-job-detail-grid">
+          <div className="aq-job-detail-prop">
+            <span className="aq-job-detail-key">task type</span>
+            <span className="aq-job-detail-value aq-mono">{job.task_type}</span>
+          </div>
+          <div className="aq-job-detail-prop">
+            <span className="aq-job-detail-key">claimed by</span>
+            <span className="aq-job-detail-value aq-mono">
+              {formatActor(job.claimed_by_actor_id)}
+            </span>
+          </div>
+          <div className="aq-job-detail-prop">
+            <span className="aq-job-detail-key">updated</span>
+            <span className="aq-job-detail-value aq-mono">
+              {formatTimestamp(job.updated_at)}
+            </span>
+          </div>
+          <div className="aq-job-detail-prop">
+            <span className="aq-job-detail-key">priority</span>
+            <span className="aq-job-detail-value aq-mono">{job.priority}</span>
+          </div>
         </div>
-        <div className="aq-job-detail-prop">
-          <span className="aq-job-detail-key">claimed by</span>
-          <span className="aq-job-detail-value aq-mono">
-            {formatActor(job.claimed_by_actor_id)}
+
+        <div className="aq-job-detail-relations">
+          <RelationRow
+            label="parent"
+            onSelect={onSelect}
+            refs={job.parent_ref ? [job.parent_ref] : []}
+          />
+          <RelationRow
+            label="depends on"
+            onSelect={onSelect}
+            refs={job.depends_on.map((relation) => relation.ref)}
+          />
+          <RelationRow
+            label="blocked by"
+            onSelect={onSelect}
+            refs={job.blocked_by.map((relation) => relation.ref)}
+          />
+          <RelationRow
+            label="blocks"
+            onSelect={onSelect}
+            refs={job.blocks.map((relation) => relation.ref)}
+          />
+          <RelationRow
+            label="children"
+            onSelect={onSelect}
+            refs={job.child_refs}
+          />
+        </div>
+
+        {job.labels.length > 0 ? (
+          <div className="aq-job-detail-labels">
+            {job.labels.map((label) => (
+              <ToneChip key={label} label={label} tone="mute" />
+            ))}
+          </div>
+        ) : null}
+
+        <div className="aq-job-detail-callout">
+          <span className="aq-mono aq-mute">
+            Writes are disabled here. Use `aq` or MCP for task actions.
           </span>
         </div>
-        <div className="aq-job-detail-prop">
-          <span className="aq-job-detail-key">updated</span>
-          <span className="aq-job-detail-value aq-mono">
-            {formatTimestamp(job.updated_at)}
-          </span>
-        </div>
-        <div className="aq-job-detail-prop">
-          <span className="aq-job-detail-key">priority</span>
-          <span className="aq-job-detail-value aq-mono">{job.priority}</span>
-        </div>
-      </div>
-
-      <div className="aq-job-detail-relations">
-        <RelationRow
-          label="parent"
-          onSelect={onSelect}
-          refs={job.parent_ref ? [job.parent_ref] : []}
-        />
-        <RelationRow
-          label="depends on"
-          onSelect={onSelect}
-          refs={job.depends_on.map((relation) => relation.ref)}
-        />
-        <RelationRow
-          label="blocked by"
-          onSelect={onSelect}
-          refs={job.blocked_by.map((relation) => relation.ref)}
-        />
-        <RelationRow
-          label="blocks"
-          onSelect={onSelect}
-          refs={job.blocks.map((relation) => relation.ref)}
-        />
-        <RelationRow
-          label="children"
-          onSelect={onSelect}
-          refs={job.child_refs}
-        />
-      </div>
-
-      {job.labels.length > 0 ? (
-        <div className="aq-job-detail-labels">
-          {job.labels.map((label) => (
-            <ToneChip key={label} label={label} tone="mute" />
-          ))}
-        </div>
-      ) : null}
-
-      <div className="aq-job-detail-callout">
-        <span className="aq-mono aq-mute">
-          Writes are disabled here. Use `aq` or MCP for task actions.
-        </span>
-      </div>
-    </article>
+      </article>
+    </div>
   );
 }
 
