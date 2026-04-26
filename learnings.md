@@ -22,6 +22,26 @@ owner: "codex"
 review_date: "2026-05-25"
 ```
 
+### AQ-316: Literal class grep contracts need selector discipline and artifact tests last
+
+```yaml
+title: "Literal class grep contracts need selector discipline and artifact tests last"
+type: "repo-behavior"
+what_happened: "AQ-316 required exactly one ripgrep match for `.aq-header` and zero matches for old `.aq-topbar` / `.aq-nav` classes while also requiring Playwright DOM proof and a screenshot artifact. The first implementation used attribute selectors in CSS/tests to avoid extra literal hits, then kept one real `.aq-header` CSS selector so the required grep had the expected single line. A later Pipelines e2e run also cleaned Playwright's default `test-results` directory, so the header screenshot had to be regenerated after all other e2e checks."
+what_learned: "When a DoD uses literal ripgrep counts as an acceptance threshold, CSS selectors, test locators, and even absence assertions can accidentally change the evidence. Playwright screenshot artifacts in `test-results` are also short-lived because each run can clean that directory."
+action_rule: "For literal class-count DoDs, plan which file owns each literal selector, use non-literal attribute selectors for supporting responsive CSS/tests when needed, and run the artifact-producing Playwright test last. Do not run lint in parallel with Playwright when lint scans `test-results`."
+applies_when: "A frontend ticket uses ripgrep output as formal DoD evidence for class removal/addition, or stores required visual artifacts under Playwright `test-results`."
+does_not_apply_when: "The DoD accepts broad class-name matches or the artifact is written to a durable, non-cleaned directory."
+evidence:
+  - "`rg -n '\\.aq-header|\\.aq-topbar|\\.aq-nav' apps/web --glob '!*.next/**'` returned one line, `apps/web/app/globals.css:68:.aq-header {`, after the selector pass."
+  - "`pnpm --filter web test:e2e --grep shell-area-pill` regenerated `apps/web/test-results/shell-1440x900-header.png` after broader e2e checks had cleaned the earlier artifact."
+scope: "project"
+confidence: "confirmed"
+status: "active"
+owner: "codex"
+review_date: "2026-05-25"
+```
+
 ### AQ-310: Gate dev cache cleanup behind explicit dev mode
 
 ```yaml
